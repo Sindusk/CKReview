@@ -336,3 +336,44 @@ VOD checks, Pull 1 (nHavrDhPVtBYkMXA fight 43):
    Check the cyst spots against the in-game drops.
 5. Pull 1, 1:40-2:08: the Maelstrom; cysts vanish one by one as they pop.
    Check each pop's cyst and order.
+
+## The Twin Fangs
+
+Pull: Twin Fangs kill, Pull 2 (vRPGT4MN6VALQWFh fight 30, 5:35).
+
+Drawn:
+- **Caustic Globules**: a green droplet in a ring of red thorns (its
+  Barbed Bulwark) at each of the 15 spots per Deluge, until a player picks
+  it up or it bursts (17s). Each Bulwark is its own actor placed by one
+  sample, and a pickup is an Eternal Venom application from Vexhul on the
+  collector: the first Deluge's 15 pickups each stood 1.0-2.9y from a
+  Bulwark spot. The droplet flashes in its last 3s.
+- **Stone Breaker**: each impact as a 3y soak circle where its tank stood,
+  from the 1.5s cast.
+- **Ravenous Feast**: each bite's 14y split where its group stood, 1.5s
+  before it lands.
+- **Corrosive Spit**: a green 4y line (assumed width; the kill had no
+  unmarked victims) from each Spawn of Vexhul to its marked target for the
+  5s cast.
+- **Coiling Ichor**: a red ring on each carrier, then a Congealed Gore pool
+  where it ended, for two minutes (the journal's).
+
+Not drawn: Vile Flood's rotation (Vexhul's logged facing doesn't turn
+during the channel), Stir the Depths' waves, the Tainted Blood founts, the
+Noxious Slick.
+
+Open questions:
+- Where does a Stone Breaker impact sit: on the tank, or at a spot the tank
+  walks into (drawn where the tank stood when it landed)?
+- Where does each Feast bite land relative to Ithraz?
+
+VOD checks, Pull 2 (vRPGT4MN6VALQWFh fight 30):
+1. Pull 2, 0:11-0:20: fifteen globules with thorn rings, collected one by
+   one. Check the spots and that each vanishes as a player steps on it.
+2. Pull 2, 0:23-0:31: three Stone Breaker soaks. Check where each impact
+   was drawn in game.
+3. Pull 2, 0:37-0:47: green Spit lines from the Spawns to their targets.
+   Check the line width.
+4. Pull 2, 0:59-1:05: three Feast bites. Check where each bite landed.
+5. Pull 2, 0:43-0:49 and after: Coiling Ichor rings, then Gore pools.
+   Check the pool spots and how long they last.

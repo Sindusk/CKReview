@@ -263,6 +263,24 @@ function Tornado({ e, x, y, t }: EffectArtProps) {
 const SSZ_SURGE = ring({ color: "#9cff5a", glow: "#3f9e1a", motes: 4, spinMs: 2000 });
 const SSZ_VIRULENCE = ring({ color: "#d6ff3a", glow: "#7a9e00", motes: 6, spinMs: 900 });
 
+// ── The Twin Fangs ──
+
+/** A Caustic Globule under its Barbed Bulwark: a green droplet inside a ring of red thorns. */
+function Globule({ e, x, y, t }: EffectArtProps) {
+  const opacity = Math.max(0, Math.min(1, (t - e.start) / FADE_MS, (e.end - t) / 150));
+  if (opacity <= 0) return null;
+  const left = e.end - t;
+  const urgent = left < 3000 && left > 0;
+  return (
+    <g opacity={opacity} pointerEvents="none">
+      <circle cx={x} cy={y} r={9} fill="none" stroke="#c0283a" strokeWidth={1.5} strokeDasharray="2 2.5" />
+      <circle cx={x} cy={y} r={5.5} fill={urgent && Math.floor(t / 150) % 2 ? "#d6ff7a" : "#5fd13a"} stroke="#e4ffc8" strokeWidth={1} />
+    </g>
+  );
+}
+
+const TF_ICHOR = ring({ color: "#c0283a", glow: "#7a0f1c", motes: 4, spinMs: 2000 });
+
 // Shell Spin: Nama's target (sea green, three shells circling) and a stun (grey).
 const LE_SHELL = ring({ color: "#3fd6b0", glow: "#1a8f74", motes: 3, spinMs: 900 });
 const LE_STUN = ring({ color: "#d8d8d8", glow: "#7a7a7a", motes: 4, spinMs: 700 });
@@ -296,6 +314,8 @@ export const VA_ART: FightArt = {
     "va-sszorak-tornado": Tornado,
     "va-sszorak-surge": SSZ_SURGE,
     "va-sszorak-virulence": SSZ_VIRULENCE,
+    "va-twin-fangs-globule": Globule,
+    "va-twin-fangs-ichor": TF_ICHOR,
   },
   shapes: {
     "va-entombed-sentinels-pool": BloodPool,
@@ -305,6 +325,7 @@ export const VA_ART: FightArt = {
     "va-nekzali-cultist": pool("#3a1f5e", "#9b6bff"),
     "va-nymrissa-frost": pool("#7fc8f0", "#e8f8ff"),
     "va-sszorak-residue": pool("#4a6b12", "#a8d43a"),
+    "va-twin-fangs-gore": pool("#5e0d16", "#b0283a"),
   },
   colors: {
     "va-vashnik-bile": VASHNIK_BILE,
@@ -324,5 +345,7 @@ export const VA_ART: FightArt = {
     // Raging Crosswinds holders, by the pair whose Gusts clear each other.
     "va-sszorak-wind-a": { fill: "#e0e8f0", flash: "#ffffff", rim: "#ffffff", glow: "#9fb4c8" },
     "va-sszorak-wind-b": { fill: "#7fe0d0", flash: "#d0fff8", rim: "#e8fffb", glow: "#2fa597" },
+    // Corrosive Spit: Vexhul's acid line.
+    "va-twin-fangs-spit": { fill: "#8fe03a", flash: "#d8ff9a", rim: "#eaffc8", glow: "#4a9e1a" },
   },
 };
