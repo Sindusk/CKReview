@@ -83,6 +83,31 @@ row, its Open list, the job header and the STATUS.md entry together.
   `wrong`. The user wants to go through them one by one in a later
   session: bring them one job at a time with the evidence (pull, MM:SS,
   numbers), per the plan.
+
+  **Progress (2026-10-18), `wrong` rows first; review only, no building:**
+  - Decided: every DoT clipping row `superseded` (ast, sch, sge, whm,
+    brd, blm ×2, sam, drg, core); Astrologian Draw ×2, Dancer timely
+    Devilment, Black Mage old AoEs, Bard Quick Nock and Black Mage Ice
+    Mage back to `candidate` (each row holds its evidence and build
+    direction); Red Mage Grand Impact module `wrong`; Gunbreaker
+    Gnashing Fang adjust `superseded`.
+  - **Resume here:** four rows the user asked to have explained, with the
+    explanation now in each row; get their decision (recommended
+    `wrong`): `drk/BloodWeapon/expected-gcds`,
+    `rdm/MeleeCombos/delay-combo`,
+    `blm/RotationWatchdog/FlareStarUsage/suggestion`,
+    `sam/ReadyProcs/overwritten`.
+  - Not yet brought: `blm/Gauge/dropped-enochian` (the `unverifiable`
+    proposal; a 7.1 Black Mage is now on disk, rFQT8XZckzvH1LNx),
+    `drg/Debuffs/applied-into-invuln`, `gnb/SonicBreak/missing-ticks`,
+    `mch/YassQueen/missing-collider`, `mnk/Brotherhood/drift` and
+    `missed-window`, `rdm/Manafication/gcd-count`,
+    `sam/Combos/meikyo-cast-breaker`, `smn/Aetherflow/extra-ruin3`,
+    `smn/Slipstream/missed-ticks`, `vpr/SerpentsIre/expected-actions`.
+    Then the `no-damage` rows.
+  - Naming: FF sample pulls are numbered per boss among the pulls on
+    disk (FFLogs fight 16 of qjCMx4bRfgNKwX9T is Pull 4); give the
+    user that number, with the fight id where it helps.
 - ~~xivanalysis pages for the checks built 2026-10-18~~: supplied and
   matched the same day (Bard ×2, Dancer, Black Mage, Viper ×2,
   Astrologian ×2, Black Mage 7.1 ×4; see each ledger row). Pages are in
