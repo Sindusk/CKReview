@@ -111,6 +111,58 @@ const GAZE_SHOW_MS = 5000;
 const GRAVITATIONAL_WAVE = 47793, INTEMPERATE_WILL = 47794;
 const HALF_ROOM: Record<number, number> = { [GRAVITATIONAL_WAVE]: 270, [INTEMPERATE_WILL]: 90 };
 
+// ── P2 Kefka: Forsaken, Trines (forsaken.ts) ────────────────────────────────
+
+// Forsaken (47804): sixteen towers in eight pairs on the r=8 ring, soaked
+// two each (The Path of Light 47806 on the soakers). Each soaker's spell
+// (1005084 stack, 1005085 circle, 1005086 cone; forsaken.ts) is planted
+// where they soak and fires ~0.6s later: Spelldriver 47808 (a 5y stack),
+// Spellscatter 47809 (5y on the holder), Spellwave 47810 (a cone at the
+// nearest player; thaliak: "a close spread ... about 90°"). The follow-ups'
+// helpers log stale spots ((99.3, 87.7) at 4:11.4 in fight 10, the
+// Paladin's plant at (104.5, 104.7)), so they're drawn from the soak.
+// When each tower pair appears isn't logged; the replay shows it from the
+// previous pair's resolution (the first from Forsaken's cast), a VOD check.
+const FORSAKEN = 47804, PATH_OF_LIGHT = 47806;
+const SPELLDRIVER = 47808, SPELLSCATTER = 47809, SPELLWAVE = 47810;
+const SPELL_OF: Record<number, number> = { 1005084: SPELLDRIVER, 1005085: SPELLSCATTER, 1005086: SPELLWAVE };
+const SPELLWAVE_ANGLE = 90;
+const TOWER_SET_GAP_MS = 15000;
+
+// Future's End / Past's End (47826 / 47827): Kefka and three clones jump
+// on the four nearest players (47830-47833), then All Things Ending
+// (47836 after Future's, 47837 after Past's) cleaves half the room in
+// front of each (Future) or behind (Past) (thaliak). Fight 10: Future's
+// End 4:19.8 then 47836 at 4:31.0, every caster facing N-ish (3-12°) with
+// the party south; Past's End 5:02.0 then 47837 at 5:13.1 facing N
+// (344-10°) with the party north. The clones are actors 17.x.
+const FUTURES_END = 47826, PASTS_END = 47827;
+const ENDS_JUMPS = [47830, 47831, 47832, 47833];
+const ENDS_CLEAVES: Record<number, "future" | "past"> = { 47836: "future", 47837: "past" };
+
+// Trine (47839): three sets of triangles descend; their tips (47840, 6y)
+// explode 12s later in spawn order (thaliak; fight 10 6:07.4, 6:09.4,
+// 6:11.4). The tip helpers are reused between sets and log a position
+// only at some casts, so a tip is drawn only from a sample at its own
+// explosion that sits on the triangle grid (x every 8.66y, y every 5y
+// from the centre); fight 10's first set has none, fight 5's third none.
+const TRINE = 47840;
+const TRINE_SHOW_MS = 12000;
+const TRINE_GRID = { x: 866, y: 500, snap: 60 };
+
+// Wings of Destruction's half-room (thaliak: "one of Kefka's wings glows
+// and cleaves that half"): an 80x40 rect in the data, drawn from Kefka
+// along his facing it covered the north half with players in it. The id
+// says the wing: 47822 = right (fight 10 6:01.7, facing N, all eight west
+// of x=98), 47821 = left (fight 5 6:01.6, facing N, all eight east of
+// x=101). So the rect runs from Kefka to his right or left, shown through
+// the 3.7s cast while the wing glows.
+const WING_RIGHT = 47822, WING_LEFT = 47821;
+
+// Aero III Assault (50167): a knockback from the middle on everyone, then
+// Down for the Count (thaliak); 2.7s cast, 40y in the data.
+const AERO_ASSAULT = 50167;
+
 const OVERRIDES: Record<number, Override> = {
   // Revolting Ruin III, both hits: a 90° tankbuster cone (user, VOD review
   // 2026-10-17). The game data has the cone but not its angle.
@@ -132,8 +184,8 @@ const OVERRIDES: Record<number, Override> = {
   [THUNDER_REAL]: { style: "lightning" },
   // Flagrant Fire III: two role stacks (47779) or eight spreads (47778).
   [FIRE_STACK]: { style: "stack" },
-  // Towers whose rows carry no omen to say so.
-  47806: { style: "tower" },   // The Path of Light (Forsaken)
+  // Towers whose rows carry no omen to say so (Forsaken's The Path of
+  // Light 47806 is drawn by forsakenShapes).
   47939: { style: "tower" }, 47940: { style: "tower" }, 47941: { style: "tower" },  // Celestriad
   // Wave Cannon's towers: one soaker each (phase1.ts).
   47786: { style: "tower", soakers: 1 },
@@ -149,6 +201,20 @@ const OVERRIDES: Record<number, Override> = {
   [GRAVITATIONAL_WAVE]: { hidden: true }, [INTEMPERATE_WILL]: { hidden: true },
   // Drawn by arrowShapes as sigils.
   [TELE_DROP]: { hidden: true },
+  // P2. Ultimate Embrace: a tankbuster shared with the other tank.
+  49740: { style: "tankbuster" },
+  // Forsaken's towers and planted spells: forsakenShapes.
+  [PATH_OF_LIGHT]: { hidden: true },
+  [SPELLDRIVER]: { hidden: true }, [SPELLSCATTER]: { hidden: true }, [SPELLWAVE]: { hidden: true },
+  // All Things Ending: half the room, in front (Future's End) or behind
+  // (Past's). With no angle the cones were 90°, and Past's drew in front:
+  // 6-8 players inside at 5:13.0-5:13.2 in fight 10, none hit.
+  47836: { angle: 180 }, 47837: { angle: 180, flip: true },
+  // Trine tips: trineShapes. Wings of Destruction's half-room: wingShapes;
+  // then 7y tankbusters on the nearest and farthest (47823).
+  [TRINE]: { hidden: true },
+  [WING_RIGHT]: { hidden: true }, [WING_LEFT]: { hidden: true },
+  47823: { style: "tankbuster" },
 };
 
 /**
@@ -163,6 +229,15 @@ const HEAD_MARKERS: Record<number, HeadMarkerDef> = {
   // 127: the spread marker, on all eight (yBKPqGwHparm7Tk4 fight 5, 0:33.0
   // -> Flagrant Fire III spreads 0:38.9).
   127: { label: "Spread", abilities: [FIRE_SPREAD, FIRE_STACK] },
+  // P2. 259: Ultimate Embrace's tank marker (fight 10 3:36.7 -> 3:41.7).
+  259: { label: "Shared tank buster", abilities: [49740] },
+  // Forsaken's spell markers, shown as each spell is handed out; they
+  // match the holder's status in every case of fight 10 (8 / 12 / 12):
+  // 715 stack, 716 circle, 717 cone. Labelled until the holder's next
+  // soak or spell, else 5s.
+  715: { label: "Stack", abilities: [PATH_OF_LIGHT, SPELLDRIVER] },
+  716: { label: "Circle", abilities: [PATH_OF_LIGHT, SPELLSCATTER] },
+  717: { label: "Cone", abilities: [PATH_OF_LIGHT, SPELLWAVE] },
   // The ring markers on Kefka (ringEffects draws the rings).
   ...Object.fromEntries(Object.keys(RINGS).map((id) => [id, { label: "Mystery Magic", abilities: RING_RESOLVE }])),
 };
@@ -284,6 +359,118 @@ function arrowShapes(data: ReplayData): AoeShape[] {
   return out;
 }
 
+function forsakenShapes(data: ReplayData): AoeShape[] {
+  const casts = data.enemyCasts ?? [];
+  const hits = data.enemyHits ?? [];
+  const auras = data.playerAuras ?? [];
+  const geo = data.actionGeometry ?? {};
+  const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  const out: AoeShape[] = [];
+  const forsaken = casts.filter((c) => c[4] === FORSAKEN && c[3] === 0).map((c) => c[0]);
+  // Towers: each Path of Light cast at its helper (it logs a sample there).
+  const towers = casts.filter((c) => c[4] === PATH_OF_LIGHT && c[3] === 0);
+  const r = (geo[PATH_OF_LIGHT]?.range ?? 4) * 100;
+  for (const c of towers) {
+    const h = hits.find((x) => x[1] === PATH_OF_LIGHT && x[2] === c[1] && Math.abs(x[0] - c[0]) < 1000 && x[4] !== null);
+    const p = h ? { x: h[4]!, y: h[5]! } : actorByKey.get(c[1]) && poseAt(actorByKey.get(c[1])!, c[0]);
+    if (!p) continue;
+    const prev = towers.filter((o) => o[0] < c[0] - 2000 && c[0] - o[0] < TOWER_SET_GAP_MS).pop()?.[0];
+    const first = forsaken.filter((t) => t < c[0] && c[0] - t < TOWER_SET_GAP_MS).pop();
+    const start = prev ?? first ?? c[0] - 3000;
+    out.push({ ...blank, kind: "circle", x: p.x, y: p.y, range: r, style: "tower", soakers: 2, name: "The Path of Light", start, resolve: c[0] });
+  }
+  // Planted spells: each soaker's spell, at their soak spot. The spell's
+  // status runs out as it's planted (0.6s after the tower in fight 10);
+  // a soak's own Path of Light hit is sometimes missing or late, so the
+  // spot is that hit's when there is one, else the player's.
+  for (const [, end, key, status] of auras) {
+    const id = SPELL_OF[status];
+    const fire = id && casts.find((c) => c[4] === id && c[3] === 0 && Math.abs(c[0] - end) <= 1500);
+    if (!id || !fire) continue;
+    const h = hits.find((x) => x[1] === PATH_OF_LIGHT && x[3] === key && x[0] >= end - 2000 && x[0] <= end + 500 && x[6] !== null);
+    const player = actorByKey.get(key);
+    const pp = player && poseAt(player, end - 600);
+    const at = h ? { x: h[6]!, y: h[7]! } : pp;
+    if (!at) continue;
+    const range = (geo[id]?.range ?? 5) * 100;
+    const land = hits.filter((x) => x[1] === id && x[0] >= fire[0] && x[0] - fire[0] < 1500);
+    const base = { ...blank, x: at.x, y: at.y, range, name: data.abilityNames?.[id] ?? fire[2], start: Math.min(end - 600, fire[0] - 300), resolve: fire[0] };
+    if (id === SPELLWAVE) {
+      // Aimed at its victim: the Spellwave hit nearest the plant.
+      const v = land.filter((x) => x[6] !== null).sort((a, b) => Math.hypot(a[6]! - at.x, a[7]! - at.y) - Math.hypot(b[6]! - at.x, b[7]! - at.y))[0];
+      if (!v) continue;
+      const bearing = (Math.atan2(v[6]! - at.x, -(v[7]! - at.y)) * 180 / Math.PI + 360) % 360;
+      out.push({ ...base, kind: "cone", bearing, angle: SPELLWAVE_ANGLE, estimated: true, style: "aoe" });
+    } else {
+      out.push({ ...base, kind: "circle", style: id === SPELLDRIVER ? "stack" : "aoe" });
+    }
+  }
+  return out;
+}
+
+function trineShapes(data: ReplayData): AoeShape[] {
+  const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  const range = (data.actionGeometry?.[TRINE]?.range ?? 6) * 100;
+  const out: AoeShape[] = [];
+  for (const c of data.enemyCasts ?? []) {
+    if (c[4] !== TRINE || c[3] !== 0) continue;
+    const s = actorByKey.get(c[1])?.samples.find((x) => Math.abs(x[0] - c[0]) <= 300);
+    if (!s) continue;
+    const gx = (s[1] - CENTRE.x) / TRINE_GRID.x, gy = (s[2] - CENTRE.y) / TRINE_GRID.y;
+    if (Math.abs(gx - Math.round(gx)) * TRINE_GRID.x > TRINE_GRID.snap || Math.abs(gy - Math.round(gy)) * TRINE_GRID.y > TRINE_GRID.snap) continue;
+    out.push({ ...blank, kind: "circle", x: s[1], y: s[2], range, style: "dm-trine", name: "Trine", start: c[0] - TRINE_SHOW_MS, resolve: c[0] });
+  }
+  return out;
+}
+
+function wingShapes(data: ReplayData): AoeShape[] {
+  const casts = data.enemyCasts ?? [];
+  const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  const out: AoeShape[] = [];
+  for (const c of casts) {
+    if ((c[4] !== WING_RIGHT && c[4] !== WING_LEFT) || c[3] !== 0) continue;
+    const boss = actorByKey.get(c[1]);
+    const p = boss && poseAt(boss, c[0]);
+    const g = data.actionGeometry?.[c[4]];
+    if (!p || !g) continue;
+    const begin = casts.find((b) => b[4] === c[4] && b[1] === c[1] && b[3] > 0 && Math.abs(b[0] + b[3] - c[0]) < 800);
+    const facing = ((((p.facing * 180) / Math.PI / 100 + 90) % 360) + 360) % 360;
+    out.push({ ...blank, kind: "rect", x: p.x, y: p.y, bearing: (facing + (c[4] === WING_RIGHT ? 90 : 270)) % 360,
+      range: g.range * 100, width: g.width * 100, style: "aoe", name: c[2], start: begin?.[0] ?? c[0] - 300, resolve: c[0] });
+  }
+  return out;
+}
+
+function aeroShapes(data: ReplayData): AoeShape[] {
+  return (data.enemyCasts ?? []).filter((c) => c[4] === AERO_ASSAULT && c[3] > 0).map((c) => ({
+    ...blank, kind: "circle" as const, x: CENTRE.x, y: CENTRE.y, range: ARENA_R, style: "knockback", name: c[2], start: c[0], resolve: c[0] + c[3],
+  }));
+}
+
+/** Future's / Past's End: the clones and Kefka from their jump to All Things Ending, cleave side marked. */
+function endsEffects(data: ReplayData): CasterEffect[] {
+  const casts = data.enemyCasts ?? [];
+  const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  const out: CasterEffect[] = [];
+  for (const c of casts) {
+    const side = c[3] === 0 ? ENDS_CLEAVES[c[4] ?? 0] : undefined;
+    const a = side && actorByKey.get(c[1]);
+    if (!side || !a) continue;
+    const jump = casts.filter((j) => j[1] === c[1] && ENDS_JUMPS.includes(j[4] ?? 0) && j[0] < c[0] && c[0] - j[0] < 15000).pop();
+    const begin = casts.filter((j) => (j[4] === FUTURES_END || j[4] === PASTS_END) && j[3] > 0 && j[0] < c[0] && c[0] - j[0] < 25000).pop();
+    const s = a.samples.reduce<(typeof a.samples)[number] | undefined>((b, x) => (!b || Math.abs(x[0] - c[0]) < Math.abs(b[0] - c[0]) ? x : b), undefined);
+    if (!s || !jump) continue;
+    const boss = a.kind === "enemy" && a.samples.length > 50;
+    out.push({
+      kind: side === "future" ? "dm-future" : "dm-past",
+      label: boss ? (side === "future" ? "Future's End: cleaves in front" : "Past's End: cleaves behind") : "",
+      actor: a.key, x: s[1], y: s[2],
+      start: boss && begin ? begin[0] : jump[0], end: c[0],
+    });
+  }
+  return out;
+}
+
 function halfRoomShapes(data: ReplayData): AoeShape[] {
   return (data.enemyCasts ?? []).filter((c) => c[3] === 0 && HALF_ROOM[c[4] ?? 0] !== undefined).map((c) => ({
     ...blank, kind: "cone" as const, x: CENTRE.x, y: CENTRE.y, bearing: HALF_ROOM[c[4]!], angle: 180, range: ARENA_R + 500,
@@ -299,6 +486,9 @@ export const DANCING_MAD_REPLAY: FightReplay = {
   overrides: OVERRIDES,
   headMarkers: HEAD_MARKERS,
   tethers: TETHERS,
-  effects: (data) => [...ringEffects(data), ...gazeEffects(data)],
-  shapes: (data) => [...trapShapes(data), ...wellShapes(data), ...arrowShapes(data), ...halfRoomShapes(data)],
+  effects: (data) => [...ringEffects(data), ...gazeEffects(data), ...endsEffects(data)],
+  shapes: (data) => [
+    ...trapShapes(data), ...wellShapes(data), ...arrowShapes(data), ...halfRoomShapes(data),
+    ...forsakenShapes(data), ...trineShapes(data), ...wingShapes(data), ...aeroShapes(data),
+  ],
 };

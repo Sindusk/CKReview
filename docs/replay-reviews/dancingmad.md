@@ -92,3 +92,67 @@ so stacks and spreads read as "hit 8, drawn 4". What's left is expected:
    circles at 0:38.9. Do the spread markers show on all eight?
 2. **1:42.2 and 1:55.3:** two Gravitational Waves, both on the west half
    (everyone stood east both times). Right half for the second one too?
+
+## Phase 2: Kefka, Forsaken and Trines (3:29 to 7:09)
+
+Looks from thaliak.com/ultimates/umad; the mechanics from forsaken.ts.
+
+### What's drawn
+
+| Mechanic | How |
+|---|---|
+| Ultimate Embrace | Purple shared tankbuster; marker 259 reads "Shared tank buster". |
+| Forsaken towers | Now built in the spec: each pair of 4y towers (soaker count 2) at its helper's spot, from the previous pair's resolution (the first pair from Forsaken's cast at 3:56.9). Their rows have no omen, so they drew only as they resolved. |
+| Forsaken spell markers | 715 "Stack", 716 "Circle", 717 "Cone": they match the holder's status 32 of 32 times in Pull 9. The label stays until the holder's next soak, else 5s. |
+| Spelldriver / Spellscatter / Spellwave | Now built in the spec: planted at the soaker's spot as their status runs out, until they fire ~0.6s later. Stack orange, circle red, cone a 90° cone at the player it hit. The helpers casting them log stale spots ((99.3, 87.7) at 4:11.4 while the plant was at (104.5, 104.7)). |
+| Future's End / Past's End | New cue: a ghost ring on each clone and a red half-disc on the side All Things Ending will cleave (front for Future's, behind for Past's), from the jump until the cleave; the text under Kefka says which. |
+| All Things Ending | 180° cones; Past's End's (47837) flipped behind. With no angle they drew 90°, and Past's drew in front over six to eight players who took nothing. Now exact in both kills (16 of 16 each). |
+| Trine | Now built in the spec: each tip a 6y gold ring with a turning triangle for 12s before it explodes, filling in over its last 2s. Only tips whose helper logged a position at its own explosion are drawn: the helpers are reused between sets. Pull 9's first set and Pull 5's third set have none. |
+| Wings of Destruction | Half-room: the 80×40 rect now runs from Kefka to his right (47822) or left (47821) through the 3.7s cast. Drawn along his facing it covered the north half, with players in it. Then purple 7y tankbusters on the nearest and farthest. |
+| Aero III Assault | New: a pale blue knockback from the middle through its 2.7s cast. Its 40y range made the engine skip it as raidwide. |
+
+### Fit check after the changes
+
+All Things Ending, Trine, Ultimate Embrace and Wings' half-room are exact.
+Spellwave's 90° cone catches a second player twice in Pull 9 (4:10.8,
+4:52.9) and is otherwise exact, so the angle may be a little narrower. The
+towers, Future's End and the spells read "hit 4, drawn 2" (one shape per
+target, compared with every hit of the same name). Aero III Assault has
+everyone inside and no hit: it's a knockback.
+
+### Couldn't find out / not drawn
+
+- **When each tower pair appears:** not logged.
+- **Trine's triangles:** only the tips are drawn, and Pull 9's first set
+  (6:07.4) isn't drawn at all.
+- **The wing's glow** on Kefka isn't drawn; the half it cleaves shows instead.
+- **Light of Judgment** (5:43.3) and the enrage are raidwide: not drawn.
+
+### VOD checks: Pull 9 (2T1HzdPKgbhM43am)
+
+1. **3:57 to 4:10:** the first tower pair (SE and NE of the middle) shows
+   from Forsaken's cast. When do the towers appear in game, and are all
+   sixteen visible at once?
+2. **3:58.6:** "Stack" over the Paladin and Dragoon, "Circle" over three,
+   "Cone" over three. Do the in-game markers match those spells?
+3. **4:10.8:** Spellwave from the Black Mage's spot toward the Sage, drawn
+   as a 90° cone. How wide is the cone in game?
+4. **4:13.4 to 4:31.0:** Future's End: the clones' half-discs face north
+   (the cleave side) with the party south. Do the clones face that way,
+   and does the game show any telegraph for All Things Ending?
+5. **5:08.0 to 5:13.1:** Past's End: the half-discs sit behind the clones
+   (south) with the party north. Right side?
+6. **5:57.7 to 6:01.7:** Wings of Destruction covers the east half from
+   Kefka's cast (players west). Is it his right wing glowing, and does
+   the game show the half or only the wing?
+7. **6:07.4:** the first Trine set explodes with nothing drawn (no
+   position logged). Where were those three triangles?
+8. **6:25.5:** Aero III Assault draws a knockback from the middle. Does
+   the game telegraph it?
+
+### VOD checks: Pull 5 (yBKPqGwHparm7Tk4)
+
+1. **5:57.6 to 6:01.6:** Wings of Destruction covers the west half (47821,
+   players east). Is it his left wing?
+2. **6:11.4:** the third Trine set explodes with nothing drawn. Where were
+   its triangles?

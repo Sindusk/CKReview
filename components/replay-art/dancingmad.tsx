@@ -13,6 +13,7 @@
 
 import type { AoeShape } from "@/lib/replay/action-shapes";
 import { ELEMENT_COLORS, rand } from "@/components/ReplayEffects";
+import { poseAt } from "@/lib/replay/ffxiv-replay";
 import type { EffectArtProps, FightArt, ShapeArtProps, TetherArtProps } from "./types";
 
 const FADE_MS = 400;
@@ -166,6 +167,50 @@ function StatueTether({ x1, y1, x2, y2, t, color }: TetherArtProps & { color: st
   );
 }
 
+/**
+ * A Trine tip: a thin gold ring with a turning triangle from when its set
+ * descends, filling in over its last 2s.
+ */
+function TrineTip({ s, x, y, r, t, resolving, opacity }: ShapeArtProps) {
+  const left = s.resolve - t;
+  const fill = resolving ? 0.75 : Math.max(0.06, Math.min(0.5, 0.5 * (1 - left / 2000)));
+  const spin = ((t - s.start) / 30) % 360;
+  const k = r * 0.45;
+  return (
+    <g opacity={opacity} pointerEvents="none">
+      <circle cx={x} cy={y} r={r} fill={resolving ? "#fff3c4" : "#ffc95a"} fillOpacity={fill} stroke="#ffdf8a" strokeWidth={2} />
+      <path d={`M${x} ${y - k} L${x + k * 0.87} ${y + k * 0.5} L${x - k * 0.87} ${y + k * 0.5} Z`} fill="none" stroke="#fff6d8" strokeWidth={2}
+        transform={`rotate(${spin} ${x} ${y})`} />
+    </g>
+  );
+}
+
+/**
+ * Future's / Past's End: a Kefka clone (a pale ghost ring; Kefka himself
+ * has his icon) with the side All Things Ending will cleave marked by a
+ * red half-disc: in front for Future's End, behind for Past's. Placed and
+ * turned as the caster stood when the cleave went off.
+ */
+function EndsCaster({ e, x, y, t, scale, actor, past }: EffectArtProps & { past: boolean }) {
+  const o = fade(t, e.start, e.end, 300);
+  if (o <= 0 || !actor) return null;
+  const s = actor.samples.reduce((b, q) => (Math.abs(q[0] - e.end) < Math.abs(b[0] - e.end) ? q : b), actor.samples[0]);
+  const now = poseAt(actor, t);
+  const at = now && !now.stale ? { x: x + (s[1] - now.x) * scale, y: y + (s[2] - now.y) * scale } : { x, y };
+  const bearing = (((s[3] * 180) / Math.PI / 100 + 90) % 360 + 360) % 360 + (past ? 180 : 0);
+  const R = Math.max(26, 350 * scale);
+  const b = (bearing * Math.PI) / 180;
+  const p = (a: number) => `${at.x + Math.sin(a) * R} ${at.y - Math.cos(a) * R}`;
+  const boss = actor.samples.length > 50;
+  return (
+    <g opacity={o} pointerEvents="none">
+      <path d={`M${p(b - Math.PI / 2)} A${R} ${R} 0 0 1 ${p(b + Math.PI / 2)} Z`} fill="#d9342b" fillOpacity={0.35} stroke="#ff7a70" strokeWidth={2} />
+      {!boss && <circle cx={at.x} cy={at.y} r={R * 0.45} fill="#e9d8ff" fillOpacity={0.35} stroke="#c9a8ff" strokeWidth={2} strokeDasharray="4 3" />}
+      {e.label && <text x={at.x} y={at.y + R + 22} fontSize={14} fill="#ffb3ab" {...LABEL}>{e.label}</text>}
+    </g>
+  );
+}
+
 const ring = (element: Element, inverted: boolean) => (p: EffectArtProps) => <MysteryRing {...p} element={element} inverted={inverted} />;
 
 export const DANCING_MAD_ART: FightArt = {
@@ -175,12 +220,15 @@ export const DANCING_MAD_ART: FightArt = {
     "dm-ring-thunder": ring("thunder", false), "dm-ring-thunder-inv": ring("thunder", true),
     "dm-gaze-look": (p) => <StatueEye {...p} look />,
     "dm-gaze-away": (p) => <StatueEye {...p} look={false} />,
+    "dm-future": (p) => <EndsCaster {...p} past={false} />,
+    "dm-past": (p) => <EndsCaster {...p} past />,
   },
   shapes: {
     "dm-fake-ice": (p) => <FakeTelegraph {...p} element="ice" />,
     "dm-fake-thunder": (p) => <FakeTelegraph {...p} element="thunder" />,
     "dm-well": GravityWell,
     "dm-arrow": ArrowSigil,
+    "dm-trine": TrineTip,
   },
   tethers: {
     "dm-yellow": (p) => <StatueTether {...p} color="#ffd23a" />,

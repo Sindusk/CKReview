@@ -79,6 +79,15 @@
 // their root cause, so modeling them would mostly re-flag the same
 // mistakes.
 //
+// ── LOG IDS FOUND FOR THE REPLAY (2026-10-18, 2T1HzdPKgbhM43am 10, ──────────
+// ── yBKPqGwHparm7Tk4 5; replay.ts has the evidence) ───────────────────────
+//   - Head markers as each spell is handed out: 715 stack (1005084), 716
+//     circle (1005085), 717 cone (1005086); 32 of 32 match in fight 10.
+//   - A spell's status runs out 0.6s after its holder's tower, as it is
+//     planted; some soaks have no Path of Light hit (fight 10, 4:10.2).
+//   - Wings of Destruction's half-room: 47822 = Kefka's right half, 47821
+//     = his left (one pull each).
+//
 // ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
 //   - [STALE?] Post-death missed towers: should a missed-tower flag after a
 //     death be suppressed? (DEATH DURING FORSAKEN already drops every tower
