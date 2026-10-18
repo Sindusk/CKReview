@@ -592,7 +592,8 @@ export function gcdKinds(player: PlayerInfo, pull: Pull, uses: GcdUse[]): Map<nu
 
 export type PlayerValues = {
   // Average damage of this player's GCDs (direct GCD hits plus DoT ticks,
-  // ÷ GCDs used) in a phase, inside or outside raid buffs.
+  // ÷ GCDs used; WoW: without DoT upkeep, persistentTicks) in a phase,
+  // inside or outside raid buffs.
   gcdValue(phaseId: number | undefined, buffed: boolean): number;
   // Average direct damage per cast of an ability over the pull.
   perUse(abilityId: number): number;
@@ -619,15 +620,17 @@ export function playerValues(
   const perAbility = new Map<number, number>();
   let total = 0;
   const gcdNames = new Set(player.casts.filter((c) => game.action(c.abilityId)?.onGcd).map((c) => c.abilityName));
+  const isGcdHit = (e: PlayerEvent) => game.isGcdDamage
+    ? game.isGcdDamage(e, gcdNames)
+    : !e.pet && (game.isTickAbility(e.abilityId) || e.isDoT || game.action(e.abilityId)?.onGcd);
+  const offGcd = game.persistentTicksOffGcd ? persistentTicks(hits.filter(isGcdHit), uses) : undefined;
   for (const e of hits) {
     const amt = e.amount ?? 0;
     total += amt;
     const ph = phaseOf(e.timestamp);
     phaseDmg.set(ph, (phaseDmg.get(ph) ?? 0) + amt);
     perAbility.set(e.abilityId, (perAbility.get(e.abilityId) ?? 0) + amt);
-    const gcdDamage = game.isGcdDamage
-      ? game.isGcdDamage(e, gcdNames)
-      : !e.pet && (game.isTickAbility(e.abilityId) || e.isDoT || game.action(e.abilityId)?.onGcd);
+    const gcdDamage = isGcdHit(e) && !offGcd?.ticks.has(e) && !offGcd?.upkeep.has(e.abilityName);
     if (gcdDamage) {
       for (const k of [key(ph, inWindows(e.timestamp, buffWindows)), key(ph, false) + "all", "all"]) {
         gcdDmg.set(k, (gcdDmg.get(k) ?? 0) + amt);
@@ -635,7 +638,7 @@ export function playerValues(
     }
   }
   for (const u of uses) {
-    if (u.startMs >= endMs) continue;
+    if (u.startMs >= endMs || offGcd?.upkeep.has(u.abilityName)) continue;
     const ph = phaseOf(u.startMs);
     for (const k of [key(ph, inWindows(u.startMs, buffWindows)), key(ph, false) + "all", "all"]) {
       gcdN.set(k, (gcdN.get(k) ?? 0) + 1);
@@ -662,4 +665,35 @@ export function playerValues(
     damageIn: (s, e) => hits.filter((h) => h.timestamp >= s && h.timestamp < e).reduce((a, h) => a + (h.amount ?? 0), 0),
     total,
   };
+}
+
+/**
+ * DamageGame.persistentTicksOffGcd: the GCD hits that a gap doesn't stop.
+ * A tick is the press's own when it lands inside a use of the same name's
+ * lock (a channel: Malefic Grasp, Mind Flay); any other tick is a DoT
+ * already up, still ticking through the gap. An ability whose later ticks
+ * outweigh its own damage is upkeep (Agony, Unstable Affliction, Rupture):
+ * its presses leave the average too, since the GCD a gap loses is the one
+ * pressed in their place. Counting them priced Wyrmtongues' gaps
+ * (Affliction, 1bM6VzcZpkqxYtAK Sszorak Pull 38, a 3:04 wipe) at 137-244k
+ * per GCD, 75% of it Unstable Affliction, Agony and Wither ticks, against
+ * ~100k for the rest of their presses: 12.4M, 39% of their damage, for
+ * 56s of idle.
+ */
+function persistentTicks(hits: PlayerEvent[], uses: GcdUse[]): { ticks: Set<PlayerEvent>; upkeep: Set<string> } {
+  const SLACK = CHANNEL_TICK_SLACK_MS;
+  const usesOf = new Map<string, GcdUse[]>();
+  for (const u of uses) usesOf.set(u.abilityName, [...(usesOf.get(u.abilityName) ?? []), u]);
+  const ticks = new Set<PlayerEvent>();
+  const own = new Map<string, number>(), later = new Map<string, number>();
+  for (const e of hits) {
+    const amt = e.amount ?? 0;
+    const inLock = !e.isDoT || (usesOf.get(e.abilityName) ?? []).some((u) =>
+      e.timestamp >= u.startMs - SLACK && e.timestamp <= u.startMs + u.castMs + SLACK);
+    if (!inLock) ticks.add(e);
+    const m = inLock ? own : later;
+    m.set(e.abilityName, (m.get(e.abilityName) ?? 0) + amt);
+  }
+  const upkeep = new Set([...later].filter(([name, v]) => usesOf.has(name) && v > (own.get(name) ?? 0)).map(([name]) => name));
+  return { ticks, upkeep };
 }

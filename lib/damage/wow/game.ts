@@ -40,6 +40,9 @@
 //   Assassination Rogue gap on JZp82Rm7TzycM94a pull 25 at 1.7M per GCD,
 //   ~2.6× their average: in WoW procs, trinkets and pets keep going.
 //   Except a Beast Mastery press's own pet hits (PET_PRESS_HITS below).
+// - persistentTicksOffGcd: DoT ticks after the press's lock, and DoT
+//   upkeep presses, leave that price too (timeline.ts persistentTicks):
+//   an Affliction wipe's gaps read 39% of the Warlock's damage.
 //
 // ── Raid buffs ─────────────────────────────────────────────────────────
 // The burst windows (raidBuffStatusIds) are the lust family and Power
@@ -726,6 +729,7 @@ export const WOW_DAMAGE: DamageGame = {
   isGcdDamage: (e, gcdNames) => e.pet
     ? PET_PRESS_HITS.has(e.abilityId)
     : !AUG_SUPPORT_HITS.has(e.abilityId) && (UNHOLY_PRESS_HITS.has(e.abilityId) || ERADICATE_HITS.has(e.abilityId) || ACTIONS.get(e.abilityId)?.onGcd === true || gcdNames.has(e.abilityName)),
+  persistentTicksOffGcd: true,
   compareFromPullStart: true,
   compareRolesPerPlayer: true,
 };

@@ -498,6 +498,14 @@ docs/damage-case-studies/qpZx3mWaG7gcDdYB.md. What generalizes:
   real ~219k and undervalued most players' gaps (Blkphnx 26k of 221k,
   Sylmigron 52k of 223k); every study number before 2026-10-13's fix was
   low. Check: a player's average GCD must sit below damage ÷ GCDs.
+- **...but not DoT upkeep** (2026-10-18). Name matching also pulled in
+  every DoT tick, which keeps landing through a gap. A 3:04 Sszorak wipe
+  (1bM6VzcZpkqxYtAK Pull 38) charged an Affliction Warlock 14.3M of 31.6M,
+  pricing each idle GCD at 137-244k when 75% of that was Unstable
+  Affliction, Agony and Wither ticks. A GCD's value now keeps only ticks
+  inside the press's own lock (channels) and leaves out upkeep presses
+  (`timeline.ts persistentTicks`): 97k per GCD, 7.6M lost. Dropped DoTs
+  are still `dot-uptime`'s to charge.
 - **A resource logged on spenders only can still show waste**
   (spenderSnapshotWaste, wow/specs/shared.ts): each spender logs the amount
   before it; fit gain per builder on intervals that ended under the cap,

@@ -177,6 +177,12 @@ export type DamageGame = {
   // `gcdNames`: names of the on-GCD actions this player cast, for hits
   // logged under another id than their cast.
   isGcdDamage?(e: PlayerEvent, gcdNames: Set<string>): boolean;
+  // A DoT tick is the press's own only inside a use's lock (a channel's
+  // ticks); later ticks keep landing through a gap. Abilities whose ticks
+  // mostly land after the lock (upkeep: Agony, Rupture) leave the average
+  // too, presses and all: a gap costs the GCD pressed in their place
+  // (timeline.ts playerValues). WoW.
+  persistentTicksOffGcd?: boolean;
   // Reference-clear comparison (lib/damage/compare.ts): compare from the
   // pull start when the context names no deciding phase, and show role
   // rows as per-player averages (WoW raid comps vary; FFXIV's are 2/2/4).
