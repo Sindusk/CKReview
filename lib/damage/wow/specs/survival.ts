@@ -120,6 +120,22 @@
 //   4:52 → 5:09), Ajunlucky 72k. Five Entombed Sentinels players hold the
 //   one ready at ~2:15–2:30 to ~3:03, where the top players press theirs at
 //   2:05 (Дэсака) or come back after (Joeexotíc's 90s).
+//
+// ── Moonlight Chakram expired unused (chakramExpired) ──────────────────
+// For a Sentinel Survival player each Takedown grants the Moonlight Chakram
+// buff (1264946) that the press (1264949; hits 1266081) needs, as Trueshot
+// does for Marksmanship. On Survival it runs out at 15.0s, not
+// Marksmanship's 17s (Imjustpika mtv6nZTcXF4RDWaf 2:22.21 → 2:37.21,
+// Huntâbow beside him 15.01s, no press beside either; every other span on
+// the 12 Sentinel player-pulls ends at a press, max 11.4s), so procs.ts's
+// 17s entry never sees a Survival expiry. A Chakram is 0.68–0.95M a press
+// on the Sentinel players (Glemon's 57k, his hits absorbed on Vashnik), so
+// a lost one is priced at the player's average Chakram less their average
+// GCD. Not counted when most of its 15s was forced or dead.
+// Measured: the top players and the weaker ones press one after every
+// Takedown (37 of 37 buffs used on the first 10 player-pulls); Imjustpika
+// 535k (2:37, the Takedown at 2:22 into Vitriolic Stasis at 2:34; 12s to
+// press it first); Huntâbow's at 4:24 ran mostly in forced time.
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { JobCheck, Moment } from "../../types";
@@ -364,4 +380,48 @@ const takedownHeld: JobCheck = (ctx) => {
   })];
 };
 
-export const SURVIVAL_CHECKS: JobCheck[] = [tipOfTheSpear, takedownHeld];
+// ── Moonlight Chakram expired unused (chakramExpired) ──────────────────
+
+const CHAKRAM_BUFF = 1264946;
+const CHAKRAM = 1264949;
+const CHAKRAM_HIT = 1266081;
+const CHAKRAM_MS = 15_000;
+const CHAKRAM_EARLY_MS = 600;
+const CHAKRAM_NEAR_MS = 200;
+
+const chakramExpired: JobCheck = (ctx) => {
+  const p = ctx.player;
+  const ev = (p.buffs ?? []).filter((b) => b.abilityId === CHAKRAM_BUFF && b.source === p.name).sort((a, b) => a.timestamp - b.timestamp);
+  if (ev.length === 0) return [];
+  const casts = p.casts.filter((c) => !c.fake && c.abilityId === CHAKRAM);
+  const notCounted = mergeWindows([...ctx.forced, ...ctx.dead]);
+  const lost: number[] = [];
+  let gained: number | undefined;
+  for (const b of ev) {
+    if (b.timestamp >= ctx.endMs) break;
+    if (b.buffStatus === "applied") gained = b.timestamp;
+    else if (b.buffStatus === "removed" && gained !== undefined) {
+      const used = casts.some((c) => Math.abs(c.timestamp - b.timestamp) <= CHAKRAM_NEAR_MS || (c.timestamp > gained! && c.timestamp < b.timestamp));
+      // Not counted when most of its 15s was forced or dead: there was no time to press it.
+      if (!used && b.timestamp - gained >= CHAKRAM_MS - CHAKRAM_EARLY_MS && overlapMs(gained, b.timestamp, notCounted) <= CHAKRAM_MS / 2) lost.push(b.timestamp);
+      gained = undefined;
+    }
+  }
+  if (lost.length === 0) return [];
+  const n = casts.filter((c) => c.timestamp < ctx.endMs).length;
+  const hits = p.damageDone.filter((h) => !h.pet && h.abilityId === CHAKRAM_HIT && h.timestamp < ctx.endMs + 5_000).reduce((a, h) => a + (h.amount ?? 0), 0);
+  if (n === 0 || !(hits > 0)) return [];
+  const gcd = ctx.values.gcdValue(undefined, false);
+  const per = hits / n - gcd;
+  if (!(per > 0)) return [];
+  return [finding(ctx, {
+    kind: "proc-lost", startMs: lost[0] - CHAKRAM_MS, endMs: lost[lost.length - 1], forced: false, inference: true,
+    label: "Moonlight Chakram expired unused",
+    lostDamage: lost.length * per,
+    basis: `${lost.length} × (${k(hits / n)} the player's average Moonlight Chakram − ${k(gcd)} average GCD, the GCD it takes)`,
+    detail: `The Moonlight Chakram a Takedown grants ran out unused ${lost.map((t) => `at ${clock(t)}`).join(", ")} (${CHAKRAM_MS / 1000}s for Survival)`,
+    moments: lost.map((t) => ({ startMs: t - CHAKRAM_MS, endMs: t, lostDamage: per, detail: `Moonlight Chakram ran out at ${clock(t)}` })),
+  })];
+};
+
+export const SURVIVAL_CHECKS: JobCheck[] = [tipOfTheSpear, takedownHeld, chakramExpired];
