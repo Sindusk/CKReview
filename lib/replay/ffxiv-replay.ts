@@ -339,6 +339,16 @@ export function buildReplayData(
       if (last && last[1] === s[1] && last[2] === s[2] && last[3] === s[3] && last[4] === s[4] && last[5] === s[5]) continue;
       kept.push(s);
     }
+    // A player at 0 HP who has HP again within 2s never died: a tank's
+    // invulnerable (JZ1KXhDbqkNH3jxR fight 24 2:11.8, Powder Mark Trail
+    // took the WAR to 0, 1 HP 0.1s later). Left at 0 the panel greyed
+    // them out for a frame. A raise takes far longer.
+    for (let i = 0; i < kept.length; i++) {
+      if (kept[i][4] !== 0 || track.kind !== "player") continue;
+      for (let j = i + 1; j < kept.length && kept[j][0] - kept[i][0] <= 2000; j++) {
+        if (kept[j][4] > 0) { kept[i][4] = 0.001; break; }
+      }
+    }
     track.samples = kept;
     if (track.kind === "enemy") track.targetable = damagedEnemies.has(track.key);
     out.push(track);

@@ -10,7 +10,7 @@
 // or donut hole estimated). Hovering an actor shows its name, strategy
 // slot (MT, OT, H1 ... from lib/mechanics/ffxiv/roles.ts), coordinates and
 // HP; clicking one pins its hitbox ring. FFXIV players carry their
-// statuses in a row underneath (icon, seconds left, stacks) and head
+// statuses in a row above (icon, seconds left, stacks) and head
 // markers as a label above. Tracks come from
 // lib/replay/ffxiv-replay.ts; page.tsx loads them only when the user
 // clicks Load replay (one FFLogs fetch per pull, never on navigation).
@@ -371,7 +371,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
                   <path d={`M${x - r * 0.6} ${y - r * 0.6} L${x + r * 0.6} ${y + r * 0.6} M${x + r * 0.6} ${y - r * 0.6} L${x - r * 0.6} ${y + r * 0.6}`} stroke="#ff4d4d" strokeWidth={4} strokeLinecap="round" />
                 )}
                 {showStatuses && !dead && (
-                  <StatusRow x={x} y={y + r + 3} t={t} scale={iconScale} spans={activeStatuses(aurasByKey.get(a.key), t, data.durationMs)} info={data.auraInfo ?? {}} />
+                  <StatusRow x={x} bottom={y - r - 2} t={t} scale={iconScale} spans={activeStatuses(aurasByKey.get(a.key), t, data.durationMs)} info={data.auraInfo ?? {}} />
                 )}
               </g>
             );
@@ -381,7 +381,9 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
           {showStatuses && headMarkers.filter((m) => t >= m.start && t <= m.end).map((m, i) => {
             const at = live.find((l) => l.a.key === m.target);
             if (!at) return null;
-            const top = toY(at.p.y) - (at.a.kind === "player" ? PLAYER_ICON * iconScale / 2 : BOSS_ICON / 2) - 8;
+            // Above the player's status row when they have one.
+            const statuses = at.a.kind === "player" && at.p.hp !== 0 && activeStatuses(aurasByKey.get(at.a.key), t, data.durationMs).length > 0;
+            const top = toY(at.p.y) - (at.a.kind === "player" ? PLAYER_ICON * iconScale / 2 : BOSS_ICON / 2) - 8 - (statuses ? statusRowHeight(iconScale) : 0);
             return <MarkerLabel key={`${m.target}-${m.start}-${i}`} x={toX(at.p.x)} y={top} label={m.label} known={!m.label.startsWith("Marker ")} />;
           })}
 
@@ -692,14 +694,19 @@ function activeStatuses(spans: AuraSpan[] | undefined, t: number, durationMs: nu
   return up.slice(0, MAX_STATUS_ICONS).map((s) => ({ s, open: s[1] >= durationMs }));
 }
 
+/** Height of a status row (icons plus the timers under them), SVG units. */
+const statusRowHeight = (scale: number) => (STATUS_H + 11) * Math.max(0.8, scale);
+
 /**
- * A player's statuses in a row under their icon, like the game's party
- * list: the status icon, seconds left under it (to the status's end in the
- * log, which is its real expiry or removal), stacks in its corner.
+ * A player's statuses in a row above their icon (user, 2026-10-17), like
+ * the game's party list: the status icon, seconds left under it (to the
+ * status's end in the log, which is its real expiry or removal), stacks in
+ * its corner. `bottom` is where the row ends, just above the icon.
  */
-function StatusRow({ x, y, t, scale, spans, info }: { x: number; y: number; t: number; scale: number; spans: { s: AuraSpan; open: boolean }[]; info: Record<number, { name: string; icon?: string }> }) {
+function StatusRow({ x, bottom, t, scale, spans, info }: { x: number; bottom: number; t: number; scale: number; spans: { s: AuraSpan; open: boolean }[]; info: Record<number, { name: string; icon?: string }> }) {
   if (!spans.length) return null;
   const w = STATUS_W * Math.max(0.8, scale), h = STATUS_H * Math.max(0.8, scale), gap = 2;
+  const y = bottom - statusRowHeight(scale);
   const left = x - (spans.length * w + (spans.length - 1) * gap) / 2;
   return (
     <g pointerEvents="none">

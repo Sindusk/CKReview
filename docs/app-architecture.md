@@ -320,7 +320,7 @@ file's header comment. Mechanic detection has its own guide:
   most entries (Fall of Faith cones, the towers' Burnt Strike, the twin
   cleaves, Relativity's spells), checked on JZ1KXhDbqkNH3jxR fight 24.
 - **Statuses** (FFXIV): the replay fetch also takes debuffs. Every status
-  an enemy or the environment put on a player shows under their icon, like
+  an enemy or the environment put on a player shows above their icon, like
   the game's party list (icon, seconds left, stacks), and is listed in the
   hover card. Up to five, with vulnerabilities and Weakness last. Tracks
   saved before 2026-10-17 have none: refetch them.

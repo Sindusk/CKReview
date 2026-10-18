@@ -153,6 +153,11 @@ type Override = {
   // Centred on the player whose status (FFLogs id) ended at the cast:
   // a Spell-in-Waiting resolving on its holder. Needs playerAuras.
   holder?:  number;
+  // A repeat of the same caster's earlier baited cast `of`: it fires from
+  // the bait's origin, alternating between the bait's lane (1st, 3rd
+  // repeat) and the lane turned by `gap` degrees (2nd). The caster's logged
+  // facing follows the players instead.
+  repeats?: { of: number; gap: number };
 };
 
 // Futures Rewritten (lib/mechanics/ffxiv/fru/*.ts headers; ids and
@@ -169,10 +174,15 @@ const FRU_STACKS = [
 ];
 const FRU_OVERRIDES: Record<number, Override> = {
   ...Object.fromEntries(FRU_STACKS.map((id) => [id, { style: "stack" as const }])),
-  // Cyclonic Break: eight narrow baited cones and their repeats. The data
-  // has no angle; in fight 24 the third repeat's nearest players stood
-  // 15-29° off its lanes, so under 30°. Half the 45° lane spacing is used.
-  40145: { angle: 22.5 }, 40146: { angle: 22.5 },
+  // Cyclonic Break: eight narrow cones baited on the players, then three
+  // repeats where they no longer stand: the bait lanes, the gaps between,
+  // the lanes again (user, 2026-10-17: players dodge into the gaps, back
+  // to their spots, then out again). Fight 24 agrees: every player stood
+  // ±20-24° off their lane at the 1st and 3rd repeats and on it at the 2nd.
+  // The helpers' facing points at the players, which drew each repeat
+  // onto them. No angle in the data; under 30° by those positions, so half
+  // the 45° lane spacing is used.
+  40145: { angle: 22.5 }, 40146: { angle: 22.5, repeats: { of: 40145, gap: 22.5 } },
   // Fall of Faith fire: Sinblaze, a 90° cone from the carrier toward the
   // nearest helper, shared by four. The helper casting it sits elsewhere;
   // its hit carries the carrier's spot, and it's aimed at the others hit.
@@ -294,6 +304,25 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
       const p = holder && poseAt(holder, t);
       if (p) { usedHolder.add(pick); targetPose = p; casterPose = { x: p.x, y: p.y, facing: 0 }; }
     }
+    // A repeat fires from its bait's origin along a lane worked out from it.
+    let repeatBearing: number | undefined;
+    if (over.repeats) {
+      let k = 1;
+      for (let j = i - 1; j >= 0 && t - casts[j][0] <= 12000; j--) {
+        const c = casts[j];
+        if (c[1] !== key || c[3] !== 0) continue;
+        if (c[4] === id) { k++; continue; }
+        if (c[4] !== over.repeats.of) continue;
+        const from = caster && sampleNear(caster, c[0], 1500);
+        const bait = c[5] ? actorByKey.get(c[5]) : undefined;
+        const bp = bait && poseAt(bait, c[0]);
+        if (from && bp) {
+          casterPose = from;
+          repeatBearing = (bearingTo(from.x, from.y, bp.x, bp.y) + (k % 2 === 0 ? over.repeats.gap : 0)) % 360;
+        }
+        break;
+      }
+    }
     if (!casterPose && !(isCircle && targetPose)) continue;
 
     // AoEs flash on the cast that lands them, not across the castbar: a
@@ -318,8 +347,14 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
       if (!targetPose && own.length) {
         const mx = own.reduce((s, h) => s + h[6]!, 0) / own.length;
         const my = own.reduce((s, h) => s + h[7]!, 0) / own.length;
-        if (Math.hypot(mx - o.x, my - o.y) > base.range) o = { x: mx, y: my };
+        // A stack is always on a player (user, 2026-10-17: a Cyclonic
+        // Break Sinsmoke pair standing within 6y of the middle drew it on
+        // Fatebreaker): its first player hit, the one it was placed on.
+        if (style === "stack") o = { x: own[0][6]!, y: own[0][7]! };
+        else if (Math.hypot(mx - o.x, my - o.y) > base.range) o = { x: mx, y: my };
       }
+      // A stack with no target and nobody hit has no player to sit on.
+      if (style === "stack" && !targetPose && !own.length) continue;
       // CastType 5 grows with the caster's hitbox; the hitbox is unknown
       // for helpers, so it's drawn at the listed range.
       out.push({ ...base, kind: "circle", x: o.x, y: o.y, bearing: 0 });
@@ -333,6 +368,7 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
       : aimed.length ? bearingTo(cp.x, cp.y, aimed.reduce((s, h) => s + h[6]!, 0) / aimed.length, aimed.reduce((s, h) => s + h[7]!, 0) / aimed.length)
       : own.length && !caster?.samples.length ? bearingTo(cp.x, cp.y, own[0][6]!, own[0][7]!)
       : facingToCompassBearing(cp.facing);
+    if (repeatBearing !== undefined) bearing = repeatBearing;
     if (over.flip) bearing = (bearing + 180) % 360;
     if (g.castType === 3 || g.castType === 13) {
       // Angle: the override, else the omen art's, else the narrowest
