@@ -67,6 +67,15 @@
 // application is flagged directly, under the same "missed the mechanic"
 // assumption the debuff-triggered rule already makes.
 //
+// ── LOG IDS FOUND FOR THE REPLAY (2026-10-18, 2T1HzdPKgbhM43am 10, ──────────
+// ── yBKPqGwHparm7Tk4 5; replay.ts has the evidence) ───────────────────────
+//   - Bowels of Agony's sigils sit 14y out on three intercardinals; each
+//     element's cast comes from a helper there (fire Inferno 47860, water
+//     Tsunami 47861, wind Cyclone 47864), when that helper logs a sample.
+//   - Latitudinal Implosion's Shockwave (47871): sides of Chaos first, then
+//     front and back (fight 5). Slap Happy's Shockwave (47851) hits all
+//     eight: raidwide.
+//
 // ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
 //   - Thunder III marking two non-tanks is a distinct, unexplained failure
 //     (skipped in detectThunderIIIErrors). It may be Phase 5's Lightning

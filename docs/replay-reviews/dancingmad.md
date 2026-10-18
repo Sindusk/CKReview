@@ -156,3 +156,75 @@ everyone inside and no hit: it's a knockback.
    players east). Is it his left wing?
 2. **6:11.4:** the third Trine set explodes with nothing drawn. Where were
    its triangles?
+
+## Phase 3: Exdeath and Chaos (7:09 to 12:16)
+
+Looks from thaliak.com/ultimates/umad (it calls this "Definition of
+Insanity"); the mechanics from exdeath.ts, limitcut.ts, blackhole.ts and
+stompies.ts.
+
+### What's drawn
+
+| Mechanic | How |
+|---|---|
+| Bowels of Agony sigils | New cue: a fire triangle, water square and wind diamond on the floor from Bowels of Agony until their element goes off, where that element's helper logged a sample (Pull 9: fire NW, wind SW, water SE; Pull 5: fire NE, wind NW, water not logged). |
+| Inferno | Now built in the spec: a 10y donut on the two players nearest the fire sigil, following them. It drew on the sigil itself. The donut's hole size is a guess (a third of its range). |
+| Stray Spray | Now on each Dynamic Fluid holder as the status runs out. Its helpers had no position near the cast, so it wasn't drawn. |
+| Stray Flames, Tsunami, Cyclone, Thunder III | Game data was right; Cyclone draws as a stack, Thunder III's hits on the tank as tankbusters. |
+| Latitudinal Implosion | Now built in the spec: Shockwave's two 90° cones out of Chaos's sides, then front and back, from Chaos himself. In Pull 9 the first pair came from helpers last seen 2s and 14s earlier, one 9y away. |
+| Vacuum Wave | New: a pale blue knockback from Exdeath through its 7.7s cast. Its 100y range made the engine skip it. |
+| Limit Cut | New: the eight clones on the rim as pale numbered ghosts, from their pulse until their dash, and a violet number badge over each player from the marker until their dash. The numbers are head markers 336-339 / 437-440 (1-8); in Pull 9 dash k hit marker k's player, all eight. |
+| Black Hole | New look: the black holes as dark swirls and their tethers (84) dark violet until Nothingness fires down them. |
+| Slap Happy | Its 6y centre burst shows through its 1.2s cast. Its Shockwave (47851) hit all eight both times, so it's now hidden: drawn as 180-270° cones it covered the arena. |
+| Damning Edict, Look upon Me and Despair | Now shown through their cast bars (both have a ground omen). |
+| Stompies | Blizzard III puddles show for their 2.7s cast as ice circles. Stomp-a-Mole towers take 2. Knock Down is a stack, and marker 161 reads "Stack". |
+
+### Fit check after the changes
+
+Most abilities are exact. What's left:
+- Implosion's front/back pair in Pull 9 (8:15.8) has two players inside
+  who weren't hit. Pull 5 is exact. The 90° angle is a guess.
+- Thunder III's 5y tankbuster drawn on a tank with no hit logged
+  (9:57.5, 10:00.5), in both pulls.
+- One Blizzard III puddle in Pull 9 (11:44.7) and three in Pull 5 have a
+  player inside who took nothing, probably because the puddle's helper
+  logs a stale spot.
+- Vacuum Wave has everyone inside and no hit: it's a knockback.
+
+### Couldn't find out / not drawn
+
+- **Headwind / Tailwind** (the gaze before Limit Cut): only their status
+  icons show; which one means "face Exdeath" isn't pinned down
+  (limitcut.ts).
+- **The Ultima Blaster pulses** (8:29 to 8:43) are raidwide; only the
+  clones that cast them are drawn.
+- **Bowels of Agony's water sigil in Pull 5:** its Tsunami came from
+  reused helpers parked elsewhere, so no spot.
+- **Umbra Smash, White Hole, Earthquake, Meteor** are raidwide: not drawn.
+
+### VOD checks: Pull 9 (2T1HzdPKgbhM43am)
+
+1. **7:31.7:** the three sigils appear (fire NW, wind SW, water SE). Do
+   they appear with Bowels of Agony, and are those the right shapes and
+   corners?
+2. **7:51.9:** Inferno draws donuts on the Bard and the Black Mage (the
+   two nearest the fire sigil). Were they the ones it targeted, and how
+   big is the donut's hole?
+3. **8:13.0 to 8:15.8:** Shockwave cones out of Chaos's sides, then his
+   front and back. Is the order right, and are they quarter cones?
+4. **8:29.0 to 8:53.0:** numbered clones on the rim and number badges on
+   the players. Do the in-game numbers match (the Viper 1, the
+   Astrologian 2, the Dragoon 3, the Paladin 4, the Sage 5, the Bard 6,
+   the Dark Knight 7, the Black Mage 8)?
+5. **9:40 onward:** black holes on the cardinals, violet tethers to their
+   players until Nothingness. Do the tethers look like that, and are the
+   holes where the replay puts them?
+6. **9:38.4:** Slap Happy's Shockwave is hidden because it hit everyone.
+   Is there a cone to dodge there?
+7. **11:42.0:** Blizzard III puddles under every player 2.7s before they
+   go off. Is that how long the game shows them?
+
+### VOD checks: Pull 5 (yBKPqGwHparm7Tk4)
+
+1. **7:31.7:** fire sigil NE, wind NW; the water sigil isn't drawn. Where
+   was it (SE or SW)?

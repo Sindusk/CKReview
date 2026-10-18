@@ -211,6 +211,75 @@ function EndsCaster({ e, x, y, t, scale, actor, past }: EffectArtProps & { past:
   );
 }
 
+/** Bowels of Agony's sigils on the floor: a fire triangle, a water square, a wind diamond. */
+function Sigil({ e, x, y, t, scale, el }: EffectArtProps & { el: "fire" | "water" | "wind" }) {
+  const o = fade(t, e.start, e.end);
+  if (o <= 0) return null;
+  const c = el === "fire" ? { glow: "#ff6a1a", line: "#ffd36b" } : el === "water" ? { glow: "#2f8dff", line: "#bfe3ff" } : { glow: "#3fd08a", line: "#c8ffe0" };
+  const R = Math.max(14, 250 * scale);
+  const pts = el === "fire" ? [0, 120, 240] : el === "water" ? [45, 135, 225, 315] : [0, 90, 180, 270];
+  const spin = ((t - e.start) / 60) % 360;
+  const d = pts.map((a, i) => `${i ? "L" : "M"}${x + Math.sin((a * Math.PI) / 180) * R} ${y - Math.cos((a * Math.PI) / 180) * R}`).join(" ") + " Z";
+  return (
+    <g opacity={o} pointerEvents="none">
+      <circle cx={x} cy={y} r={R * 1.25} fill={c.glow} fillOpacity={0.12} stroke={c.glow} strokeWidth={2} strokeOpacity={0.6}
+        strokeDasharray="5 4" transform={`rotate(${spin} ${x} ${y})`} />
+      <path d={d} fill={c.glow} fillOpacity={0.3} stroke={c.line} strokeWidth={2.5} strokeLinejoin="round" filter="url(#replay-glow)" />
+    </g>
+  );
+}
+
+/** A Limit Cut clone on the rim: a pale Kefka ghost with its number. */
+function LimitCutClone({ e, x, y, t }: EffectArtProps) {
+  const o = fade(t, e.start, e.end, 250);
+  if (o <= 0) return null;
+  return (
+    <g opacity={o} pointerEvents="none">
+      <circle cx={x} cy={y} r={15} fill="#e9d8ff" fillOpacity={0.5} stroke="#c9a8ff" strokeWidth={2.5} strokeDasharray="4 3" />
+      {e.label && <text x={x} y={y + 6} fontSize={17} fill="#fff" {...LABEL}>{e.label}</text>}
+    </g>
+  );
+}
+
+/** A Limit Cut number over its player: a violet badge with the number, as the game's. */
+function LimitCutNumber({ e, x, y, t }: EffectArtProps) {
+  const o = fade(t, e.start, e.end, 200);
+  if (o <= 0) return null;
+  const by = y - 40;
+  return (
+    <g opacity={o} pointerEvents="none">
+      <path d={`M${x} ${by - 13} L${x + 13} ${by} L${x} ${by + 13} L${x - 13} ${by} Z`} fill="#4a1f8a" stroke="#d6b8ff" strokeWidth={2} filter="url(#replay-glow)" />
+      <text x={x} y={by + 6} fontSize={16} fill="#fff" {...LABEL} strokeWidth={3}>{e.label}</text>
+    </g>
+  );
+}
+
+/** A small black hole: a dark swirl with a violet rim. */
+function BlackHole({ e, x, y, t }: EffectArtProps) {
+  const o = fade(t, e.start, e.end, 300);
+  if (o <= 0) return null;
+  const spin = ((t - e.start) / 8) % 360;
+  return (
+    <g opacity={o} pointerEvents="none">
+      <circle cx={x} cy={y} r={14} fill="#0a0410" stroke="#8a4dff" strokeWidth={6} strokeOpacity={0.45} filter="url(#replay-glow)" />
+      <circle cx={x} cy={y} r={10} fill="none" stroke="#c9a8ff" strokeWidth={2} strokeDasharray="9 6" transform={`rotate(${-spin} ${x} ${y})`} />
+    </g>
+  );
+}
+
+/** A black hole's tether: a thin dark-violet line with a pulse running toward the player. */
+function VoidTether({ x1, y1, x2, y2, t }: TetherArtProps) {
+  const f = (t / 700) % 1;
+  return (
+    <g pointerEvents="none">
+      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#5a1fb0" strokeWidth={10} strokeOpacity={0.4} strokeLinecap="round" filter="url(#replay-glow)" />
+      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#2a0a4a" strokeWidth={4} strokeLinecap="round" />
+      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#c9a8ff" strokeWidth={1.5} strokeLinecap="round" />
+      <circle cx={x1 + (x2 - x1) * f} cy={y1 + (y2 - y1) * f} r={4} fill="#e2cbff" />
+    </g>
+  );
+}
+
 const ring = (element: Element, inverted: boolean) => (p: EffectArtProps) => <MysteryRing {...p} element={element} inverted={inverted} />;
 
 export const DANCING_MAD_ART: FightArt = {
@@ -222,6 +291,12 @@ export const DANCING_MAD_ART: FightArt = {
     "dm-gaze-away": (p) => <StatueEye {...p} look={false} />,
     "dm-future": (p) => <EndsCaster {...p} past={false} />,
     "dm-past": (p) => <EndsCaster {...p} past />,
+    "dm-sigil-fire": (p) => <Sigil {...p} el="fire" />,
+    "dm-sigil-water": (p) => <Sigil {...p} el="water" />,
+    "dm-sigil-wind": (p) => <Sigil {...p} el="wind" />,
+    "dm-lc-clone": LimitCutClone,
+    "dm-lc-number": LimitCutNumber,
+    "dm-black-hole": BlackHole,
   },
   shapes: {
     "dm-fake-ice": (p) => <FakeTelegraph {...p} element="ice" />,
@@ -233,5 +308,6 @@ export const DANCING_MAD_ART: FightArt = {
   tethers: {
     "dm-yellow": (p) => <StatueTether {...p} color="#ffd23a" />,
     "dm-purple": (p) => <StatueTether {...p} color="#a35cff" />,
+    "dm-void": VoidTether,
   },
 };

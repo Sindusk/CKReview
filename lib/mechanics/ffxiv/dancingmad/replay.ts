@@ -163,6 +163,48 @@ const WING_RIGHT = 47822, WING_LEFT = 47821;
 // Down for the Count (thaliak); 2.7s cast, 40y in the data.
 const AERO_ASSAULT = 50167;
 
+// ── P3 Exdeath and Chaos (exdeath.ts, limitcut.ts, blackhole.ts, ───────────
+// ── stompies.ts) ─────────────────────────────────────────────────────────────
+
+// Bowels of Agony (47858): three sigils 90° apart on the intercardinals
+// (thaliak: a water square, a wind diamond, a fire triangle), each firing
+// at the nearest players when its debuff is cleansed: fire = Inferno
+// 47860 (a 10y donut on the two nearest), water = Tsunami 47861 (5y on
+// the two nearest, a knockback), wind = Cyclone 47864 (a partner stack on
+// the sigil). A sigil's spot is its helper's sample at its own cast when
+// that sits 14y out on a diagonal: fight 10 fire NW (90.1, 90.1), wind SW,
+// water SE; fight 5 fire NE, wind NW, water unlogged (its Tsunami came
+// from reused Trine helpers).
+const BOWELS = 47858;
+const SIGILS: Record<number, "fire" | "water" | "wind"> = { 47860: "fire", 47861: "water", 47864: "wind" };
+const INFERNO = 47860;
+const SIGIL_R = 1400, SIGIL_TOL = 80;
+
+// Latitudinal Implosion (47870): Chaos's Shockwave cones (47871), first
+// out of his sides, then front and back (thaliak; Longitudinal is the
+// reverse, not in either log). Fight 5: Chaos facing 314°, the pairs at
+// 44/224 then 134/314; fight 10's first pair came from helpers last seen
+// 2s and 14s earlier (one 9y off), so the cones are drawn from Chaos.
+const LATITUDINAL = 47870, IMPLOSION_SHOCKWAVE = 47871;
+const SHOCKWAVE_ANGLE = 90;
+
+// Limit Cut: eight clones on the rim pulse (Ultima Blaster 47843, every
+// 2s from 8:29.0 in fight 10) and then dash at their numbered player in
+// the same order (47844, 8:51.4-8:53.0). The numbers are head markers:
+// 336-339 = 1-4, 437-440 = 5-8 (fight 10: dash k hit marker k's player,
+// all eight).
+const LC_PULSE = 47843, LC_DASH = 47844;
+const LC_NUMBERS: Record<number, number> = { 336: 1, 337: 2, 338: 3, 339: 4, 437: 5, 438: 6, 439: 7, 440: 8 };
+
+// Vacuum Wave (47891): Exdeath knocks everyone back (7.7s cast; 100y in
+// the data, so the engine skips it as raidwide).
+const VACUUM_WAVE = 47891;
+
+// Black Hole: the small black holes (actors "black hole", 17y out on the
+// cardinals) tether their players (84) and fire Nothingness (47868) down
+// the tether.
+const NOTHINGNESS = 47868, BLACK_HOLE_TETHER = 84;
+
 const OVERRIDES: Record<number, Override> = {
   // Revolting Ruin III, both hits: a 90° tankbuster cone (user, VOD review
   // 2026-10-17). The game data has the cone but not its angle.
@@ -215,6 +257,32 @@ const OVERRIDES: Record<number, Override> = {
   [TRINE]: { hidden: true },
   [WING_RIGHT]: { hidden: true }, [WING_LEFT]: { hidden: true },
   47823: { style: "tankbuster" },
+  // P3. Inferno and the Implosion cones: p3Shapes.
+  [INFERNO]: { hidden: true },
+  [IMPLOSION_SHOCKWAVE]: { hidden: true },
+  // Stray Spray: a 10y donut on each Dynamic Fluid holder as it's cleansed
+  // (thaliak). Its helpers had no sample near the cast (fight 10, 8:17.9:
+  // the last 2.1s earlier, 7y off), so it wasn't drawn.
+  47862: { holder: 1001601 },
+  47864: { style: "stack" },                    // Cyclone, at the wind sigil
+  47884: { style: "tankbuster" },               // Thunder III on the tank nearest Exdeath
+  // Slap Happy's Shockwave (47851) hits all eight in both slaps (fight 10
+  // 9:39.7, 10:10.1): raidwide. Drawn as two 180-270° cones it covered the
+  // arena.
+  47851: { hidden: true },
+  // Ground telegraphs with an omen, shown through their cast bars: Slap
+  // Happy's 6y burst (47849, general_1bf, 1.2s), Damning Edict (47873, a
+  // 60x80 rect from Chaos), Look upon Me and Despair (47854, a 16y-wide
+  // line from Kefka).
+  47849: { telegraph: true },
+  47873: { telegraph: true },
+  47854: { telegraph: true },
+  // Stompies (stompies.ts): Exdeath's Blizzard III puddles drop under every
+  // player and go off 2.7s later; Stomp-a-Mole's towers take two; Knock
+  // Down is a stack, Big Bang lands on its spots.
+  47885: { telegraph: true, style: "ice" },
+  47856: { style: "tower", soakers: 2 },
+  47875: { style: "stack" },
 };
 
 /**
@@ -238,6 +306,15 @@ const HEAD_MARKERS: Record<number, HeadMarkerDef> = {
   715: { label: "Stack", abilities: [PATH_OF_LIGHT, SPELLDRIVER] },
   716: { label: "Circle", abilities: [PATH_OF_LIGHT, SPELLSCATTER] },
   717: { label: "Cone", abilities: [PATH_OF_LIGHT, SPELLWAVE] },
+  // P3. Limit Cut's numbers (LC_NUMBERS): their dash lands 12.5-14s
+  // later, past the label's 12s look-ahead, so p3Effects draws the number
+  // on the player until it; the label here only stops "Marker 336" from
+  // showing, ending at the first Ultima Blaster pulse (47843, raidwide,
+  // 0.1s after the markers in fight 10).
+  ...Object.fromEntries(Object.entries(LC_NUMBERS).map(([id, n]) => [id, { label: String(n), abilities: [LC_DASH, LC_PULSE] }])),
+  // 161: Knock Down's stack marker (fight 10 11:42.1 -> 11:47.2, 11:47.6
+  // -> 11:52.7).
+  161: { label: "Stack", abilities: [47875] },
   // The ring markers on Kefka (ringEffects draws the rings).
   ...Object.fromEntries(Object.keys(RINGS).map((id) => [id, { label: "Mystery Magic", abilities: RING_RESOLVE }])),
 };
@@ -253,11 +330,13 @@ const HEAD_MARKERS: Record<number, HeadMarkerDef> = {
  * tethers (0:30.9) pay off with Pulse Wave's knockback, a cast with no
  * hit, and stay plain.
  */
-const TETHERS: Record<number, TetherKind[]> = {
+const TETHERS: Record<number, TetherKind | TetherKind[]> = {
   45: [
     { element: "dm-yellow", payoff: [47792, 47797] },
     { element: "dm-purple", payoff: [GRAVITAS, 47798] },
   ],
+  // P3 Black Hole: a black hole's tether, paid off by its Nothingness.
+  [BLACK_HOLE_TETHER]: { element: "dm-void", payoff: [NOTHINGNESS] },
 };
 
 function ringEffects(data: ReplayData): CasterEffect[] {
@@ -471,6 +550,108 @@ function endsEffects(data: ReplayData): CasterEffect[] {
   return out;
 }
 
+const nearestSample = (a: ReplayData["actors"][number], t: number) =>
+  a.samples.reduce<(typeof a.samples)[number] | undefined>((b, x) => (!b || Math.abs(x[0] - t) < Math.abs(b[0] - t) ? x : b), undefined);
+const facingBearing = (f: number) => ((((f * 180) / Math.PI / 100 + 90) % 360) + 360) % 360;
+
+function p3Shapes(data: ReplayData): AoeShape[] {
+  const casts = data.enemyCasts ?? [];
+  const geo = data.actionGeometry ?? {};
+  const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  const players = data.actors.filter((a) => a.kind === "player");
+  const out: AoeShape[] = [];
+  for (const c of casts) {
+    if (c[3] !== 0) continue;
+    if (c[4] === INFERNO) {
+      // On the two players nearest the fire sigil (once per cast pair).
+      if (out.some((s) => s.name === c[2] && s.resolve === c[0])) continue;
+      const a = actorByKey.get(c[1]);
+      const s = a && nearestSample(a, c[0]);
+      if (!s || Math.abs(s[0] - c[0]) > 300) continue;
+      const near = players.map((p) => ({ p, at: poseAt(p, c[0]) })).filter((x) => x.at && x.at.hp !== 0)
+        .sort((x, y) => Math.hypot(x.at!.x - s[1], x.at!.y - s[2]) - Math.hypot(y.at!.x - s[1], y.at!.y - s[2])).slice(0, 2);
+      const range = (geo[INFERNO]?.range ?? 10) * 100;
+      for (const n of near) {
+        out.push({ ...blank, kind: "donut", x: n.at!.x, y: n.at!.y, range, inner: range / 3, estimated: true,
+          style: "aoe", name: c[2], start: c[0] - 300, resolve: c[0], follow: n.p.key });
+      }
+    }
+    if (c[4] === LATITUDINAL) {
+      const chaos = actorByKey.get(c[1]);
+      const p = chaos && poseAt(chaos, c[0]);
+      if (!p) continue;
+      const f = facingBearing(p.facing);
+      const waves = [...new Set(casts.filter((w) => w[4] === IMPLOSION_SHOCKWAVE && w[3] === 0 && w[0] > c[0] && w[0] - c[0] < 5000).map((w) => w[0]))]
+        .filter((t, i, all) => i === 0 || t - all[i - 1] > 1000).slice(0, 2);
+      const range = (geo[IMPLOSION_SHOCKWAVE]?.range ?? 40) * 100;
+      waves.forEach((t, i) => {
+        for (const b of i === 0 ? [f + 90, f + 270] : [f, f + 180]) {
+          out.push({ ...blank, kind: "cone", x: p.x, y: p.y, bearing: b % 360, angle: SHOCKWAVE_ANGLE, estimated: true, range,
+            style: "aoe", name: "Shockwave", start: i === 0 ? c[0] - c[3] : waves[0], resolve: t });
+        }
+      });
+    }
+  }
+  // Vacuum Wave: a knockback from Exdeath through its cast.
+  for (const c of casts) {
+    if (c[4] !== VACUUM_WAVE || c[3] <= 0) continue;
+    const a = actorByKey.get(c[1]);
+    const p = a && poseAt(a, c[0] + c[3]);
+    if (p) out.push({ ...blank, kind: "circle", x: p.x, y: p.y, range: ARENA_R, style: "knockback", name: c[2], start: c[0], resolve: c[0] + c[3] });
+  }
+  return out;
+}
+
+function p3Effects(data: ReplayData): CasterEffect[] {
+  const casts = data.enemyCasts ?? [];
+  const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  const out: CasterEffect[] = [];
+  // Sigils, from Bowels of Agony to their element's cast.
+  for (const b of casts.filter((c) => c[4] === BOWELS && c[3] === 0)) {
+    for (const [id, el] of Object.entries(SIGILS)) {
+      const c = casts.find((x) => x[4] === Number(id) && x[3] === 0 && x[0] > b[0] && x[0] - b[0] < 90000
+        && actorByKey.get(x[1]) && (() => {
+          const s = nearestSample(actorByKey.get(x[1])!, x[0]);
+          if (!s || Math.abs(s[0] - x[0]) > 300) return false;
+          const r = Math.hypot(s[1] - CENTRE.x, s[2] - CENTRE.y);
+          return Math.abs(r - SIGIL_R) < SIGIL_TOL && Math.abs(Math.abs(s[1] - CENTRE.x) - Math.abs(s[2] - CENTRE.y)) < SIGIL_TOL;
+        })());
+      if (!c) continue;
+      const s = nearestSample(actorByKey.get(c[1])!, c[0])!;
+      out.push({ kind: `dm-sigil-${el}`, label: "", x: s[1], y: s[2], start: b[0], end: c[0] + 500 });
+    }
+  }
+  // Limit Cut clones: from their pulse to their dash, numbered.
+  const markers = (data.headMarkers ?? []).filter((m) => LC_NUMBERS[m[2]]);
+  for (const p of casts.filter((c) => c[4] === LC_PULSE && c[3] === 0)) {
+    const a = actorByKey.get(p[1]);
+    const s = a && nearestSample(a, p[0]);
+    const dash = casts.find((c) => c[4] === LC_DASH && c[3] === 0 && c[1] === p[1] && c[0] > p[0] && c[0] - p[0] < 40000);
+    if (!s || !dash || Math.abs(s[0] - p[0]) > 300) continue;
+    // Its number: the marker on the player its dash hit.
+    const hit = (data.enemyHits ?? []).find((h) => h[1] === LC_DASH && h[2] === p[1] && h[0] >= dash[0] && h[0] - dash[0] < 1500);
+    const m = hit && markers.find((x) => x[1] === hit[3] && hit[0] - x[0] < 20000 && hit[0] > x[0]);
+    out.push({ kind: "dm-lc-clone", label: m ? String(LC_NUMBERS[m[2]]) : "", x: s[1], y: s[2], start: p[0] - 300, end: dash[0] + 400 });
+  }
+  // Limit Cut numbers on the players, from the marker to their dash.
+  for (const m of markers) {
+    const hit = (data.enemyHits ?? []).find((h) => h[1] === LC_DASH && h[3] === m[1] && h[0] > m[0] && h[0] - m[0] < 20000);
+    const p = actorByKey.get(m[1]);
+    const at = p && poseAt(p, m[0]);
+    if (!at) continue;
+    out.push({ kind: "dm-lc-number", label: String(LC_NUMBERS[m[2]]), actor: m[1], x: at.x, y: at.y, start: m[0], end: hit?.[0] ?? m[0] + 15000 });
+  }
+  // Black holes: from their tether until it fires.
+  for (const t of (data.tethers ?? []).filter((x) => x[3] === BLACK_HOLE_TETHER)) {
+    const hole = actorByKey.get(t[1]);
+    const hit = (data.enemyHits ?? []).find((h) => h[1] === NOTHINGNESS && h[3] === t[2] && h[0] > t[0] && h[0] - t[0] < 15000);
+    const s = hole && nearestSample(hole, hit?.[0] ?? t[0]);
+    if (!s) continue;
+    out.push({ kind: "dm-black-hole", label: "", x: s[1], y: s[2], start: t[0], end: (hit?.[0] ?? t[0] + 8000) + 300 });
+  }
+  return out;
+}
+
 function halfRoomShapes(data: ReplayData): AoeShape[] {
   return (data.enemyCasts ?? []).filter((c) => c[3] === 0 && HALF_ROOM[c[4] ?? 0] !== undefined).map((c) => ({
     ...blank, kind: "cone" as const, x: CENTRE.x, y: CENTRE.y, bearing: HALF_ROOM[c[4]!], angle: 180, range: ARENA_R + 500,
@@ -486,9 +667,9 @@ export const DANCING_MAD_REPLAY: FightReplay = {
   overrides: OVERRIDES,
   headMarkers: HEAD_MARKERS,
   tethers: TETHERS,
-  effects: (data) => [...ringEffects(data), ...gazeEffects(data), ...endsEffects(data)],
+  effects: (data) => [...ringEffects(data), ...gazeEffects(data), ...endsEffects(data), ...p3Effects(data)],
   shapes: (data) => [
     ...trapShapes(data), ...wellShapes(data), ...arrowShapes(data), ...halfRoomShapes(data),
-    ...forsakenShapes(data), ...trineShapes(data), ...wingShapes(data), ...aeroShapes(data),
+    ...forsakenShapes(data), ...trineShapes(data), ...wingShapes(data), ...aeroShapes(data), ...p3Shapes(data),
   ],
 };

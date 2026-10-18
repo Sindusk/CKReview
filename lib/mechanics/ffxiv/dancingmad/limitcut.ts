@@ -103,6 +103,10 @@
 // module self-gates on the debuffs' presence rather than any
 // encounter-name or timing check.
 //
+// The numbers are head markers on the players (2026-10-18, for the
+// replay): 336-339 = 1-4, 437-440 = 5-8, 12.5-14s before their dash
+// (2T1HzdPKgbhM43am fight 10: dash k hit marker k's player, all eight).
+//
 // ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
 // Not built:
 //   - a 4+-player scramble goes unflagged
