@@ -5,7 +5,7 @@
 // Top-down replay of the selected pull, styled after strategy-guide
 // diagrams: the fight's in-game map (XIVAPI's copy of the texture), job
 // icons for players, FFLogs' Boss icon for bosses with their hitbox ring
-// and front marker, and every enemy AoE at its game-data size as a blue
+// and front marker, and every enemy AoE at its game-data size as a red
 // shape with a white rim (lib/replay/action-shapes.ts; dashed = cone angle
 // or donut hole estimated). Hovering an actor shows its name, strategy
 // slot (MT, OT, H1 ... from lib/mechanics/ffxiv/roles.ts), coordinates and
@@ -73,10 +73,11 @@ const MAX_EXTRAPOLATE_MS = 350;
 // FFLogs' own actor icons ("Boss", "NPC"), the CDN the app already uses
 // for ability icons (lib/ability-icons.ts).
 const FFLOGS_ICON = (name: string) => `https://assets.rpglogs.com/img/ff/icons/${name}.png`;
-// Guide-style AoE colours by kind: blue AoEs, yellow towers, purple
-// tankbusters; white rims. `flash` is the fill as it resolves.
+// AoE colours by kind: red AoEs (user, 2026-10-17; were guide-style
+// blue), yellow towers, purple tankbusters; light rims. `flash` is the
+// fill as it resolves.
 const AOE_COLORS: Record<AoeShape["style"], { fill: string; flash: string; rim: string; glow: string }> = {
-  aoe:        { fill: "#2f5bff", flash: "#7fa2ff", rim: "#dfe8ff", glow: "#5f8bff" },
+  aoe:        { fill: "#d9342b", flash: "#ff7a70", rim: "#ffe1dc", glow: "#ff5a4a" },
   tower:      { fill: "#f2c230", flash: "#ffe27a", rim: "#fff6c8", glow: "#ffb84a" },   // non-circle towers only; circles use Tower
   tankbuster: { fill: "#8a3dff", flash: "#c99bff", rim: "#f1e2ff", glow: "#b47bff" },
 };

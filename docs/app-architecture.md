@@ -263,7 +263,7 @@ file's header comment. Mechanic detection has its own guide:
   styled after strategy-guide diagrams: the in-game map, job icons in
   role-coloured rings, FFLogs' Boss icon (`assets.rpglogs.com/img/ff/
   icons/Boss.png`, the CDN `lib/ability-icons.ts` already uses) with its
-  hitbox ring and front notch, enemy AoEs as blue shapes with white rims,
+  hitbox ring and front notch, enemy AoEs as red shapes with light rims,
   and a cast bar. Hover shows name, strategy slot (`detectFFRoles`),
   coordinates and HP; click pins a hitbox ring. WoW is below.
 - **WoW** (`lib/replay/wow-replay.ts`, `fetchWowReplayData` in
