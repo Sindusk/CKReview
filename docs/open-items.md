@@ -667,8 +667,20 @@ and delete them from the header.
     Heating Up conversions, Fire Blast charges (no recharge model), Heat
     Shimmer, precast delay, Meteor held. Kept `wrong` (four rows) for the
     user's review.
-  - [mage-frost.md](wowa-audit/mage-frost.md): 4; Fingers of Frost
-    overcap.
+  - [mage-frost.md](wowa-audit/mage-frost.md): phase 3 done 2026-10-17 on
+    21 Frost player-pulls (top Zhenglanxin, Choechoi ×2, 악용유저,
+    夏夜椿湫, Serasín; weak Purer, Mabho, Raisedxfist), Spellslinger on
+    Entombed Sentinels, Frostfire on three Vashnik players, no Icy Veins.
+    Built: Fingers of Frost wasted (frostmage.ts; top 0–199k, others up to
+    2.94M), Fingers of Frost expiry (procs.ts, 15s), the tracked Frozen Orb
+    valued (worth 0 a use before) with burstHold, Ray of Frost burstHold.
+    Unbuilt with numbers: Brain Freeze overwritten (≤0.4M; whether it
+    grants a Flurry isn't in the log), Thermal Void Flurries, Brain Freeze
+    expiry (never), Comet Storm drift (Ray of Frost resets it; valued it
+    fired on all three Frostfire players). Unverifiable: Freezing stacks
+    shattered (Freezing 1221389 isn't fetched; Shatter is ~40% of the
+    damage). Kept `wrong` (Ray of Frost ticks, Comet Storm targets) for
+    the user's review.
   - [paladin-holy.md](wowa-audit/paladin-holy.md): healer, 5; Avenging
     Wrath and Divine Toll drift.
   - [priest-discipline.md](wowa-audit/priest-discipline.md): healer, 3;
