@@ -79,3 +79,49 @@ the check's 0.5y hitbox). Spirit Taker: one player drawn at its edge.
 8. **9:26.9 (wave 3):** the replay explodes NW, W, SW and SE, E, NE. Is that
    the third explosion, or does the middle go off again? (The log puts all
    six at the centre, but most players standing there weren't hit.)
+
+## P4 Enter the Dragon (2026-10-18)
+
+Pull used: DWbAwTGQrYznK1jL Pull 18, a clear. P4 runs from Materialization
+(10:15) to the transition (~13:08). Pull 17 of the same report (a wipe at
+11:33) was checked for Darklit too. No VOD.
+
+### What's drawn
+
+| Mechanic | How |
+|---|---|
+| Akh Rhai, Darklit towers and cones, Spirit Taker, Waters, Somber Dance, Akh Morn, Morn Afah, Longing of the Lost, Crystallize Time's Spell-in-Waiting resolutions | The game data was right (all exact). |
+| Darklit's half-room Hallowed Wings (40228) | Now built in the spec. The game data centred the 40y band on Shiva, which covered the whole north half and four players who weren't hit. It's now the half on her right: east, since she faced north in both pulls, while everyone stood west. 40227 is drawn as the left half, unseen. |
+| Crystallize Time hourglasses | The P3 hourglass cue, extended to the six sorrow's hourglasses: yellow N/S (Maelstrom first, 11:54.4), purple pair (last, 12:04.9), green pair (11:59.9), from Speed's tethers (11:46.6). |
+| Dragon heads | New cue: two pale wyrm heads leave the north at ~11:50.7, one each way round, ~12.5y out at ~12°/s. They shrink after their first pop and are gone at the second. Their run is fitted to the four pops (the log has a head only where it popped). |
+| Blue beacons | New cue: a blue marker where each head popped, until a blue player's Wyrmfang ends on it (all four were taken within 2.5y). |
+| Tidal Light | New look: sea-green 10y bands, each shown through its own cast bar, so the wave reads as it travels from the west wall (12:01-12:10), then from the south (12:07-12:16). Nobody was hit; the fit check flags players standing on a band's edge or walking in behind it. |
+| Return | The P3 clock markers, now for Crystallize Time's Return (12:16.2 to the rewind at 12:23.2). |
+| Rewind Hallowed Wings (40332) | Knockback style: a wild charge across the whole arena from the first Tidal Light's wall (12:25.7), then the second's (12:30.2). It hits all eight. |
+| Darklit chains (tethers 110 / 111) | Unchanged: the default tether look, Chain until Fate replaces it. |
+
+### Couldn't find out / not drawn
+
+- **Marker 62** (10:35.9) on the two Darklit Water holders still reads
+  "Marker 62". The same engine change as in P3 is pending.
+- **The heads' look and lap:** the fit says one lap takes ~30s. The model's
+  "a head finishing its lap wipes" wasn't seen.
+- **Hallowed Wings 40227** (left) is unseen in any pull on disk.
+- **The heads' true start:** they're drawn leaving the north at 11:50.7.
+  Nothing logs when they appear.
+
+### VOD checks: Pull 18 (DWbAwTGQrYznK1jL)
+
+1. **10:55.2 to 11:00.2:** Shiva's half-room Hallowed Wings is drawn over
+   the east half. Was the east half the one hit?
+2. **11:46.6 to 12:04.9:** six hourglasses, yellow N/S, purple and green
+   pairs, exploding in that order. Do the colours match the tethers in game?
+3. **11:50.7:** the two dragon heads leave the north here, one each way. Do
+   they start here, and do they meet the red players at 11:57.6 (east) and
+   11:57.8 (west), then at 12:02.2 (SE and SW)?
+4. **11:57.6 to 12:12.6:** a blue beacon stays where each head popped until
+   a blue player takes it. Does the game's beacon look like that and last
+   until taken?
+5. **12:01.1 to 12:16.4:** Tidal Light is drawn as four bands from the west
+   wall, then four from the south, each lit for its cast bar. Does the wave
+   in game start from those walls, in that order?

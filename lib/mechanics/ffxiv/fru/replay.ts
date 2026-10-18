@@ -114,6 +114,20 @@ const OVERRIDES: Record<number, Override> = {
   // placed by relativityShapes / apocalypseShapes below: the helpers'
   // logged facing and positions are stale for both.
   40292: { hidden: true }, 40297: { hidden: true },
+  // P4 Darklit's half-room Hallowed Wings: placed by halfRoomWings below.
+  40227: { hidden: true }, 40228: { hidden: true },
+  // P4 Crystallize Time's Tidal Light: four 10y bands sweeping across the
+  // 40y arena 2s apart, one axis then the other (DWbAwTGQrYznK1jL 18:
+  // from the west wall 12:03.8-12:10.0, from the south 12:10.2-12:16.4).
+  // Each band shown through its own cast bar (2.7s, then 1.7s each), so
+  // the wave reads as it travels. Nobody was hit all pull; the players
+  // walked in behind each band.
+  40252: { telegraph: true, style: "fru-tidal" }, 40253: { telegraph: true, style: "fru-tidal" },
+  // The rewind's Hallowed Wings: a wild charge from the first Tidal
+  // Light's wall across the whole arena, then from the second's (12:25.7
+  // from W, 12:30.2 from S); it hit all eight both times, ranked by
+  // distance, and knocks back (enter-the-dragon.ts).
+  40332: { style: "knockback" },
   // Tank busters.
   40290: { style: "tankbuster" },                   // Black Halo
   40182: { style: "tankbuster" },                   // Darkest Dance jump
@@ -313,7 +327,7 @@ function buildEffects(data: ReplayData): CasterEffect[] {
       if (kind && p) out.push({ kind, label: "", x: p.x, y: p.y, start: mm[0], end: c[0] + MIRROR_AFTER_MS });
     }
   }
-  out.push(...relativityEffects(data), ...apocalypseEffects(data));
+  out.push(...relativityEffects(data), ...apocalypseEffects(data), ...dragonHeads(data));
   return out;
 }
 
@@ -358,6 +372,12 @@ const MELTDOWN_BEGIN = 40291, MELTDOWN_FIRST = 40235, MELTDOWN_NEXT = 40292;
 const MELTDOWN_STEP = 15;             // degrees per follow-up
 const MELTDOWN_SPAN_MS = 12000;       // first beam to last follow-up (~10.6s)
 const SAME_SPOT = 100;                // centi-yalms: a shooter on its hourglass
+const HOURGLASS_TETHER_MS = 20000;    // Speed's tethers to the set's first shot
+// P4 Crystallize Time's sorrow's hourglasses: Maelstrom 40299, a 12y
+// circle after a 1.2s begincast on each. DWbAwTGQrYznK1jL 18: tethers 134
+// on N/S (fire 11:54.4), 133 on two intercardinals (12:04.9), the other
+// two untethered (11:59.9), as enter-the-dragon.ts's model says.
+const MAELSTROM = 40299;
 
 type MeltdownVolley = {
   key: string; x: number; y: number;  // shooter and where it stands
@@ -415,7 +435,9 @@ function relativityShapes(data: ReplayData): AoeShape[] {
 // Spell-in-Waiting: Return records each player's spot when it runs out
 // (a blue marker in game, NAUR guide) and pulls them back there at the
 // Stun. Fight 24: five at 7:56.5, three at 8:06.5, all back at 8:20.5.
-const RETURN_WAITING = 1002464, RETURN = 1002452;
+// P4's Crystallize Time uses another waiting id, 1004208 (33s; all eight
+// at 12:16.2 in DWbAwTGQrYznK1jL 18, back at 12:23.2).
+const RETURN_WAITING = [1002464, 1004208], RETURN = 1002452;
 // Shadoweye: a gaze from its three holders as the Stun lands (8:23.6 in
 // fight 24); anyone facing one gets Doom. Shown on the holder for its
 // last seconds, while everyone has to face out.
@@ -431,18 +453,23 @@ function relativityEffects(data: ReplayData): CasterEffect[] {
   const volleys = meltdownVolleys(data);
 
   // The hourglasses, from their tethers (or Relativity's cast) to their
-  // last shot.
+  // last shot. P4's Crystallize Time has six more (sorrow's hourglass),
+  // drawn the same way until their Maelstrom.
   const relativity = casts.find((c) => c[4] === RELATIVITY && c[3] === 0);
-  const bodies = [...new Set(casts.filter((c) => c[4] === MELTDOWN_BEGIN && c[3] > 0).map((c) => c[1]))];
-  const firstTether = tethers.find((tt) => bodies.includes(tt[1]) || bodies.includes(tt[2]));
+  const bodyCasts = casts.filter((c) => (c[4] === MELTDOWN_BEGIN || c[4] === MAELSTROM) && c[3] > 0);
+  const bodies = [...new Set(bodyCasts.map((c) => c[1]))];
   for (const key of bodies) {
     const a = actorByKey.get(key);
     const p = a?.samples[0];
-    const begin = casts.find((c) => c[1] === key && c[4] === MELTDOWN_BEGIN && c[3] > 0);
+    const begin = bodyCasts.find((c) => c[1] === key);
     if (!p || !begin) continue;
-    const v = volleys.find((q) => Math.hypot(q.x - p[1], q.y - p[2]) <= SAME_SPOT && q.t >= begin[0] && q.t - begin[0] <= 6000);
+    const v = begin[4] === MELTDOWN_BEGIN
+      ? volleys.find((q) => Math.hypot(q.x - p[1], q.y - p[2]) <= SAME_SPOT && q.t >= begin[0] && q.t - begin[0] <= 6000)
+      : undefined;
     const last = v ? (v.follow[v.follow.length - 1] ?? v.t) : begin[0] + begin[3];
-    const start = firstTether?.[0] ?? (relativity ? relativity[0] + 4000 : begin[0] - 9000);
+    // The set's first tether: Speed's, at most 20s before it goes off.
+    const firstTether = tethers.find((tt) => (bodies.includes(tt[1]) || bodies.includes(tt[2])) && tt[0] <= begin[0] && begin[0] - tt[0] <= HOURGLASS_TETHER_MS);
+    const start = firstTether?.[0] ?? (relativity && begin[4] === MELTDOWN_BEGIN ? relativity[0] + 4000 : begin[0] - 9000);
     const tether = tethers.find((tt) => (tt[1] === key || tt[2] === key) && (tt[3] === QUICKEN_TETHER || tt[3] === SLOW_TETHER));
     const speed = casts.find((c) => c[5] === key && (c[4] === QUICKEN || c[4] === SLOW) && c[3] === 0);
     const kind = tether?.[3] === QUICKEN_TETHER || speed?.[4] === QUICKEN ? "fru-hourglass-yellow"
@@ -454,7 +481,7 @@ function relativityEffects(data: ReplayData): CasterEffect[] {
 
   // Return's recorded spots.
   for (const w of auras) {
-    if (w[3] !== RETURN_WAITING) continue;
+    if (!RETURN_WAITING.includes(w[3])) continue;
     const ret = auras.find((r) => r[3] === RETURN && r[2] === w[2] && Math.abs(r[0] - w[1]) <= 1000);
     const player = actorByKey.get(w[2]);
     const p = player && poseAt(player, w[1]);
@@ -581,6 +608,130 @@ function apocalypseEffects(data: ReplayData): CasterEffect[] {
   }];
 }
 
+// ── P4 Enter the Dragon ─────────────────────────────────────────────────────
+//
+// Built 2026-10-18 on DWbAwTGQrYznK1jL fight 18 (a clear; P4 from
+// Materialization 10:15.3 to the transition ~13:08), no VOD yet. Fit
+// check: Akh Rhai, Bright Hunger, The Path of Light, Spirit Taker, Darklit
+// Waters, Somber Dance, Akh Morn, Morn Afah, Longing of the Lost and every
+// Crystallize Time Spell-in-Waiting were exact from the game data.
+
+// Darklit's half-room Hallowed Wings (40227 / 40228): Shiva in the middle
+// cleaves one half of the room, a 40y-wide band beside her running the
+// length of the arena. Game data has it centred on her (all of the north
+// half). Fight 18 10:55.2-11:00.2: she faced north, cast 40228, everyone
+// stood on the west half (x 93-96) and nobody was hit: 40228 is her right
+// (east) side. 40227 is taken to be the left; no pull shows it yet.
+const HALF_WINGS: Record<number, 1 | -1> = { 40228: 1, 40227: -1 };
+
+function halfRoomWings(data: ReplayData): AoeShape[] {
+  const out: AoeShape[] = [];
+  const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  for (const c of data.enemyCasts ?? []) {
+    const side = c[4] !== undefined && c[3] === 0 ? HALF_WINGS[c[4]] : undefined;
+    const g = side && data.actionGeometry?.[c[4]!];
+    const a = actorByKey.get(c[1]);
+    const p = a && sampleNear(a, c[0], 1500);
+    if (!side || !g || !p) continue;
+    const b = facingToCompassBearing(p.facing);
+    const r = (b * Math.PI) / 180, s = ((b + 90 * side) * Math.PI) / 180;
+    const half = (g.width * 100) / 2, len = g.range * 100;
+    out.push({
+      kind: "rect", bearing: b, range: len, width: g.width * 100, angle: 0, inner: 0, estimated: false, style: "aoe",
+      // From half its length behind her, offset half its width to the side.
+      x: p.x + Math.sin(s) * half - Math.sin(r) * len / 2, y: p.y - Math.cos(s) * half + Math.cos(r) * len / 2,
+      name: data.abilityNames?.[c[4]!] ?? "Hallowed Wings", start: c[0] - 300, resolve: c[0],
+    });
+  }
+  return out;
+}
+
+// Crystallize Time's two dragon heads (drachen wanderer): they leave the
+// north together, one clockwise and one counterclockwise, ~12.5y out, and
+// a red player (Wyrmclaw) touching one pops it (Longing of the Lost): the
+// first touch shrinks it, the second destroys it; a head finishing its lap
+// wipes (enter-the-dragon.ts). The log has a head only where it popped, so
+// their run is fitted to the pops: angle from north = speed × (t - start).
+// Fight 18: pops 80° clockwise (11:57.6), 92° counterclockwise (11:57.8),
+// then 140° and 141° (12:02.2) fit one speed of ~12°/s from north at
+// ~11:50.7, 8.3s after Crystallize Time's cast. Where a pop's caster
+// logged a stale (100, 100), the red's own spot is used.
+// Each pop leaves a blue beacon where it happened, which one blue player
+// (Wyrmfang) takes to cleanse: fight 18's four fangs ended 0.9-2.5y from
+// the four pop spots, 11.6-10.4s later.
+const LONGING = 40241;
+const WYRMCLAW = 1003263, WYRMFANG = 1003264;
+const CRYSTALLIZE_TIME = 40298;
+const HEAD_RING = 1250;               // centi-yalms, the heads' run (pops 12.3-12.8y out)
+const HEAD_SPEED_DEFAULT = 12;        // degrees a second
+const HEAD_STEP_MS = 100;             // the run is drawn as short steps
+const BEACON_TAKE = 400;              // centi-yalms: a fang ending this near takes it
+const BEACON_MAX_MS = 20000;
+
+type HeadPop = { t: number; x: number; y: number; b: number; red: string };
+
+function headPops(data: ReplayData): HeadPop[] {
+  const hits = data.enemyHits ?? [];
+  const auras = data.playerAuras ?? [];
+  const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  const out: HeadPop[] = [];
+  for (const w of auras) {
+    if (w[3] !== WYRMCLAW) continue;
+    const h = hits.find((x) => x[1] === LONGING && x[3] === w[2] && Math.abs(x[0] - w[1]) <= 1000);
+    if (!h) continue;   // a claw that ran out or died with its holder
+    const src = h[4] !== null && Math.hypot(h[4] - ARENA_CENTRE, h[5]! - ARENA_CENTRE) >= RING_MIN ? { x: h[4], y: h[5]! } : undefined;
+    const player = actorByKey.get(w[2]);
+    const p = src ?? (h[6] !== null ? { x: h[6], y: h[7]! } : player && poseAt(player, w[1]));
+    if (!p) continue;
+    out.push({ t: w[1], x: p.x, y: p.y, b: bearingTo(ARENA_CENTRE, ARENA_CENTRE, p.x, p.y), red: w[2] });
+  }
+  return out.sort((a, b) => a.t - b.t);
+}
+
+function dragonHeads(data: ReplayData): CasterEffect[] {
+  const ct = (data.enemyCasts ?? []).find((c) => c[4] === CRYSTALLIZE_TIME && c[3] === 0);
+  if (!ct) return [];
+  const pops = headPops(data).filter((p) => p.t > ct[0] && p.t - ct[0] <= 60000);
+  // Speed and start from the pops: |angle| = speed × (t - start).
+  let speed = HEAD_SPEED_DEFAULT, t0 = ct[0] + 8300;
+  if (pops.length >= 2) {
+    const xs = pops.map((p) => p.t / 1000), ys = pops.map((p) => Math.abs(wrap(p.b)));
+    const mx = xs.reduce((s, v) => s + v, 0) / xs.length, my = ys.reduce((s, v) => s + v, 0) / ys.length;
+    const sxx = xs.reduce((s, v) => s + (v - mx) ** 2, 0), sxy = xs.reduce((s, v, i) => s + (v - mx) * (ys[i] - my), 0);
+    const k = sxx > 0 ? sxy / sxx : 0;
+    if (k >= 5 && k <= 15) { speed = k; t0 = (mx - my / k) * 1000; }
+  } else if (pops.length === 1) {
+    t0 = pops[0].t - (Math.abs(wrap(pops[0].b)) / speed) * 1000;
+  }
+  const out: CasterEffect[] = [];
+  for (const dir of [1, -1] as const) {
+    const mine = pops.filter((p) => Math.sign(wrap(p.b)) === dir);
+    const lap = t0 + (360 / speed) * 1000;
+    const end = mine.length >= 2 ? mine[1].t : lap;
+    const kind = dir > 0 ? "fru-wanderer-cw" : "fru-wanderer-ccw";
+    for (let t = Math.max(t0, ct[0]); t < end; t += HEAD_STEP_MS) {
+      const b = ((dir * speed * (t - t0)) / 1000 * Math.PI) / 180;
+      const small = mine.length >= 1 && t >= mine[0].t;
+      out.push({
+        kind: small ? `${kind}-small` : kind, label: "",
+        x: ARENA_CENTRE + Math.sin(b) * HEAD_RING, y: ARENA_CENTRE - Math.cos(b) * HEAD_RING,
+        start: t, end: Math.min(end, t + HEAD_STEP_MS),
+      });
+    }
+  }
+  // The blue beacons.
+  const auras = data.playerAuras ?? [];
+  const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  const taken = new Set<(typeof auras)[number]>();
+  for (const p of pops) {
+    const fang = auras.filter((f) => f[3] === WYRMFANG && !taken.has(f) && f[1] > p.t && f[1] - p.t <= BEACON_MAX_MS)
+      .find((f) => { const a = actorByKey.get(f[2]); const q = a && poseAt(a, f[1]); return q && Math.hypot(q.x - p.x, q.y - p.y) <= BEACON_TAKE; });
+    if (fang) taken.add(fang);
+    out.push({ kind: "fru-beacon", layer: "floor", label: "", x: p.x, y: p.y, start: p.t, end: fang ? fang[1] + 300 : p.t + BEACON_MAX_MS });
+  }
+  return out;
+}
+
 export const FRU_REPLAY: FightReplay = {
   key: "fru",
   game: "ffxiv",
@@ -591,7 +742,7 @@ export const FRU_REPLAY: FightReplay = {
   markerAoes: MARKER_AOES,
   tethers: TETHERS,
   effects: buildEffects,
-  shapes: (data) => [...relativityShapes(data), ...apocalypseShapes(data)],
+  shapes: (data) => [...relativityShapes(data), ...apocalypseShapes(data), ...halfRoomWings(data)],
   floorStatuses: FLOOR_STATUSES,
   jailStatuses: JAIL_STATUSES,
 };

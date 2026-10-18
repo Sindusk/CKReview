@@ -102,6 +102,15 @@
 // - Spirit Taker 14 +43.0: the NIN should have spread to the D marker,
 //   the SGE was fine. Not readable (positions too sparse; see
 //   oracle-of-darkness.ts), so both stay named.
+// Replay build 2026-10-18 (DWbAwTGQrYznK1jL 18, a clear; no VOD;
+// fru/replay.ts):
+// - Half-room Hallowed Wings 40228 covered Shiva's right (east, facing N)
+//   in both of that report's P4 pulls (17, 18); 40227 is presumed left.
+// - CT's dragon heads ran ~12°/s from north (~+95.4) by their four pops;
+//   each pop's beacon was taken by a fang 0.9-2.5y from it 10-12s later.
+// - CT's hourglasses carry Speed's 134 (N/S) / 133 tethers as in P3; the
+//   rewind's waiting Return is 1004208 (33s), then Return 1002452.
+// - Marker 62 at +20.6 on the two Darklit Water holders (as P3's Refrain).
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-etd-autos: Shiva's second auto on a non-tank names the tank who

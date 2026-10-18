@@ -427,6 +427,59 @@ function speedTether(col: string) {
   };
 }
 
+// ── P4 Enter the Dragon ─────────────────────────────────────────────────────
+
+/**
+ * A Crystallize Time dragon head running round the arena: a pale wyrm
+ * head with a short body trailing behind it along its run, wrapped in an
+ * icy glow. Shrunk after its first pop. Each step of the run is its own
+ * short effect, so it draws without fading.
+ */
+function Wanderer({ e, x, y, scale, cx, cy, t }: EffectArtProps) {
+  const cw = e.kind.startsWith("fru-wanderer-cw");
+  const small = e.kind.endsWith("-small");
+  const k = (small ? 0.6 : 1) * scale * 100;   // ~1y in SVG units
+  const ring = Math.hypot(x - cx, y - cy);
+  const a = Math.atan2(x - cx, -(y - cy));
+  const dir = cw ? 1 : -1;
+  // Body: points behind the head along the ring.
+  const body = Array.from({ length: 7 }, (_, i) => {
+    const b = a - dir * (i * 0.7 * k) / Math.max(1, ring);
+    const wob = Math.sin(t / 160 + i * 0.9) * 0.25 * k;
+    return { x: cx + Math.sin(b) * (ring + wob), y: cy - Math.cos(b) * (ring + wob) };
+  });
+  const line = body.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
+  // Facing: along the run.
+  const deg = (a * 180) / Math.PI + (cw ? 90 : -90);
+  return (
+    <g pointerEvents="none">
+      <path d={line} fill="none" stroke="#9fdcff" strokeWidth={1.3 * k} strokeOpacity={0.35} strokeLinecap="round" filter="url(#replay-glow)" />
+      <path d={line} fill="none" stroke="#e8f4ff" strokeWidth={0.6 * k} strokeLinecap="round" />
+      <g transform={`translate(${x} ${y}) rotate(${deg}) scale(${k / 26})`}>
+        <path d="M-7 -4 Q-16 4 -20 18 M7 -4 Q16 4 20 18" fill="none" stroke="#e8f4ff" strokeWidth={3.5} strokeLinecap="round" />
+        <path d="M0 -30 Q6 -28 7 -18 L12 -6 Q13 6 6 10 L-6 10 Q-13 6 -12 -6 L-7 -18 Q-6 -28 0 -30 Z" fill="#e8f4ff" stroke="#5fb4e8" strokeWidth={2.5} />
+        <ellipse cx={-5.5} cy={-6} rx={2.8} ry={1.8} fill="#ff4d5e" />
+        <ellipse cx={5.5} cy={-6} rx={2.8} ry={1.8} fill="#ff4d5e" />
+      </g>
+    </g>
+  );
+}
+
+/** A popped head's blue beacon on the floor, waiting for a blue player. */
+function Beacon({ e, x, y, t, scale }: EffectArtProps) {
+  const opacity = fade(e, t, 300, 300);
+  if (opacity <= 0) return null;
+  const r = 120 * scale;
+  const pulse = 0.7 + 0.3 * Math.sin(t / 200);
+  return (
+    <g opacity={opacity} pointerEvents="none">
+      <circle cx={x} cy={y} r={r * 1.4} fill="#2f7dff" fillOpacity={0.15} stroke="#4aa8ff" strokeWidth={6} strokeOpacity={0.5 * pulse} filter="url(#replay-glow)" />
+      <circle cx={x} cy={y} r={r * 0.55} fill="#bfe0ff" stroke="#2f7dff" strokeWidth={2} />
+      <path d={`M${x} ${y - r * 0.35} L${x + r * 0.3} ${y} L${x} ${y + r * 0.35} L${x - r * 0.3} ${y} Z`} fill="#2f7dff" />
+    </g>
+  );
+}
+
 // The dragon circles just outside the boss's hitbox (the boss icon when
 // the hitbox is small or unknown).
 const Dragon = ({ e, x, y, t, scale, actor }: EffectArtProps) =>
@@ -446,7 +499,11 @@ export const FRU_ART: FightArt = {
     "fru-return": ReturnMarker,
     "fru-shadoweye": Shadoweye,
     "fru-apocalypse-cw": ApocalypseLights, "fru-apocalypse-ccw": ApocalypseLights,
+    "fru-wanderer-cw": Wanderer, "fru-wanderer-ccw": Wanderer, "fru-wanderer-cw-small": Wanderer, "fru-wanderer-ccw-small": Wanderer,
+    "fru-beacon": Beacon,
   },
   shapes: { "fru-apocalypse": ApocalypseCircle },
+  // Tidal Light's bands: sea-green water light.
+  colors: { "fru-tidal": { fill: "#2fb3c8", flash: "#b8f4ff", rim: "#e6fcff", glow: "#4fd6e8" } },
   tethers: { "fru-quicken": speedTether("#ffd23a"), "fru-slow": speedTether("#b45cff") },
 };
