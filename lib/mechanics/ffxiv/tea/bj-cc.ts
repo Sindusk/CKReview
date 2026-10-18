@@ -213,6 +213,12 @@
 //   expectations/rulings.json. F14 followed the Lightning plan up to round
 //   3, so Cruise Chaser's tank stays named there (unruled: the user
 //   couldn't tell).
+// Replay findings (2026-10-18, tea/replay.ts, F4 the kill): Optical Sight's
+//   eight Hawk Blasters land where each player stood at their 4.7s
+//   begincast (helpers log the middle); Enumeration's helpers stand on the
+//   two marked DPS (marker 65); each Water leaves its tornado at the
+//   Crashing Wave spot (no actor logged); Cruise Chaser stood 2.4y from
+//   the frozen tornado's spot at Propeller Wind, the party lined up east.
 // OPEN QUESTIONS:
 // 1. Collisions name both players. Who moved (B37 pass 4, B43 +63 two
 //    melee in the west Enumeration; C22 +101.5 two ranged at pass 3)?

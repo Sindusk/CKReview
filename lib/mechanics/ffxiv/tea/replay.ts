@@ -10,6 +10,7 @@
 // fixed. Nothing here is VOD-verified yet: docs/replay-reviews/tea.md has
 // the checks.
 
+import { facingToCompassBearing } from "@/lib/mechanics/geometry";
 import type { AoeShape } from "@/lib/replay/action-shapes";
 import type { CasterEffect, FightReplay, Override, TetherKind } from "@/lib/replay/fight-spec";
 import { poseAt, sampleNear, type ReplayActor, type ReplayData } from "@/lib/replay/ffxiv-replay";
@@ -350,14 +351,259 @@ function hawkBlaster(data: ReplayData): AoeShape[] {
   return out;
 }
 
+// ── Phase 2: Brute Justice and Cruise Chaser ────────────────────────────────
+//
+// Ids from bj-cc.ts's header; placements checked on Q9zqJb4VLmjhd1B6 4
+// (2:13 to 4:38).
+
+const OPTICAL_HAWK = 18481;
+const EYE_OF_THE_CHAKRAM = 18517;
+const SPIN_CRUSHER = 19058;
+const CRASHING_WAVE = 18496, CRASHING_THUNDER = 18497;
+const EARTH_MISSILE = 18510, ICE_MISSILE = 18511, HIDDEN_MINEFIELD = 18513, HIDDEN_MINE = 18514, ENUMERATION = 18512;
+const FLARETHROWER = 18502;
+const PROPELLER_WIND = 18482, GAVEL = 18492;
+const PLASMA_LIMIT_CUT = 18483;
+const COMPRESSED_WATER = 1002142, COMPRESSED_LIGHTNING = 1002143;
+
+// Optical Sight's Hawk Blaster: drawn by opticalSight() (the casts sit on
+// helpers in the middle).
+OVERRIDES[OPTICAL_HAWK] = { hidden: true };
+// Eye of the Chakram: the two 6y lines across the arena, baited through
+// the middle; shown for their 5.7s cast as the game telegraphs them. Fit
+// exact on the kill (2:43.3, nobody hit).
+OVERRIDES[EYE_OF_THE_CHAKRAM] = { telegraph: true };
+// Spin Crusher: drawn by spinCrusher() (the data's 5y doesn't reach out of
+// Cruise Chaser's 5y hitbox).
+OVERRIDES[SPIN_CRUSHER] = { hidden: true };
+// Water and Lightning: 8y stacks on their carriers (exact on all six).
+// Water is shared by three or more, Lightning by exactly two.
+OVERRIDES[CRASHING_WAVE] = { style: "tea-water" };
+OVERRIDES[CRASHING_THUNDER] = { style: "lightning" };
+// Missile Command: two 5y Earth Missiles on the two farthest from Brute
+// Justice, then the Hidden Minefield under them, both telegraphed through
+// their 2.7s casts (the helpers stand where they land: exact).
+OVERRIDES[EARTH_MISSILE] = { telegraph: true };
+OVERRIDES[HIDDEN_MINEFIELD] = { telegraph: true, style: "drop" };
+// The mines themselves: drawn by mines() as one-soaker towers.
+OVERRIDES[HIDDEN_MINE] = { hidden: true };
+// Ice Earth Missile on the marked tank, which freezes the first tornado.
+OVERRIDES[ICE_MISSILE] = { style: "ice" };
+// Enumeration: a 5y stack of exactly three on each marked DPS (marker 65).
+// Its helpers stand on the two marked players at the cast (kill 3:19.9:
+// the dancer and black mage); a clean one logs no damage. Its own style
+// (stack orange): the engine skips a "stack" with no target and no hits.
+OVERRIDES[ENUMERATION] = { style: "tea-enum" };
+// Flarethrower: Brute Justice's fire cone at its nearest player, aimed
+// through the second tornado to burn it. 90° per [BM] (provisional there);
+// one hit on the kill (the warrior), so the data can't say.
+OVERRIDES[FLARETHROWER] = { angle: 90, style: "tea-fire" };
+
+/** Water / Lightning carriers (head markers 68 / 69 as each status lands, kill 2:35.3 ...). */
+const BJCC_MARKERS = {
+  68: { label: "Water", abilities: [CRASHING_WAVE], lookaheadMs: 31000 },
+  69: { label: "Lightning", abilities: [CRASHING_THUNDER], lookaheadMs: 31000 },
+  67: { label: "Ice", abilities: [ICE_MISSILE] },
+};
+/** Enumeration's ring rides on each marked DPS until it resolves (marker 65 at 3:14.7 -> 3:19.9 on the kill). */
+const MARKER_AOES = { 65: { ability: ENUMERATION, name: "Enumeration: 3" } };
+
+// Decree Nisi colours, the BPOG line (bj-cc.ts: Alpha blue, Gamma purple,
+// Beta orange, Delta green): the colour a player carries now, and the one
+// Verdict says they must hold at Gavel.
+const NISI: Record<number, string> = { 1002222: "a", 1002223: "b", 1002137: "g", 1002138: "d" };
+const JUDGMENT: Record<number, string> = { 1002224: "a", 1002225: "b", 1002139: "g", 1002140: "d" };
+const NISI_LETTER: Record<string, string> = { a: "α", b: "β", g: "γ", d: "δ" };
+
+const OPTICAL_RADIUS = 1000;
+const CARRIER_SHOW_MS = 5000;      // a Water / Lightning ring on its carrier for its last 5s
+const PILLAR_RADIUS = 400;         // the frozen tornado; its true size isn't in the log
+const SHADOW_LENGTH = 2500;
+
+/**
+ * Optical Sight: eight 10y Hawk Blasters on where each player stood when
+ * the 4.7s cast began, shown through it (kill 2:42.7: the party spread on
+ * the clock 17y out, then gathered in the middle; nobody was hit). The
+ * helpers casting them all log the middle.
+ */
+function opticalSight(data: ReplayData): AoeShape[] {
+  const out: AoeShape[] = [];
+  const casts = data.enemyCasts ?? [];
+  for (const b of bursts(data, OPTICAL_HAWK)) {
+    if (!casts.some((c) => c[4] === OPTICAL_HAWK && c[3] === 0 && Math.abs(c[0] - (b.t + b.dur)) < 800)) continue;
+    for (const { p } of living(data, b.t)) {
+      out.push({ kind: "circle", x: p.x, y: p.y, bearing: 0, range: OPTICAL_RADIUS, width: 0, angle: 0, inner: 0, estimated: false,
+        style: "aoe", name: "Hawk Blaster", start: b.t, resolve: b.t + b.dur });
+    }
+  }
+  return out;
+}
+
+/** Spin Crusher: Cruise Chaser's 90° frontal ([BM]), its 5y plus the hitbox, as it lands (no telegraph in game). */
+function spinCrusher(data: ReplayData): AoeShape[] {
+  const out: AoeShape[] = [];
+  const range = (data.actionGeometry?.[SPIN_CRUSHER]?.range ?? 5) * 100;
+  for (const c of data.enemyCasts ?? []) {
+    if (c[4] !== SPIN_CRUSHER || c[3] !== 0) continue;
+    const cc = data.actors.find((a) => a.key === c[1]);
+    const p = cc && (sampleNear(cc, c[0], 1500) ?? poseAt(cc, c[0]));
+    if (!cc || !p) continue;
+    out.push({ kind: "cone", x: p.x, y: p.y, bearing: facingToCompassBearing(p.facing),
+      range: range + (cc.hitbox ?? 500), width: 0, angle: 90, inner: 0, estimated: false, style: "aoe", name: "Spin Crusher",
+      start: c[0] - 300, resolve: c[0] });
+  }
+  return out;
+}
+
+/**
+ * Hidden Mines: a one-soaker mine on each Minefield spot from its 2.7s
+ * cast until the tank sets it off (kill: placed 3:17.8 at (98.2, 113.3)
+ * and (102.2, 113.1), the paladin set them off 3:20.7 and 3:21.7 from 3.1y
+ * and 2.9y). Drawn at the Minefield's 5y.
+ */
+function mines(data: ReplayData): AoeShape[] {
+  const out: AoeShape[] = [];
+  const casts = data.enemyCasts ?? [];
+  const spots = casts.filter((c) => c[4] === HIDDEN_MINEFIELD && c[3] === 0).map((c) => {
+    const a = data.actors.find((x) => x.key === c[1]);
+    return { t: c[0], p: a && sampleNear(a, c[0], 1500) };
+  }).filter((s): s is { t: number; p: NonNullable<ReturnType<typeof sampleNear>> } => !!s.p);
+  const booms = casts.filter((c) => c[4] === HIDDEN_MINE && c[3] === 0).map((c) => {
+    const a = data.actors.find((x) => x.key === c[1]);
+    return { t: c[0], p: a && sampleNear(a, c[0], 1500) };
+  });
+  for (const s of spots) {
+    const boom = booms.find((b) => b.t > s.t && b.t - s.t < 15000 && b.p && Math.hypot(b.p.x - s.p.x, b.p.y - s.p.y) < 200);
+    const begin = casts.find((c) => c[4] === HIDDEN_MINEFIELD && c[3] > 0 && Math.abs(c[0] + c[3] - s.t) < 800);
+    out.push({ kind: "circle", x: s.p.x, y: s.p.y, bearing: 0, range: 500, width: 0, angle: 0, inner: 0, estimated: false,
+      style: "tower", soakers: 1, name: "Hidden Mine", start: begin ? begin[0] : s.t, resolve: boom ? boom.t : s.t + 10000 });
+  }
+  return out;
+}
+
+/** Water / Lightning: the 8y ring on its carrier for the last seconds before it goes off. */
+function carriers(data: ReplayData): AoeShape[] {
+  const out: AoeShape[] = [];
+  for (const [start, end, target, id] of data.playerAuras ?? []) {
+    if (id !== COMPRESSED_WATER && id !== COMPRESSED_LIGHTNING) continue;
+    const water = id === COMPRESSED_WATER;
+    // Only a status that went off as its stack, not one a death or Gavel
+    // removed (kill: the fourth pair, 4:04.5 to Gavel, never resolves).
+    const blast = water ? CRASHING_WAVE : CRASHING_THUNDER;
+    if (!(data.enemyCasts ?? []).some((c) => c[4] === blast && c[3] === 0 && Math.abs(c[0] - end) < 1500)) continue;
+    out.push({ kind: "circle", x: 0, y: 0, bearing: 0, range: 800, width: 0, angle: 0, inner: 0, estimated: false,
+      style: water ? "tea-water" : "lightning", name: water ? "Compressed Water" : "Compressed Lightning",
+      start: Math.max(start, end - CARRIER_SHOW_MS), resolve: end, follow: target, noFlash: true });
+  }
+  return out;
+}
+
+/**
+ * Propeller Wind's shadow: the strip behind the frozen tornado, away from
+ * Cruise Chaser, where the party hides through the 5.7s cast (kill 4:16.2:
+ * Cruise Chaser at the west wall, the pillar at (86.2, 100.1), all seven
+ * others in a line at y 99.9-100.6 east of it).
+ */
+function propellerShadow(data: ReplayData): AoeShape[] {
+  const out: AoeShape[] = [];
+  const casts = data.enemyCasts ?? [];
+  const pillar = frozenPillar(data);
+  if (!pillar) return out;
+  for (const c of casts) {
+    if (c[4] !== PROPELLER_WIND || c[3] <= 0) continue;
+    const cc = data.actors.find((a) => a.key === c[1]);
+    const p = cc && (sampleNear(cc, c[0], 2000) ?? poseAt(cc, c[0]));
+    if (!p) continue;
+    // Away from Cruise Chaser through the pillar. On the kill it stood 2.4y
+    // from the pillar's logged spot, too close to aim by, so then the strip
+    // runs from the wall it stands at toward the middle.
+    const cx = data.map ? -data.map.offsetX * 100 : 10000, cy = data.map ? -data.map.offsetY * 100 : 10000;
+    const bearing = Math.hypot(pillar.x - p.x, pillar.y - p.y) > 600 ? bearingTo(p.x, p.y, pillar.x, pillar.y) : bearingTo(p.x, p.y, cx, cy);
+    out.push({ kind: "rect", x: pillar.x, y: pillar.y, bearing, range: SHADOW_LENGTH,
+      width: PILLAR_RADIUS * 2, angle: 0, inner: 0, estimated: false, style: "tea-safe", name: "Propeller Wind: hide here",
+      start: c[0], resolve: c[0] + c[3], noFlash: true });
+  }
+  return out;
+}
+
+/** The Water tornadoes: one at each Crashing Wave (the Water stack's spot). */
+function waterTornadoes(data: ReplayData) {
+  return (data.enemyCasts ?? []).filter((c) => c[4] === CRASHING_WAVE && c[3] === 0).map((c) => {
+    const a = data.actors.find((x) => x.key === c[1]);
+    return { t: c[0], p: a && sampleNear(a, c[0], 1500) };
+  }).filter((x): x is { t: number; p: NonNullable<ReturnType<typeof sampleNear>> } => !!x.p);
+}
+
+/** The tornado the ice tank froze: the one nearest the ice Earth Missile's hit. */
+function frozenPillar(data: ReplayData): { x: number; y: number; t: number } | undefined {
+  const ice = (data.enemyHits ?? []).find((h) => h[1] === ICE_MISSILE && h[6] !== null);
+  if (!ice) return undefined;
+  const near = waterTornadoes(data).filter((w) => w.t < ice[0])
+    .sort((a, b) => Math.hypot(a.p.x - ice[6]!, a.p.y - ice[7]!) - Math.hypot(b.p.x - ice[6]!, b.p.y - ice[7]!))[0];
+  return near && Math.hypot(near.p.x - ice[6]!, near.p.y - ice[7]!) < 1500 ? { x: near.p.x, y: near.p.y, t: ice[0] } : undefined;
+}
+
+function phaseTwoEffects(data: ReplayData): CasterEffect[] {
+  const out: CasterEffect[] = [];
+  const casts = data.enemyCasts ?? [];
+  const gavel = casts.find((c) => c[4] === GAVEL && c[3] === 0)?.[0];
+  const bj = data.actors.find((a) => a.kind === "enemy" && a.targetable && a.name === "Brute Justice");
+  const phaseEnd = gavel ?? (bj?.samples.length ? bj.samples[bj.samples.length - 1][0] : data.durationMs);
+
+  // Water tornadoes (bj-cc.ts): the first frozen by the ice, the second
+  // burned by Flarethrower, the third left until Gavel. Kill: W (86.2,
+  // 100.1) at 3:04.3, frozen 3:20.5; NE (113.6, 92.2) at 3:34.1, burned
+  // 3:43.2; NE again at 4:03.8.
+  const pillar = frozenPillar(data);
+  const fire = casts.find((c) => c[4] === FLARETHROWER && c[3] === 0);
+  const tornadoes = waterTornadoes(data);
+  let burned = false;
+  for (const w of tornadoes) {
+    let end = phaseEnd;
+    if (pillar && w.p.x === pillar.x && w.p.y === pillar.y) {
+      end = pillar.t;
+      out.push({ kind: "tea-ice-pillar", layer: "floor", label: "", radius: PILLAR_RADIUS, x: w.p.x, y: w.p.y, start: pillar.t, end: phaseEnd });
+    } else if (fire && !burned && fire[0] > w.t) {
+      end = fire[0] + 500;
+      burned = true;
+    }
+    out.push({ kind: "tea-tornado", layer: "floor", label: "", radius: PILLAR_RADIUS, x: w.p.x, y: w.p.y, start: w.t, end });
+  }
+
+  // Plasma Shield (Cruise Chaser's "Limit Cut" 18483): only its front can be
+  // hurt, so its front arc is drawn while it lives (kill: 3:44.8 to 3:46.1).
+  const shield = data.actors.find((a) => a.kind === "enemy" && a.name === "plasma shield");
+  const lc = casts.find((c) => c[4] === PLASMA_LIMIT_CUT && c[3] === 0);
+  if (shield?.samples.length && lc) {
+    const s0 = shield.samples[0];
+    const dead = shield.samples.find((s) => s[4] === 0)?.[0] ?? shield.samples[shield.samples.length - 1][0];
+    out.push({ kind: "tea-shield-front", label: "Shield: hit its front", actor: shield.key, x: s0[1], y: s0[2], start: Math.min(lc[0], s0[0]), end: dead });
+  }
+
+  // Nisi colours on their carriers, and the colour Verdict requires.
+  for (const [start, end, target, id] of data.playerAuras ?? []) {
+    const n = NISI[id], j = JUDGMENT[id];
+    if (!n && !j) continue;
+    const who = data.actors.find((a) => a.key === target);
+    const p = who && poseAt(who, start);
+    if (!p) continue;
+    out.push({ kind: n ? `tea-nisi-${n}` : `tea-judgment-${j}`, label: NISI_LETTER[n ?? j], actor: target, x: p.x, y: p.y, start, end: Math.min(end, phaseEnd + 2500) });
+  }
+  return out;
+}
+
 export const TEA_REPLAY: FightReplay = {
   key: "tea",
   game: "ffxiv",
   name: "The Epic of Alexander",
   signature: [FLUID_SWING, CASCADE, WAVE_BOSS_VISIBLE, WAVE_TORNADO_VISIBLE],
   overrides: OVERRIDES,
-  headMarkers: { ...LIMIT_CUT_MARKERS },
+  headMarkers: { ...LIMIT_CUT_MARKERS, ...BJCC_MARKERS },
+  markerAoes: MARKER_AOES,
   tethers: TETHERS,
-  effects: (data) => [...phaseOneEffects(data)],
-  shapes: (data) => [...protean(data), ...sluice(data), ...hawkBlaster(data)],
+  effects: (data) => [...phaseOneEffects(data), ...phaseTwoEffects(data)],
+  shapes: (data) => [
+    ...protean(data), ...sluice(data), ...hawkBlaster(data),
+    ...opticalSight(data), ...spinCrusher(data), ...mines(data), ...carriers(data), ...propellerShadow(data),
+  ],
 };

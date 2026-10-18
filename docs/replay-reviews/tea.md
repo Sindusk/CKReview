@@ -130,3 +130,69 @@ script pairing its one hit with the wrong circle of the pair.
     Same on screen?
 11. **Pull 4, 1:56-1:58** — the second set's first pair, drawn NE/SW again
     at 1:58.2. Right?
+
+## Phase 2: Brute Justice and Cruise Chaser (2:13 to 4:38 on the kill)
+
+Checked on the kill only (the clears in reports B and C are event files,
+no replay saved).
+
+### What's drawn
+- **Decree Nisi colours:** a ring in the carrier's colour (α blue,
+  β orange, γ purple, δ green: the BPOG line) with its letter, for as long
+  as they hold it; after Verdict a dashed outer ring in the colour they
+  must hold at Gavel. The statuses were already in the status row; the
+  ring is what makes a pass readable at a glance.
+- **Water / Lightning:** head markers 68 / 69 read "Water" / "Lightning"
+  over the carrier; for the last 5s before it goes off, the 8y stack ring
+  rides on them (sea blue / lightning blue), then the hit flashes.
+- **Eye of the Chakram:** the two 6y lines shown for their 5.7s cast.
+- **Optical Sight:** eight 10y circles on where each player stood when the
+  4.7s cast began, shown through the cast (the log puts all eight in the
+  middle). Nobody stood in one when they landed.
+- **Spin Crusher:** a 90° frontal from Cruise Chaser, its 5y plus the 5y
+  hitbox, as it lands (no telegraph in game).
+- **Missile Command:** Earth Missiles and the Minefield telegraphed
+  through their casts; each mine then sits as a one-soaker tower until
+  the tank sets it off. The ice marker (67) reads "Ice"; Enumeration's
+  marker (65) puts a ring on each marked DPS, then the 5y stack of three
+  flashes.
+- **Tornadoes:** each Water leaves a tornado where it went off (the log
+  has no tornado actor here). The one nearest the ice tank's hit turns
+  into an ice block until Gavel; the next is burned by Flarethrower (an
+  orange 90° cone); the third stays until Gavel.
+- **Plasma Shield:** a bright arc on its front (the only side that takes
+  damage), dim dashes round the rest, until it breaks.
+- **Propeller Wind:** a green strip behind the ice block, away from
+  Cruise Chaser, through the 5.7s cast.
+
+### Fit check
+Everything exact: chakrams 2, Optical Sight 8, Spin Crusher 1, Water 3,
+Lightning 3, missiles 3, Minefield 2, mines 2, Flarethrower 1.
+
+### Not known
+- The ice block's and tornadoes' size (drawn 4y, as Phase 1's).
+- Cruise Chaser stood 2.4y from where Water 1 went off when Propeller Wind
+  began, too close to aim the shadow by, so the strip runs from Cruise
+  Chaser's wall toward the middle. Is the block where Water 1 went off?
+- Enumeration's marker reads "Marker 65" (a clean Enumeration logs no hit
+  to confirm the label with).
+- Flarethrower's angle (90° from BossMod, one hit on the kill).
+
+### VOD checks: Q9zqJb4VLmjhd1B6 Pull 4
+12. **Pull 4, 2:29-2:39** — Nisi drawn: dancer α (blue), black mage
+    β (orange), monk γ (purple), dragoon δ (green); the supports pick them
+    up at 2:51-2:52. Do the colours match the game's?
+13. **Pull 4, 3:04** — a tornado drawn where the first Water went off,
+    west (86, 100). Is the tornado there?
+14. **Pull 4, 3:15-3:20** — the warrior's ice marker, then the ice block
+    drawn on that west tornado from 3:20.5. Is that the frozen tornado?
+15. **Pull 4, 3:41-3:46** — the Plasma Shield's front drawn facing the
+    same way as Cruise Chaser. Is that the side the ranged hit?
+16. **Pull 4, 3:43** — Flarethrower drawn as a 90° cone from Brute
+    Justice east through the warrior to the NE tornado, which is then
+    gone. Cone width about right, and does that tornado go?
+17. **Pull 4, 4:16-4:22** — the green hiding strip runs east from the ice
+    block; Cruise Chaser drawn at the west wall right beside it. Where is
+    Cruise Chaser on screen, and is the party hiding east of the block?
+18. **Pull 4, 4:04-4:24** — the third tornado drawn NE until Gavel at
+    4:24. When does it disappear?

@@ -11,6 +11,8 @@
 // WaterTether: Drainage's tether from a tornado to a tank.
 
 import { rand } from "@/components/ReplayEffects";
+import { facingToCompassBearing } from "@/lib/mechanics/geometry";
+import { poseAt, sampleNear } from "@/lib/replay/ffxiv-replay";
 import type { EffectArtProps, FightArt, TetherArtProps } from "./types";
 
 const WATER = { glow: "#2fa8ff", hot: "#bfeaff", deep: "#0b4f8f", text: "#9fdcff" };
@@ -122,11 +124,93 @@ function WaterTether({ x1, y1, x2, y2, t }: TetherArtProps) {
   );
 }
 
+/** The tornado frozen into Gelid Gaol: a pale ice block with facets and a frost rim (Propeller Wind's cover). */
+function IcePillar({ e, x, y, t, scale }: EffectArtProps) {
+  const r = (e.radius ?? 400) * scale;
+  const o = fade(t, e.start, e.end, 500);
+  if (o <= 0) return null;
+  const pts = Array.from({ length: 7 }, (_, k) => {
+    const a = (k / 7) * Math.PI * 2 + 0.3;
+    const rr = r * (0.82 + 0.18 * rand(k * 3.7));
+    return `${(x + Math.sin(a) * rr).toFixed(1)},${(y - Math.cos(a) * rr).toFixed(1)}`;
+  }).join(" ");
+  return (
+    <g opacity={o} pointerEvents="none">
+      <circle cx={x} cy={y} r={r * 1.15} fill="#cfeeff" fillOpacity={0.18} stroke="#cfeeff" strokeWidth={8} strokeOpacity={0.35} filter="url(#replay-glow)" />
+      <polygon points={pts} fill="#e9f7ff" fillOpacity={0.85} stroke="#ffffff" strokeWidth={2} strokeLinejoin="round" />
+      <path d={`M${x - r * 0.4} ${y - r * 0.5} L${x + r * 0.1} ${y} L${x - r * 0.2} ${y + r * 0.55} M${x + r * 0.1} ${y} L${x + r * 0.6} ${y - r * 0.2}`}
+        fill="none" stroke="#9fd8ff" strokeWidth={1.5} />
+    </g>
+  );
+}
+
+/** Plasma Shield's damageable front: a glowing arc on its facing side, the rest dim. */
+function ShieldFront({ e, x, y, t, scale, actor }: EffectArtProps) {
+  const o = fade(t, e.start, e.end, 300);
+  if (o <= 0 || !actor) return null;
+  const pose = poseAt(actor, t) ?? sampleNear(actor, t, 5000);
+  if (!pose) return null;
+  const r = ((actor.hitbox ?? 500) + 150) * scale;
+  const b = facingToCompassBearing(pose.facing);
+  const arc = (from: number, to: number) => {
+    const a0 = (from * Math.PI) / 180, a1 = (to * Math.PI) / 180;
+    return `M${x + Math.sin(a0) * r} ${y - Math.cos(a0) * r} A${r} ${r} 0 ${to - from > 180 ? 1 : 0} 1 ${x + Math.sin(a1) * r} ${y - Math.cos(a1) * r}`;
+  };
+  return (
+    <g opacity={o} pointerEvents="none">
+      <path d={arc(b + 60, b + 300)} fill="none" stroke="#7f8ca8" strokeWidth={4} strokeOpacity={0.5} strokeDasharray="6 6" />
+      <path d={arc(b - 60, b + 60)} fill="none" stroke="#7cf0ff" strokeWidth={14} strokeOpacity={0.45} filter="url(#replay-glow)" />
+      <path d={arc(b - 60, b + 60)} fill="none" stroke="#e6fdff" strokeWidth={4} />
+      <text x={x} y={y + r + 18} textAnchor="middle" fill="#bff6ff" fontSize={13} fontWeight={800}
+        stroke="rgba(0,0,0,0.8)" strokeWidth={4} paintOrder="stroke">{e.label}</text>
+    </g>
+  );
+}
+
+// Decree Nisi colours, the BPOG line (bj-cc.ts).
+const NISI_COLORS: Record<string, string> = { a: "#3d8bff", b: "#ff9a2e", g: "#b45cff", d: "#3fd46a" };
+
+/**
+ * A Nisi colour on its carrier: a solid ring in the colour with its Greek
+ * letter in a badge at the lower right. A Final Judgment (the colour the
+ * player needs at Gavel) is a dashed outer ring and a badge lower left.
+ */
+function NisiRing({ e, x, y, t }: EffectArtProps) {
+  const judgment = e.kind.startsWith("tea-judgment-");
+  const col = NISI_COLORS[e.kind.slice(-1)] ?? "#ffffff";
+  const o = fade(t, e.start, e.end, 200);
+  if (o <= 0) return null;
+  const r = judgment ? 25 : 20;
+  const bx = x + (judgment ? -17 : 17), by = y + 17;
+  return (
+    <g opacity={o} pointerEvents="none">
+      <circle cx={x} cy={y} r={r} fill="none" stroke={col} strokeWidth={judgment ? 2.5 : 3.5}
+        strokeDasharray={judgment ? "5 4" : undefined} strokeOpacity={0.95} />
+      <circle cx={bx} cy={by} r={7} fill={judgment ? "#15161c" : col} stroke={col} strokeWidth={1.5} />
+      <text x={bx} y={by + 4} textAnchor="middle" fontSize={11} fontWeight={800} fill={judgment ? col : "#0d0e12"}>{e.label}</text>
+    </g>
+  );
+}
+
+const NISI_ART = Object.fromEntries(["a", "b", "g", "d"].flatMap((k) => [[`tea-nisi-${k}`, NisiRing], [`tea-judgment-${k}`, NisiRing]]));
+
 export const TEA_ART: FightArt = {
   effects: {
     "tea-tornado": Tornado,
     "tea-embolus": Embolus,
     "tea-hand-fist": HandGesture, "tea-hand-palm": HandGesture,
+    "tea-ice-pillar": IcePillar,
+    "tea-shield-front": ShieldFront,
+    ...NISI_ART,
+  },
+  colors: {
+    // Compressed Water's stack: sea blue. Flarethrower: fire orange.
+    // Propeller Wind's shadow: a safe spot, green.
+    "tea-water": { fill: "#1f8fe0", flash: "#8fd6ff", rim: "#dff4ff", glow: "#3fb0ff" },
+    "tea-fire":  { fill: "#ff5a1a", flash: "#ffb36b", rim: "#ffe4c8", glow: "#ff7a2a" },
+    "tea-safe":  { fill: "#2fbf6a", flash: "#8ff0b4", rim: "#d8ffe6", glow: "#4ad88a" },
+    // Enumeration: a stack, in the built-in stack orange.
+    "tea-enum":  { fill: "#f08a24", flash: "#ffc070", rim: "#fff0d8", glow: "#ffa040" },
   },
   tethers: { "tea-water": WaterTether },
 };
