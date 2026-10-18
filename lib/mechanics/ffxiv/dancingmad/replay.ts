@@ -56,8 +56,9 @@ const RING_TEXT: Record<string, string> = {
 };
 // Casts that resolve a ring set (Mystery Magic, Graven 2's lone Blowout,
 // P4's Thrumming Thunder 50654).
-const RING_RESOLVE = [47764, 47765, BLIZZARD_SHOWN, BLIZZARD_FAKE, BLIZZARD_REAL, THUNDER_SHOWN, THUNDER_FAKE, THUNDER_REAL, 50654];
+const RING_RESOLVE = [47764, 47765, BLIZZARD_SHOWN, BLIZZARD_FAKE, BLIZZARD_REAL, THUNDER_SHOWN, THUNDER_FAKE, THUNDER_REAL, 50654, 47781];
 const RING_WINDOW_MS = 9000;
+const MANA_CHARGE_ID = 47780, MANA_RELEASE_ID = 47781;   // see P4 below
 
 // Double-Trouble Trap (1005078): one support and one DPS carry it; it
 // detonates as a 6y four-person stack that knocks everyone in it back,
@@ -205,6 +206,36 @@ const VACUUM_WAVE = 47891;
 // the tether.
 const NOTHINGNESS = 47868, BLACK_HOLE_TETHER = 84;
 
+// ── P4 Kefka Says (kefka-says.ts) ───────────────────────────────────────────
+
+// Kefka's rings use the same markers as P1 (kefka-says.ts: 675 ice fake,
+// 676 ice real, 677 lightning fake, 678 lightning real). Mana Charge
+// (47780) records the next thunder and ice; Mana Release (47781) shows a
+// second pair of rings, and the replayed attack is real when the two
+// match (kefka-says.ts "MANA RELEASE"). Fight 10: recorded thunder ? at
+// 13:34.4 and ice ? at 13:52.3, release rings ? ? at 14:03.5, then the
+// normal 47775 / 47768 at 14:15.7: double fake is real.
+
+// Flood of Naught (50067): Neo Exdeath on an edge, a white (50068) and a
+// black (50069) Antilight, each a 47x21 rect from a helper beside him,
+// and Edge of Death (50070) down the middle; all 5.2s casts. The ids are
+// the colours that hit (fight 10 13:23.0: White hit the five players west
+// of the line, Black the three east); a fake Flood shows them swapped
+// (kefka-says.ts), and the Grand Cross / Flood real-fake signal (status
+// 1002056 on the bosses) isn't in the replay data, so the colours drawn
+// are the ones that hit.
+const WHITE_ANTILIGHT = 50068, BLACK_ANTILIGHT = 50069;
+
+// Stray Spray (47908): donuts on the Dynamic Fluid holders (kefka-says.ts),
+// 40y out with a 6y hole (omen gl_circle4006); the engine guessed a 13y
+// hole. Cursed Shriek (1005543): a gaze from each holder as it runs out
+// (Death Shriek 47894); look at or away depends on the Grand Cross that
+// gave it, which the replay can't read.
+const P4_STRAY_SPRAY = 47908, CURSED_SHRIEK = 1005543;
+const SPRAY_HOLE = 600;
+const SPRAY_MERGE = 300;
+const SHRIEK_SHOW_MS = 5000;
+
 const OVERRIDES: Record<number, Override> = {
   // Revolting Ruin III, both hits: a 90° tankbuster cone (user, VOD review
   // 2026-10-17). The game data has the cone but not its angle.
@@ -283,6 +314,18 @@ const OVERRIDES: Record<number, Override> = {
   47885: { telegraph: true, style: "ice" },
   47856: { style: "tower", soakers: 2 },
   47875: { style: "stack" },
+  // P4. Flood of Naught's halves in their colours through the cast, the
+  // middle line with them.
+  [WHITE_ANTILIGHT]: { telegraph: true, style: "dm-white" },
+  [BLACK_ANTILIGHT]: { telegraph: true, style: "dm-black" },
+  50070: { telegraph: true },
+  // Death Wave: the stack (two per set, 3 hit each in fight 10); Death
+  // Bolt: the spread on its target.
+  47898: { style: "stack" },
+  // Stray Flames' circles, baited under players (omen general_1bf), shown
+  // through the cast; Stray Spray: p4Shapes.
+  47906: { telegraph: true },
+  [P4_STRAY_SPRAY]: { hidden: true },
 };
 
 /**
@@ -346,17 +389,30 @@ function ringEffects(data: ReplayData): CasterEffect[] {
   const marks = (data.headMarkers ?? []).filter((m) => RINGS[m[2]] && actorByKey.get(m[1])?.kind === "enemy");
   for (const t of [...new Set(marks.map((m) => m[0]))]) {
     const set = marks.filter((m) => m[0] === t).map((m) => RINGS[m[2]]);
-    const end = casts.find((c) => c[3] === 0 && c[0] > t && c[0] - t <= RING_WINDOW_MS && RING_RESOLVE.includes(c[4] ?? 0))?.[0];
-    if (end === undefined) continue;
+    const endCast = casts.find((c) => c[3] === 0 && c[0] > t && c[0] - t <= RING_WINDOW_MS && RING_RESOLVE.includes(c[4] ?? 0));
+    if (!endCast) continue;
+    const end = endCast[0];
     const boss = actorByKey.get(marks.find((m) => m[0] === t)![1])!;
     const p = poseAt(boss, t);
     // One ring each, nested outward from the boss's hitbox (fire inside,
     // as thaliak's "upper ring is fire"); the first carries the text.
     const rings = set.sort((a, b) => RING_ORDER.indexOf(a.element) - RING_ORDER.indexOf(b.element));
     const base = (boss.hitbox ?? 300) + RING_GAP;
+    // Mana Release: each element is real when its ring matches the one
+    // recorded after Mana Charge.
+    const charge = endCast[4] === MANA_RELEASE_ID
+      ? casts.filter((c) => c[4] === MANA_CHARGE_ID && c[3] === 0 && c[0] < t).pop()?.[0] : undefined;
+    const recorded = (el: Ring["element"]) => charge === undefined ? undefined
+      : marks.filter((m) => m[0] > charge && m[0] < t && RINGS[m[2]].element === el).map((m) => RINGS[m[2]]).pop();
+    const text = (q: Ring) => {
+      if (charge === undefined) return RING_TEXT[q.element + (q.inverted ? "?" : "")];
+      const rec = recorded(q.element);
+      const name = q.element === "ice" ? "Ice" : q.element === "thunder" ? "Thunder" : "Fire";
+      return rec ? `${name}: ${rec.inverted ? "?" : "real"} + ${q.inverted ? "?" : "real"} = ${rec.inverted === q.inverted ? "real" : "fake"}` : `${name}: recorded ring not seen`;
+    };
     rings.forEach((r, i) => out.push({
       kind: `dm-ring-${r.element}${r.inverted ? "-inv" : ""}`,
-      label: i === 0 ? rings.map((q) => RING_TEXT[q.element + (q.inverted ? "?" : "")]).join(" · ") : "",
+      label: i === 0 ? (charge !== undefined ? "Mana Release · " : "") + rings.map(text).join(" · ") : "",
       radius: base + i * RING_GAP,
       actor: boss.key, x: p?.x ?? CENTRE.x, y: p?.y ?? CENTRE.y, start: t, end,
     }));
@@ -652,6 +708,34 @@ function p3Effects(data: ReplayData): CasterEffect[] {
   return out;
 }
 
+function p4Shapes(data: ReplayData): AoeShape[] {
+  const casts = data.enemyCasts ?? [];
+  const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  const range = (data.actionGeometry?.[P4_STRAY_SPRAY]?.range ?? 40) * 100;
+  const out: AoeShape[] = [];
+  for (const c of casts) {
+    if (c[4] !== P4_STRAY_SPRAY || c[3] !== 0) continue;
+    const a = actorByKey.get(c[1]);
+    const s = a && nearestSample(a, c[0]);
+    if (!s || Math.abs(s[0] - c[0]) > 300) continue;
+    // Holders stacked together share one donut: eight overlapping fills
+    // turned the arena solid red (fight 10, 14:14.9).
+    if (out.some((o) => o.resolve === c[0] && Math.hypot(o.x - s[1], o.y - s[2]) < SPRAY_MERGE)) continue;
+    const begin = casts.find((b) => b[4] === c[4] && b[1] === c[1] && b[3] > 0 && Math.abs(b[0] + b[3] - c[0]) < 800);
+    out.push({ ...blank, kind: "donut", x: s[1], y: s[2], range, inner: SPRAY_HOLE, style: "aoe", name: c[2], start: begin?.[0] ?? c[0] - 300, resolve: c[0] });
+  }
+  return out;
+}
+
+function p4Effects(data: ReplayData): CasterEffect[] {
+  const out: CasterEffect[] = [];
+  for (const [start, end, key, id] of data.playerAuras ?? []) {
+    if (id !== CURSED_SHRIEK) continue;
+    out.push({ kind: "dm-shriek", label: "", actor: key, x: CENTRE.x, y: CENTRE.y, start: Math.max(start, end - SHRIEK_SHOW_MS), end });
+  }
+  return out;
+}
+
 function halfRoomShapes(data: ReplayData): AoeShape[] {
   return (data.enemyCasts ?? []).filter((c) => c[3] === 0 && HALF_ROOM[c[4] ?? 0] !== undefined).map((c) => ({
     ...blank, kind: "cone" as const, x: CENTRE.x, y: CENTRE.y, bearing: HALF_ROOM[c[4]!], angle: 180, range: ARENA_R + 500,
@@ -667,9 +751,9 @@ export const DANCING_MAD_REPLAY: FightReplay = {
   overrides: OVERRIDES,
   headMarkers: HEAD_MARKERS,
   tethers: TETHERS,
-  effects: (data) => [...ringEffects(data), ...gazeEffects(data), ...endsEffects(data), ...p3Effects(data)],
+  effects: (data) => [...ringEffects(data), ...gazeEffects(data), ...endsEffects(data), ...p3Effects(data), ...p4Effects(data)],
   shapes: (data) => [
     ...trapShapes(data), ...wellShapes(data), ...arrowShapes(data), ...halfRoomShapes(data),
-    ...forsakenShapes(data), ...trineShapes(data), ...wingShapes(data), ...aeroShapes(data), ...p3Shapes(data),
+    ...forsakenShapes(data), ...trineShapes(data), ...wingShapes(data), ...aeroShapes(data), ...p3Shapes(data), ...p4Shapes(data),
   ],
 };

@@ -280,6 +280,19 @@ function VoidTether({ x1, y1, x2, y2, t }: TetherArtProps) {
   );
 }
 
+/** Cursed Shriek on its holder for its last seconds: a violet eye above them (look at or away unknown). */
+function ShriekEye({ e, x, y, t }: EffectArtProps) {
+  const o = fade(t, e.start, e.end, 250);
+  if (o <= 0) return null;
+  const by = y - 42, w = 14, h = 7;
+  return (
+    <g opacity={o} pointerEvents="none">
+      <path d={`M${x - w} ${by} Q${x} ${by - h * 1.6} ${x + w} ${by} Q${x} ${by + h * 1.6} ${x - w} ${by} Z`} fill="#140a1e" stroke="#b06bff" strokeWidth={2} filter="url(#replay-glow)" />
+      <circle cx={x} cy={by} r={h * 0.65} fill="#d6b8ff" />
+    </g>
+  );
+}
+
 const ring = (element: Element, inverted: boolean) => (p: EffectArtProps) => <MysteryRing {...p} element={element} inverted={inverted} />;
 
 export const DANCING_MAD_ART: FightArt = {
@@ -297,6 +310,12 @@ export const DANCING_MAD_ART: FightArt = {
     "dm-lc-clone": LimitCutClone,
     "dm-lc-number": LimitCutNumber,
     "dm-black-hole": BlackHole,
+    "dm-shriek": ShriekEye,
+  },
+  // Flood of Naught's Antilights.
+  colors: {
+    "dm-white": { fill: "#f4f1ea", flash: "#ffffff", rim: "#ffffff", glow: "#fffbe8" },
+    "dm-black": { fill: "#1c1424", flash: "#3a2a4a", rim: "#b9a6d6", glow: "#4a2a6a" },
   },
   shapes: {
     "dm-fake-ice": (p) => <FakeTelegraph {...p} element="ice" />,

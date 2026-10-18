@@ -151,6 +151,12 @@
 //   Tsunami real -> Stay
 //   Tsunami fake -> Move
 //
+// The same markers drive P1's Mystery Magic; 673 / 674 are fire fake / real
+// there (2026-10-18, replay.ts). In 2T1HzdPKgbhM43am fight 10 and
+// yBKPqGwHparm7Tk4 fight 5 an ice-fake round casts 47771 (the shown cleave,
+// no damage) with 47774 (the real one), a lightning-fake round 47776 with
+// 47777; a real round only 47768 / 47775.
+//
 // -- MANA CHARGE / MANA RELEASE ---------------------------------------------
 //
 // Relevant casts:

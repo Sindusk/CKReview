@@ -228,3 +228,53 @@ Most abilities are exact. What's left:
 
 1. **7:31.7:** fire sigil NE, wind NW; the water sigil isn't drawn. Where
    was it (SE or SW)?
+
+## Phase 4: Kefka Says (12:16 to 15:00)
+
+The mechanics from kefka-says.ts (its model is from the wtfdig analyzer).
+
+### What's drawn
+
+| Mechanic | How |
+|---|---|
+| Kefka's rings and dodges | P1's ring cue and telegraphs work here unchanged: ice and thunder rings (dashed with "?" when fake), the shown fake telegraph as a dashed outline, the real cleaves and lines flashing as they land. kefka-says.ts's marker table (675 ice fake ... 678 lightning real) agrees with what P1's casts showed. |
+| Mana Charge / Mana Release | The release's rings read "Mana Release · Ice: ? + ? = real" and so on, from the rings recorded after Mana Charge (double fake is real). In Pull 9 the replay at 14:15.7 was the normal cleaves and lines, as the rule says. |
+| Flood of Naught | New look: White and Black Antilight as a white and a dark half-room through their 5.2s cast, with Edge of Death down the middle. The colours are the ones that hit (Pull 9 13:23.0: White hit the five players west of the line, Black the three east). |
+| Death Wave / Death Bolt | Death Wave draws as a stack; Death Bolt was already right. |
+| Stray Flames | Shown through its 4.7s cast (it has a ground omen). |
+| Stray Spray | Now built in the spec: a 40y donut with a 6y hole (omen gl_circle4006), one per group of stacked holders. The engine guessed a 13y hole, and eight overlapping copies turned the arena solid red. |
+| Cursed Shriek | New cue: a violet eye over each holder for the 5s before their gaze goes off. |
+
+### Fit check after the changes
+
+Flood's halves, Edge of Death, Stray Flames and Stray Spray are exact in
+both kills. The fake telegraphs have players inside, as they should. Pull 9's
+Mana Release lines at 14:15.7 show seven players "inside" at 0.4y from the
+edge: the safe spot is where the stripes meet. Death Wave and Death Bolt
+read "hit 6, drawn 3" (two stacks compared together).
+
+### Couldn't find out / not drawn
+
+- **Grand Cross and Flood real/fake:** the signal (status 1002056 on Neo
+  Exdeath and Chaos) is on the bosses, and the replay fetches only player
+  statuses. So the replay can't say whether a Grand Cross was fake, which
+  way a Cursed Shriek must be looked at, or whether Flood's telegraph
+  showed swapped colours. Fetching it would need an engine change to the
+  replay fetch.
+- **Acceleration Bomb, Compressed Water, Forked Lightning, the wounds:**
+  only their status icons show.
+- **Grand Cross, Ultima Upsurge, Death Surge** are raidwide: not drawn.
+
+### VOD checks: Pull 9 (2T1HzdPKgbhM43am)
+
+1. **13:17.4 to 13:22.9:** Flood of Naught: white half west, dark half
+   east, a line down the middle. Is that what the game showed, or were
+   the colours swapped (a fake Flood)?
+2. **13:52.3 / 14:03.5:** the Mana Release rings read "Thunder: ? + ? =
+   real" and "Ice: ? + ? = real". Do the release rings show "?" orbs for
+   both?
+3. **14:09.9 to 14:14.9:** one red donut with a 6y hole round the stacked
+   party (Stray Spray). Is the hole that small?
+4. **13:35.2 and 13:59.2:** violet eyes over the Cursed Shriek holders
+   for 5s before their gaze. Do the eyes sit on the holders in game?
+
