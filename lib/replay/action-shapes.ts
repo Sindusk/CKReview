@@ -399,6 +399,12 @@ export function buildTethers(data: ReplayData): TetherSpan[] {
     const kind = Array.isArray(options)
       ? options.find((k) => hits.some((h) => h[3] === target && h[0] > t && h[0] < end && k.payoff.includes(h[1])))
       : options;
+    if (kind?.endStatus) {
+      // Lasts as long as its status on the player end (up to a minute).
+      const holder = playerEnd(data, source, target);
+      const s = (data.playerAuras ?? []).find((a) => a[2] === holder && kind.endStatus!.includes(a[3]) && a[0] <= t + 1000 && a[1] > t);
+      return { source, target, id, start: t, end: s ? Math.min(s[1], t + 60000) : end, element: kind.element };
+    }
     if (kind?.passed) {
       const holder = playerEnd(data, source, target);
       const taken = passedAt.get(i);

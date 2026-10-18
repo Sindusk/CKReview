@@ -96,6 +96,10 @@ export type TetherKind = {
   // payoff then ends only a tether nobody took. Payoffs land on the
   // player end, whichever end that is.
   passed?: number;
+  // Ends when the player end's status of one of these ids runs out (TOP
+  // Hello World's Local / Remote Regression tethers break by distance,
+  // which the log shows only as the status ending), not at a payoff.
+  endStatus?: number[];
 };
 
 /**
