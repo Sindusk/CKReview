@@ -62,3 +62,65 @@ VOD checks, Pull 1 (phzkLrdNBgtfCmW9 fight 54):
    rings (Stygian Infection) on their carriers. Check the carriers match
    the players with those debuffs, and that each orange ring ends at a
    Caustic Explosion.
+
+## The Coiled Altar
+
+Pull: Coiled Altar kill, Pull 3 (vRPGT4MN6VALQWFh fight 38, 8:20).
+
+Drawn:
+- **Venom orbs**: every Coalesced Venom (green) and Virulent Mutation
+  (purple) orb, at its spawn spot (each orb is its own actor, placed by its
+  spawn cast). It ends when a player picks it up (the carrier debuff goes on
+  within 6y), when a Sever / Blighted Sever cone covers it, or when Venom
+  Rupture lands on the raid away from a Sever (Zul'jan's defeat, 2:18.4:
+  11 orbs at once; the header says 9-11). 122 orbs in the kill.
+- **Toxic Deluge**: a drop ring at each orb's landing spot from the cast
+  to the orb appearing (3s).
+- **Carriers**: a green 5y circle (Volatile Venom) or purple 6y circle
+  (Mutagenic Venom) riding on the carrier for its 5s.
+- **Sever, Soul Sever, Blighted Sever**: cones from the boss toward the
+  tank they hit, shown for the 3-4s cast, 60° wide (assumed; db2 has no
+  angle), 35y / 45y. The kill's last Blighted Sever (7:54.3) hit nobody,
+  so it's drawn along Zul'jan's facing, and it does point through the
+  purple orbs. Fit check: every cone matches who it hit; the closest
+  unhit player stood 43° off the tank line, so the cone is at most ~86°.
+- **Guillotine / Grim Guillotine**: an orange shared-soak circle (9y) on
+  the marked player until the impact.
+- **Gloombomb**: a dark purple 15y circle on each marked player for 5s.
+- **Axegrinder axes**: a spinning axe for a moment where an axe struck a
+  player (the axes log a position only then).
+- **Unnerving Fixation**: a pale violet ring on each fixated player.
+
+Not drawn: ghosts (Manifestations of Dread log only their spawn),
+Noxious Ground (no position), Dreadmarch (no debuff in the fetch), Soul
+Fragments and intermission Fragments of Malacrass (no actors), the
+Soulcoilers' shields (the adds themselves are drawn).
+
+Can't check from the log: how many orbs each Sever destroyed (Venom
+Rupture's per-orb stacks are applydebuffstack events, which the replay
+fetch leaves out), so the cone's 60° is a guess the orbs can't confirm.
+
+Open questions:
+- Sever's real cone angle, and does it follow the tank or the boss's
+  facing at the end of the cast?
+- Does the green / purple orb look match the game, and is a Deluge drop
+  telegraphed on the floor for those 3s?
+
+VOD checks, Pull 3 (vRPGT4MN6VALQWFh fight 38):
+1. Pull 3, 0:02-0:05: yellow rings where the first Deluge's orbs land
+   (four green, four purple at 0:05). Check the orbs appear at those spots
+   and whether the game shows the landing spots beforehand.
+2. Pull 3, 0:06-0:15: carriers pick orbs up (green or purple circle on
+   them) and the orbs reappear where the circle ends. Check the orbs are
+   dropped where the carriers stood at the end.
+3. Pull 3, 0:20-0:23: Sever's cone from Zul'jan through the dropped
+   orbs, which vanish at 0:23. Check the cone's width against the in-game
+   frontal and that the same orbs are destroyed.
+4. Pull 3, 0:43-0:48: Guillotine's soak circle on the marked player.
+   Check the marked player and that five stood in it at 0:48.
+5. Pull 3, 2:18: every orb vanishes at Zul'jan's defeat. Check that's
+   when the game clears them.
+6. Pull 3, 2:46-2:52: four Gloombomb circles on the marked players.
+   Check the bomb size (15y) against the in-game circles.
+7. Pull 3, 7:51-7:54: the last Blighted Sever, drawn along Zul'jan's
+   facing because it hit nobody. Check where the frontal really went.

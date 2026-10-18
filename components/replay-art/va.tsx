@@ -49,12 +49,60 @@ const VASHNIK_STYGIAN = ring({ color: "#b07bff", glow: "#6a2bd9", motes: 4, spin
 // colour; Plague Froth's lanes keep the standard red).
 const VASHNIK_BILE: AoeColors = { fill: "#4fd14a", flash: "#a6ff8a", rim: "#d9ffc8", glow: "#2fae3a" };
 
+// ── The Coiled Altar ──
+
+/**
+ * A venom orb on the floor: a glossy blob that wobbles, green for
+ * Coalesced Venom, purple for a Virulent Mutation (the guides' colours).
+ * About 2y across: the orb itself, not its damage area.
+ */
+function VenomOrb({ e, x, y, t, scale }: EffectArtProps) {
+  const purple = e.kind === "va-coiled-altar-mutation";
+  const opacity = Math.max(0, Math.min(1, (t - e.start) / FADE_MS, (e.end - t) / FADE_MS));
+  if (opacity <= 0) return null;
+  const r = Math.max(7, 110 * scale);
+  const k = (e.x * 7 + e.y * 3) % 97;
+  const w = 1 + 0.07 * Math.sin(t / 260 + k);
+  const [deep, mid, hot] = purple ? ["#5a1f9e", "#9d4dff", "#e3c4ff"] : ["#1f7a2a", "#56d64a", "#d6ffc4"];
+  return (
+    <g opacity={opacity} pointerEvents="none">
+      <ellipse cx={x} cy={y} rx={r * 1.5 * w} ry={r * 1.5 / w} fill={mid} fillOpacity={0.3} filter="url(#replay-glow)" />
+      <ellipse cx={x} cy={y} rx={r * w} ry={r / w} fill={deep} stroke={mid} strokeWidth={1.5} />
+      <circle cx={x - r * 0.3} cy={y - r * 0.3} r={r * 0.3} fill={hot} fillOpacity={0.7} />
+    </g>
+  );
+}
+
+/** A roaming axe where it struck a player: a spinning double-bladed axe. */
+function Axe({ e, x, y, t }: EffectArtProps) {
+  const opacity = Math.max(0, Math.min(1, (t - e.start) / 200, (e.end - t) / 400));
+  if (opacity <= 0) return null;
+  const a = (t / 4) % 360;
+  return (
+    <g opacity={opacity} transform={`translate(${x} ${y}) rotate(${a})`} pointerEvents="none">
+      <line x1={0} y1={-13} x2={0} y2={13} stroke="#8a6a44" strokeWidth={3} />
+      <path d="M0 -12 Q11 -14 12 -4 Q6 -6 0 -6 Z M0 -12 Q-11 -14 -12 -4 Q-6 -6 0 -6 Z" fill="#c9d0d6" stroke="#40484f" strokeWidth={1} />
+    </g>
+  );
+}
+
+const CA_FIXATE = ring({ color: "#c7b6ff", glow: "#5b3fbf", motes: 2, spinMs: 1600 });
+
 export const VA_ART: FightArt = {
   effects: {
     "va-vashnik-exploding": VASHNIK_EXPLODING,
     "va-vashnik-stygian": VASHNIK_STYGIAN,
+    "va-coiled-altar-orb": VenomOrb,
+    "va-coiled-altar-mutation": VenomOrb,
+    "va-coiled-altar-axe": Axe,
+    "va-coiled-altar-fixate": CA_FIXATE,
   },
   colors: {
     "va-vashnik-bile": VASHNIK_BILE,
+    // Orb carriers' pulse areas: green Volatile, purple Mutagenic.
+    "va-coiled-altar-volatile": { fill: "#3fbf3a", flash: "#a6ff8a", rim: "#bff5b0", glow: "#2a8f2a" },
+    "va-coiled-altar-mutagenic": { fill: "#8a3dff", flash: "#c99bff", rim: "#e2ccff", glow: "#6a2bd9" },
+    // Gloombomb: Malacrass's shadow bomb.
+    "va-coiled-altar-gloombomb": { fill: "#3b2a6b", flash: "#8f6bff", rim: "#b9a6ff", glow: "#2a1a5e" },
   },
 };

@@ -30,6 +30,10 @@
 //   Deluge, Grim Guillotine, Blighted Sever, Soulcoilers, Nightfall.
 //
 // Coalesced Venom orbs are invisible actors (no events). Pickups show as
+// (Replay, 2026-10-18, kill vRPGT4MN6VALQWFh f38: each orb IS an actor,
+// "Coalesced Venom Stalker" / "Virulent Mutation", placed once by its
+// 1282403 / 1309742 spawn cast, 3s after Deluge and at each carrier's drop;
+// coiled-altar-replay.ts tracks their lifetimes from that.) Pickups show as
 // player debuffs: Volatile Venom 1282419 (normal orb, 5s) and Mutagenic
 // Venom 1310498 (purple orb, 5s); each pulses 1282288 / 1310691 on the
 // carrier and anyone near them every second. Tainted Blood (1310013),
