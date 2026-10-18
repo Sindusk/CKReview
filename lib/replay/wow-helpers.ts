@@ -96,6 +96,16 @@ export function wowImpacts(data: ReplayData, ids: number[], radiusYards: number,
   return out;
 }
 
+/**
+ * A ring riding on each cast's target for its cast bar (a tank hit, a
+ * targeted bolt): `style` "tankbuster" for tank hits.
+ */
+export function wowCastTargetRings(data: ReplayData, ids: number[], name: string, rangeYards: number, style: AoeShape["style"] = "tankbuster", fallbackMs = 1500): AoeShape[] {
+  return wowCasts(data, ids).filter((c) => c.target && c.target !== c.caster).map((c) =>
+    wowShape({ kind: "circle", x: 0, y: 0, range: rangeYards * 100, name, start: c.begin ?? c.t - fallbackMs, resolve: c.t,
+      follow: c.target, style, estimated: false }));
+}
+
 /** An AoeShape with the fields a WoW builder rarely sets filled in. */
 export function wowShape(s: Pick<AoeShape, "kind" | "x" | "y" | "range" | "name" | "start" | "resolve"> & Partial<AoeShape>): AoeShape {
   return { bearing: 0, width: 0, angle: 0, inner: 0, estimated: true, style: "aoe", ...s };
