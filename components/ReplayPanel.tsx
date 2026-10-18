@@ -98,6 +98,8 @@ const AOE_COLORS: Record<AoeShape["style"], { fill: string; flash: string; rim: 
   knockback:  { fill: "#5fb4e8", flash: "#a8dcff", rim: "#e6f6ff", glow: "#7cc8ff" },
   lightning:  { fill: "#2f7dff", flash: "#9fd0ff", rim: "#eaf6ff", glow: "#4aa8ff" },   // FRU Bow Shock
   drop:       { fill: "#ffd84a", flash: "#fff2a8", rim: "#ffe680", glow: "#ffcc33" },   // DropRing only
+  light:      { fill: "#ffc95a", flash: "#fff3c4", rim: "#fffaf0", glow: "#ffdf8a" },   // FRU House of Light
+  ice:        { fill: "#a8dcff", flash: "#ffffff", rim: "#ffffff", glow: "#cfeeff" },   // FRU Icicle Impact (IceCircle until it lands)
 };
 // Status icons under each player: at most this many, mechanic statuses
 // before the common ones (vulnerabilities, Weakness) that a raid carries
@@ -695,6 +697,42 @@ function DropRing({ x, y, r, t }: { x: number; y: number; r: number; t: number }
   );
 }
 
+/**
+ * An ice circle still being prepared (FRU Icicle Impact): a white ring
+ * with a frosted fill and a snowflake turning in the middle. The ring
+ * closes in from a wider dashed one as the cast fills, so it reads as
+ * coming, not landed (user, 2026-10-17).
+ */
+function IceCircle({ x, y, r, t, s, opacity }: { x: number; y: number; r: number; t: number; s: AoeShape; opacity: number }) {
+  const c = AOE_COLORS.ice;
+  const f = Math.max(0, Math.min(1, (t - s.start) / Math.max(1, s.resolve - s.start)));   // cast progress
+  const spin = (t / 25) % 360;
+  const flake = r * 0.42;
+  const arm = (a: number) => {
+    const rad = (a * Math.PI) / 180, ux = Math.sin(rad), uy = -Math.cos(rad), px = -uy, py = ux;
+    const at = (d: number) => ({ x: x + ux * d, y: y + uy * d });
+    const b1 = at(flake * 0.45), b2 = at(flake * 0.72), tip = at(flake);
+    const br = flake * 0.22;
+    return (
+      <g key={a}>
+        <line x1={x} y1={y} x2={tip.x} y2={tip.y} />
+        <path d={`M${b1.x + (ux + px) * br * 0.7} ${b1.y + (uy + py) * br * 0.7} L${b1.x} ${b1.y} L${b1.x + (ux - px) * br * 0.7} ${b1.y + (uy - py) * br * 0.7}`} fill="none" />
+        <path d={`M${b2.x + (ux + px) * br * 0.5} ${b2.y + (uy + py) * br * 0.5} L${b2.x} ${b2.y} L${b2.x + (ux - px) * br * 0.5} ${b2.y + (uy - py) * br * 0.5}`} fill="none" />
+      </g>
+    );
+  };
+  return (
+    <g opacity={Math.max(0.6, opacity)} pointerEvents="none">
+      <circle cx={x} cy={y} r={r} fill={c.fill} fillOpacity={0.12 + 0.18 * f} stroke={c.glow} strokeWidth={10} strokeOpacity={0.35} filter="url(#replay-glow)" />
+      <circle cx={x} cy={y} r={r * (1.18 - 0.18 * f)} fill="none" stroke={c.rim} strokeOpacity={0.5 * (1 - f)} strokeWidth={2} strokeDasharray="10 8" />
+      <circle cx={x} cy={y} r={r} fill="none" stroke={c.rim} strokeWidth={2.5} />
+      <g transform={`rotate(${spin} ${x} ${y})`} stroke={c.rim} strokeWidth={Math.max(2, r * 0.035)} strokeLinecap="round" opacity={0.6 + 0.4 * f}>
+        {[0, 60, 120, 180, 240, 300].map(arm)}
+      </g>
+    </g>
+  );
+}
+
 function Aoe({ s, opacity, resolving, toX, toY, scale, uid, t }: { s: AoeShape; opacity: number; resolving: boolean; toX: (x: number) => number; toY: (y: number) => number; scale: number; uid: string; t: number }) {
   const x = toX(s.x), y = toY(s.y);
   const r = s.range * scale;
@@ -703,6 +741,7 @@ function Aoe({ s, opacity, resolving, toX, toY, scale, uid, t }: { s: AoeShape; 
   if (s.style === "knockback") return <Knockback s={s} x={x} y={y} r={r} scale={scale} opacity={opacity} />;
   if (s.kind === "cross" && s.star && !resolving) return <StarPoints s={s} x={x} y={y} r={r} scale={scale} opacity={opacity} />;
   if (s.style === "drop") return <DropRing x={x} y={y} r={r} t={t} />;
+  if (s.style === "ice" && s.kind === "circle" && !resolving) return <IceCircle x={x} y={y} r={r} t={t} s={s} opacity={opacity} />;
   const c = AOE_COLORS[s.style];
   const base = resolving ? c.flash : c.fill;
   const grad = `aoe-${uid}`;

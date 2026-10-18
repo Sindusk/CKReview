@@ -123,7 +123,7 @@ export type AoeShape = {
   angle: number;                 // cone full angle, degrees
   inner: number;                 // donut inner radius, centi-yalms
   estimated: boolean;            // angle or inner radius guessed (not drawn differently)
-  style: "aoe" | "tower" | "tankbuster" | "stack" | "knockback" | "lightning" | "drop";
+  style: "aoe" | "tower" | "tankbuster" | "stack" | "knockback" | "lightning" | "drop" | "light" | "ice";
   soakers?: number;              // towers: players it needs, when the ability says
   name: string;
   start: number; resolve: number; // ms from pull start: telegraph start, resolution
@@ -166,6 +166,9 @@ type Override = {
   // a fixed spot the players read ahead of time.
   telegraph?: boolean;
   star?:    boolean;         // a cross telegraphed as star points until it fires
+  // Starts where the caster of the latest of these abilities (within 8s)
+  // stood: the boss these cones really come from, not the helper casting.
+  originCaster?: number[];
 };
 
 // Futures Rewritten (lib/mechanics/ffxiv/fru/*.ts headers; ids and
@@ -238,7 +241,15 @@ const FRU_OVERRIDES: Record<number, Override> = {
   // from their cast bars as the game does (user, 2026-10-17): 2, then 4
   // about 4s later, then the last 2 as the Frigid Stones drop; each lands
   // 8.7s after it begins (both pulls).
-  40198: { telegraph: true },
+  // In white with a turning snowflake until they land (user, 2026-10-17).
+  40198: { telegraph: true, style: "ice" },
+  // Diamond Dust's House of Light: four cones from Shiva in the middle out
+  // through the four nearest players (user, 2026-10-17: two drew from the
+  // north and west walls). The helpers casting them last logged a position
+  // at the walls in Fall of Faith; Shiva's reflection casts the Scythe /
+  // Axe Kick at (100, 100) just before (both pulls). Golden light, as in
+  // game.
+  40206: { originCaster: [40202, 40203], style: "light" },
   // Frigid Needle: each dropped stone shows an 8-way star through its 4.7s
   // cast, pointing where its lines will shoot (user, 2026-10-17): two
   // 40201 crosses per stone (one cardinal, one diagonal: casters face 180
@@ -313,6 +324,14 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
     let casterPose: { x: number; y: number; facing: number } | undefined = caster && sampleNear(caster, t, 1500);
     if (!casterPose && over.holdCaster && caster) casterPose = sampleNear(caster, t, HOLD_CASTER_MS);
     if (!casterPose && own[0]?.[4] != null) casterPose = { x: own[0][4]!, y: own[0][5]!, facing: 0 };
+    if (over.originCaster) {
+      for (let j = i; j >= 0 && t - casts[j][0] <= 8000; j--) {
+        const c = casts[j];
+        const who = c[4] !== undefined && over.originCaster.includes(c[4]) ? actorByKey.get(c[1]) : undefined;
+        const p = who && sampleNear(who, c[0], 4000);
+        if (p) { casterPose = { x: p.x, y: p.y, facing: p.facing }; break; }
+      }
+    }
     if (over.originAt !== undefined) {
       for (let j = i; j >= 0 && t - casts[j][0] <= 1500; j--) {
         const c = casts[j];
