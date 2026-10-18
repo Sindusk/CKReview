@@ -134,6 +134,7 @@ export type AoeShape = {
   // player, whose drop is drawn by its own cast (FRU Frigid Stone).
   noFlash?: boolean;
   star?: boolean;                // cross: star points while telegraphed (FRU Frigid Needle)
+  lineStack?: boolean;           // rect: a line stack, chevrons until it fires (marker 525)
 };
 
 /**
@@ -433,7 +434,13 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
     const cp = casterPose!;
     // Aimed at the players hit: their centre, leaving out anyone standing
     // on the origin (Sinblaze's carrier).
-    const aimed = over.aim === "hits" ? own.filter((h) => Math.hypot(h[6]! - cp.x, h[7]! - cp.y) > 100) : [];
+    // A line stack (the game's standard marker 525 on the caster or its
+    // target within the last 12s) is aimed at the party it hit, shown from
+    // the marker, and drawn as a stack.
+    const lineStack = !isCircle && g.castType !== 3 && g.castType !== 13 && g.castType !== 10 && g.castType !== 11
+      ? (data.headMarkers ?? []).find((m) => m[2] === LINE_STACK_MARKER && (m[1] === key || m[1] === targetKey) && t - m[0] > 0 && t - m[0] <= 12000)
+      : undefined;
+    const aimed = over.aim === "hits" || lineStack ? own.filter((h) => Math.hypot(h[6]! - cp.x, h[7]! - cp.y) > 100) : [];
     let bearing = targetPose && over.holder === undefined ? bearingTo(cp.x, cp.y, targetPose.x, targetPose.y)
       : aimed.length ? bearingTo(cp.x, cp.y, aimed.reduce((s, h) => s + h[6]!, 0) / aimed.length, aimed.reduce((s, h) => s + h[7]!, 0) / aimed.length)
       : own.length && !caster?.samples.length ? bearingTo(cp.x, cp.y, own[0][6]!, own[0][7]!)
@@ -460,7 +467,9 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
       const b = (bearing * Math.PI) / 180;
       out.push({ ...base, kind: "rect", x: cp.x - Math.sin(b) * base.range, y: cp.y + Math.cos(b) * base.range, bearing, range: base.range * 2 });
     } else {
-      out.push({ ...base, kind: "rect", x: cp.x, y: cp.y, bearing });
+      out.push(lineStack
+        ? { ...base, kind: "rect", x: cp.x, y: cp.y, bearing, start: Math.min(base.start, lineStack[0]), style: "stack", lineStack: true }
+        : { ...base, kind: "rect", x: cp.x, y: cp.y, bearing });
     }
   }
   // A head marker that puts an AoE on its player: the circle rides on them
@@ -577,13 +586,17 @@ export type HeadMarkerSpan = { target: string; id: number; start: number; end: n
 const HEAD_MARKERS: Record<number, { label: string; abilities: number[] }> = {
   218: { label: "Tank buster", abilities: [40168, 40191] },
   345: { label: "Frigid Stone", abilities: [40199] },
-  525: { label: "Hallowed Ray", abilities: [40211] },
+  525: { label: "Line stack", abilities: [40211] },
   375: { label: "Luminous Hammer", abilities: [40218] },
   259: { label: "Black Halo", abilities: [40290] },
   184: { label: "Dark Water III", abilities: [40271] },
   139: { label: "Dark Eruption", abilities: [40274] },
 };
 const HEAD_MARKER_LOOKAHEAD_MS = 12000;
+// The game's standard line-stack marker, used in many fights (user,
+// 2026-10-17). FRU puts it on Shiva herself 5.5s before Hallowed Ray's
+// beam. A rect cast by the marked actor (or at it) becomes a line stack.
+const LINE_STACK_MARKER = 525;
 
 /**
  * When each head marker shows and what it reads: a known marker until the

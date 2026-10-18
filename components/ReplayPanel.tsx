@@ -740,6 +740,40 @@ function IceCircle({ x, y, r, t, s, opacity }: { x: number; y: number; r: number
 }
 
 /**
+ * A line stack while it's coming, as the game's standard marker: orange
+ * chevrons in a row along the beam, all pointing back at the caster and
+ * drifting toward it, inside a faint outline of the beam's width (marker
+ * 525; user, 2026-10-17). The beam itself flashes as a stack when it fires.
+ */
+const CHEVRON_STEP = 300;   // centi-yalms between chevrons
+function LineStackChevrons({ s, x, y, r, scale, t, opacity }: { s: AoeShape; x: number; y: number; r: number; scale: number; t: number; opacity: number }) {
+  const c = AOE_COLORS.stack;
+  const b = (s.bearing * Math.PI) / 180;
+  const ux = Math.sin(b), uy = -Math.cos(b), px = -uy, py = ux;
+  const half = Math.max(8, (s.width * scale) / 2);
+  const step = CHEVRON_STEP * scale;
+  const drift = ((t / 600) % 1) * step;      // flowing toward the caster
+  const out: React.ReactNode[] = [];
+  for (let d = step - drift; d < r; d += step) {
+    const cx = x + ux * d, cy = y + uy * d;
+    if (Math.hypot(cx - 500, cy - 500) > 440) continue;   // over the arena only
+    const tip = { x: cx - ux * half * 0.6, y: cy - uy * half * 0.6 };
+    out.push(
+      <path key={d.toFixed(1)} d={`M${cx + px * half} ${cy + py * half} L${tip.x} ${tip.y} L${cx - px * half} ${cy - py * half}`}
+        fill="none" stroke={c.fill} strokeWidth={Math.max(3, half * 0.35)} strokeLinecap="round" strokeLinejoin="round" />,
+    );
+  }
+  const end = { x: x + ux * r, y: y + uy * r };
+  const edge = (k: number) => `M${x + px * half * k} ${y + py * half * k} L${end.x + px * half * k} ${end.y + py * half * k}`;
+  return (
+    <g opacity={Math.max(0.7, opacity)} pointerEvents="none">
+      <path d={`${edge(1)} ${edge(-1)}`} stroke={c.rim} strokeOpacity={0.35} strokeWidth={1.5} strokeDasharray="6 6" fill="none" />
+      <g filter="url(#replay-shadow)">{out}</g>
+    </g>
+  );
+}
+
+/**
  * A glowing puddle left on the floor (FRU Sinbound Holy's Bleeding): a
  * soft white-gold pool, brightest at its edge, shimmering slightly, fading
  * out over its last half second.
@@ -772,6 +806,7 @@ function Aoe({ s, opacity, resolving, toX, toY, scale, uid, t }: { s: AoeShape; 
   if (s.style === "knockback") return <Knockback s={s} x={x} y={y} r={r} scale={scale} opacity={opacity} />;
   if (s.kind === "cross" && s.star && !resolving) return <StarPoints s={s} x={x} y={y} r={r} scale={scale} opacity={opacity} />;
   if (s.style === "drop") return <DropRing x={x} y={y} r={r} t={t} />;
+  if (s.kind === "rect" && s.lineStack && !resolving) return <LineStackChevrons s={s} x={x} y={y} r={r} scale={scale} t={t} opacity={opacity} />;
   if (s.style === "puddle") return <Puddle x={x} y={y} r={r} t={t} s={s} uid={uid} />;
   if (s.style === "ice" && s.kind === "circle" && !resolving) return <IceCircle x={x} y={y} r={r} t={t} s={s} opacity={opacity} />;
   const c = AOE_COLORS[s.style];

@@ -333,6 +333,10 @@ file's header comment. Mechanic detection has its own guide:
   element rings at their Brightfire size from when they appear. FRU's Thin
   Ice frosts the whole arena while the party carries it, and moving players
   leave a short slide trail. Shown with the AoEs layer.
+- **Line stacks:** the game's standard line-stack marker (525) on a
+  caster or its target turns that actor's next rectangle within 12s into a
+  line stack: orange chevrons along the beam, pointing back at the caster,
+  from the marker until it fires, aimed where it hit.
 - **Head markers** show as a label over the marked actor. The log gives
   only a number, so `buildHeadMarkers` names the ones it knows (FRU's) when
   the ability they announce follows. The label stays until that hit; an
