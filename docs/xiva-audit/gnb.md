@@ -25,7 +25,7 @@
 |---|---|---|---|---|
 | gnb/NoMercy/gcd-count | verified | `noMercy` expectedGcds | No Mercy under 9 GCDs (8 at 2.47s+) | Fight 16's 7 matched with its 2.47s; the app reads the 2.45s tier (`gcdTierMs`), so 10:11, 15:14, 16:15 count (settled with RmCphLTDaMXyAf2r). |
 | gnb/NoMercy/expected-actions | verified | `noMercy` expected | Savage Claw, Wicked Talon, Double Down, Sonic Break, Blasting Zone, Bow Shock or Lion Heart missing | Fight 16's 13 matched. 5:06's Double Down was 0.1s before No Mercy (multiplier 1.01). |
-| gnb/NoMercy/gnashing-fang-adjust | wrong | `noMercy` (the intended rule) | Gnashing Fang missing from No Mercy | xivanalysis's unit bug makes it always expected. The app expects it only when the GCD is slow or it was used inside. |
+| gnb/NoMercy/gnashing-fang-adjust | superseded | `noMercy` (the intended rule) | Gnashing Fang missing from No Mercy | xivanalysis's unit bug makes it always expected. The app expects it only when the GCD is slow or it was used inside. Proposed `wrong`; the user chose `superseded` 2026-10-18. |
 | gnb/NoMercy/lion-heart-adjust | verified | `noMercy` | Lion Heart missing | 7.4+: always expected; before 7.4: only with Bloodfest in the window. The app uses the 7.4 rule on every patch. |
 | gnb/NoMercy/rushed-window-adjust | superseded | burst window cut short by the kill | a window the kill cuts short | xivanalysis subtracts 1 from each; the app keeps what could still fit (`readyAgain`). |
 | gnb/NoMercy/bloodfest-used-notes | no-damage | — | — | A note column before 7.3. |
