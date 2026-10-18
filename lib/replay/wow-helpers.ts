@@ -106,6 +106,25 @@ export function wowCastTargetRings(data: ReplayData, ids: number[], name: string
       follow: c.target, style, estimated: false }));
 }
 
+/**
+ * The last time one of `ids` went on a player standing within
+ * `radiusYards` of a spot, between `from` and `from + maxMs`: how long a
+ * ground effect (a pool, a patch) visibly kept catching players. undefined
+ * when nobody stepped in.
+ */
+export function wowLastAuraNear(data: ReplayData, ids: number[], spot: { x: number; y: number }, from: number, radiusYards: number, maxMs: number): number | undefined {
+  const want = new Set(ids);
+  const actors = actorMap(data);
+  let last: number | undefined;
+  for (const [t, id, target, applied] of data.enemyAuras ?? []) {
+    if (!applied || !want.has(id) || t < from || t > from + maxMs) continue;
+    const a = actors.get(target);
+    const p = a && poseAt(a, t);
+    if (p && Math.hypot(p.x - spot.x, p.y - spot.y) <= radiusYards * 100) last = t;
+  }
+  return last;
+}
+
 /** An AoeShape with the fields a WoW builder rarely sets filled in. */
 export function wowShape(s: Pick<AoeShape, "kind" | "x" | "y" | "range" | "name" | "start" | "resolve"> & Partial<AoeShape>): AoeShape {
   return { bearing: 0, width: 0, angle: 0, inner: 0, estimated: true, style: "aoe", ...s };
