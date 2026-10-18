@@ -225,8 +225,9 @@ and delete them from the header.
   - [pct.md](xiva-audit/pct.md): Pictomancer, 1 candidate
     (Hyperphantasia, only lost at deaths on disk), 6 covered (portrait
     overwrites built 2026-10-16; Striking Muse not judged on 7.2).
-  - [ast.md](xiva-audit/ast.md): Astrologian, 1 candidate (Macrocosmos
-    underuse: the user, 2026-10-18, it's an AoE, so not `no-damage`), 4 covered.
+  - [ast.md](xiva-audit/ast.md): Astrologian, 0 candidates, 5 covered
+    (Macrocosmos drift built 2026-10-18, valued only from casts that hit
+    two or more enemies: level with Fall Malefic on one).
     Early Earthly Star detonations built 2026-10-16 (the user: a mistake
     worth a finding); 99 on disk; matched xivanalysis's Stellar Burst
     count (2) on K6qfMamL7rN8yz2Q (its suggestion can't fire: bug).

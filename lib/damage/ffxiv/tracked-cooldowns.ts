@@ -20,6 +20,8 @@ import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { TrackedCooldown } from "../types";
 import { XIVA_ACTIONS, XIVA_STATUSES } from "./xiva-data";
 import { FORCED_CRIT_SHARE } from "./jobs/melee";
+import { baseValue } from "./jobs/shared";
+import { ratesFromStats } from "../crit-rates";
 
 export type TrackedCooldownSpec = {
   actions:           string[];  // xivanalysis action keys; several = one shared recast
@@ -232,6 +234,48 @@ function leyLinesValue(player: PlayerInfo, endMs: number): { value: number; basi
     .reduce((a, e) => a + (e.amount ?? 0), 0) / uses;
   if (dealt <= 0) return undefined;
   return { value: dealt * 0.15, basis: `${Math.round(dealt / 1000)}k dealt in Circle of Power in an average Ley Lines window × 15% (its faster casts)` };
+}
+
+// Macrocosmos (xivanalysis Macrocosmos.tsx, 2026-10-18): a GCD worth only
+// its extra targets. On one enemy it's level with the Fall Malefic it
+// replaces (551 casts on disk: base hit 1.003× the player's Fall Malefic,
+// p10-p90 0.96-1.04), so a held one there costs nothing. On two it's
+// 1.58× (44 casts), against Gravity II's 1.54× on the same two. A lost use
+// is priced from the player's own casts in the pull: each cast that hit
+// two or more enemies gains its base damage over the better of Fall
+// Malefic and Gravity II on that many targets, one-target casts gain
+// nothing, averaged over every cast and priced at their average Fall
+// Malefic (crit and direct hit back in). A player who used it only on one
+// enemy gets no finding.
+function macrocosmosValue(player: PlayerInfo, endMs: number): { value: number; basis: string } | undefined {
+  const macro = XIVA_ACTIONS.MACROCOSMOS?.id, fall = XIVA_ACTIONS.FALL_MALEFIC?.id, grav = XIVA_ACTIONS.GRAVITY_II?.id;
+  if (macro === undefined || fall === undefined) return undefined;
+  const critMult = player.stats ? ratesFromStats(player.stats.criticalHit, player.stats.directHit).critMult : 1.55;
+  const hits = player.damageDone.filter((e) => !e.isDoT && !e.pet && e.timestamp < endMs && (e.amount ?? 0) > 0);
+  const avg = (xs: number[]) => (xs.length ? xs.reduce((a, x) => a + x, 0) / xs.length : 0);
+  const fallHits = hits.filter((e) => e.abilityId === fall);
+  const fallBase = avg(fallHits.map((e) => baseValue(e, critMult)));
+  const fallRolled = avg(fallHits.map((e) => e.amount ?? 0));
+  if (fallBase <= 0) return undefined;
+  const gravBase = avg(hits.filter((e) => e.abilityId === grav).map((e) => baseValue(e, critMult)));
+  const casts = player.casts.filter((c) => c.abilityId === macro && c.timestamp < endMs);
+  if (casts.length === 0) return undefined;
+  let gain = 0, multi = 0;
+  for (const c of casts) {
+    const own = hits.filter((e) => e.abilityId === macro && e.timestamp >= c.timestamp && e.timestamp < c.timestamp + 1_500);
+    const targets = new Set(own.map((e) => `${e.targetActorId ?? e.target}.${e.targetInstance ?? 1}`)).size;
+    if (targets < 2) continue;
+    multi++;
+    const instead = Math.max(fallBase, gravBase * targets);
+    gain += Math.max(0, own.reduce((a, e) => a + baseValue(e, critMult), 0) - instead);
+  }
+  if (gain <= 0) return undefined;
+  const value = (gain / casts.length) * (fallRolled / fallBase);
+  const k = (n: number) => `${Math.round(n / 1000)}k`;
+  return {
+    value,
+    basis: `${k(value)}: what an average Macrocosmos gained over Fall Malefic / Gravity II in its place (${multi} of ${casts.length} casts hit two or more enemies; one enemy gains nothing)`,
+  };
 }
 
 // Reassemble: a forced crit and direct hit on the best tool, as Life Surge.
@@ -481,6 +525,7 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   "Astrologian": [
     { actions: ["DIVINATION"] },
     { actions: ["EARTHLY_STAR"], prePullEvidence: ["STELLAR_EXPLOSION", "STELLAR_BURST"], damage: ["STELLAR_EXPLOSION", "STELLAR_BURST"], landDelayMs: 10_000 },
+    { actions: ["MACROCOSMOS"], valuePerUse: macrocosmosValue, minLevel: 90 },
   ],
   // Assize added 2026-10-16 (xivanalysis oGCDs.tsx checklist; a damage
   // oGCD). The FFLogs top 15 for Red Hot and Deep Blue press the first at
