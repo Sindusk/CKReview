@@ -172,6 +172,7 @@ and delete them from the header.
   module job by job against the FFXIV damage checks. Phases 1 and 2 done
   for all 21 jobs (2026-10-15). Phase 3 (premise and firing checks,
   building candidates) is ongoing: each ledger's "Open" list is its work.
+  Next session starts from [xiva-audit/HANDOFF-phase3.md](xiva-audit/HANDOFF-phase3.md).
   Every job now has samples on disk. The AoE-on-too-few-targets candidates
   were built 2026-10-15 for all eleven jobs (DNC, DRK, WAR, GNB, MNK,
   NIN, SAM, MCH, RPR, BLM, SMN), checked on 19 Red Hot and Deep Blue

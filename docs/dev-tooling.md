@@ -108,6 +108,11 @@ nothing written:
   wrong cast shows up there too (Gunbreaker's Continuation).
 - Then fetch only the pull you'll use, into its own report folder:
   `node scripts/fetch-ff-report.js <code> --fight <id>`.
+- `node scripts/ff-findings.js <Job> "<regex>" [code ...]` runs the
+  damage analysis over every sample with that job (or the named reports)
+  and prints each finding whose label or detail matches: the
+  false-positive sweep after building or changing a job check. A full
+  run takes a few minutes.
 
 **The same for WoW** (wowa-audit phase 3), read-only, nothing written:
 - `node scripts/wow-rankings.js "<encounter>" <spec> [--from-pct n] [--pages n] [--difficulty 5]`
