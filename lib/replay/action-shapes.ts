@@ -133,6 +133,7 @@ export type AoeShape = {
   // Gone at `resolve` with no flash: a marker's circle riding on its
   // player, whose drop is drawn by its own cast (FRU Frigid Stone).
   noFlash?: boolean;
+  star?: boolean;                // cross: star points while telegraphed (FRU Frigid Needle)
 };
 
 /**
@@ -164,6 +165,7 @@ type Override = {
   // A ground telegraph shown for its whole cast bar, not just as it lands:
   // a fixed spot the players read ahead of time.
   telegraph?: boolean;
+  star?:    boolean;         // a cross telegraphed as star points until it fires
 };
 
 // Futures Rewritten (lib/mechanics/ffxiv/fru/*.ts headers; ids and
@@ -237,6 +239,11 @@ const FRU_OVERRIDES: Record<number, Override> = {
   // about 4s later, then the last 2 as the Frigid Stones drop; each lands
   // 8.7s after it begins (both pulls).
   40198: { telegraph: true },
+  // Frigid Needle: each dropped stone shows an 8-way star through its 4.7s
+  // cast, pointing where its lines will shoot (user, 2026-10-17): two
+  // 40201 crosses per stone (one cardinal, one diagonal: casters face 180
+  // and 225 in both pulls) and the 5y 40200 circle under it.
+  40201: { telegraph: true, star: true }, 40200: { telegraph: true },
   // Tank busters.
   40290: { style: "tankbuster" },                   // Black Halo
   40182: { style: "tankbuster" },                   // Darkest Dance jump
@@ -411,7 +418,7 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
       const inner = Number.isFinite(nearest) ? Math.max(100, nearest - 50) : base.range / 3;
       out.push({ ...base, kind: "donut", x: cp.x, y: cp.y, bearing: 0, inner, estimated: true });
     } else if (g.castType === 11) {
-      out.push({ ...base, kind: "cross", x: cp.x, y: cp.y, bearing });
+      out.push({ ...base, kind: "cross", x: cp.x, y: cp.y, bearing, star: over.star });
     } else if (over.twoWay) {
       // Start a range behind the caster and run twice its length.
       const b = (bearing * Math.PI) / 180;

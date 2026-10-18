@@ -40,6 +40,9 @@
 //   begins 2, then 4 (+4.0s), then the last 2 (+8.0s, as the stones drop),
 //   each landing 8.7s after its begincast, often from a different helper
 //   than the one that began it (JZ1KXhDbqkNH3jxR 24, M9Nagmnw2LzHZPVq 1).
+//   Frigid Needle begins 2.1s after the drop at each stone (4.7s cast):
+//   two 40201 crosses (5y-wide lines, 40y arms; one cardinal, one
+//   diagonal) and a 5y 40200 circle, shown in game as an 8-way star.
 //   The House of Light 40206 cones target the four nearest (cast target =
 //   player). Icicle Impact 40198, Axe Kick 40202, Scythe Kick 40203,
 //   Frigid Needle 40200/40201 all give Damage Down. Heavenly Strike 40207

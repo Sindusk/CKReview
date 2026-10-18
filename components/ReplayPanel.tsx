@@ -647,12 +647,43 @@ function Knockback({ s, x, y, r, scale, opacity }: { s: AoeShape; x: number; y: 
   return <g opacity={opacity} pointerEvents="none">{out}</g>;
 }
 
+/**
+ * A cross while it's still telegraphed, as the game's star (FRU Frigid
+ * Needle): four golden points out of its centre along the arms, each
+ * tipped with an arrow, and a faint guide along the line it will shoot.
+ * Two crosses on one spot (cardinal + diagonal) make the 8-way star.
+ */
+const STAR_POINT = 650;     // centi-yalms
+function StarPoints({ s, x, y, r, scale, opacity }: { s: AoeShape; x: number; y: number; r: number; scale: number; opacity: number }) {
+  const len = STAR_POINT * scale, base = 90 * scale;
+  return (
+    <g opacity={opacity} pointerEvents="none">
+      {[0, 90, 180, 270].map((d) => {
+        const b = ((s.bearing + d) * Math.PI) / 180;
+        const ux = Math.sin(b), uy = -Math.cos(b), px = -uy, py = ux;
+        const tip = { x: x + ux * len, y: y + uy * len };
+        const head = 0.32 * len;
+        return (
+          <g key={d}>
+            <line x1={x} y1={y} x2={x + ux * r} y2={y + uy * r} stroke="#ffd36b" strokeOpacity={0.45} strokeWidth={1.5} strokeDasharray="6 8" />
+            <path d={`M${x + px * base} ${y + py * base} L${tip.x - ux * head * 0.6} ${tip.y - uy * head * 0.6} L${x - px * base} ${y - py * base} Z`}
+              fill="#ff9a2e" fillOpacity={0.85} stroke="#fff0c8" strokeWidth={1.5} strokeLinejoin="round" />
+            <path d={`M${tip.x} ${tip.y} L${tip.x - ux * head + px * head * 0.45} ${tip.y - uy * head + py * head * 0.45} L${tip.x - ux * head - px * head * 0.45} ${tip.y - uy * head - py * head * 0.45} Z`}
+              fill="#ffe08a" stroke="#c4560c" strokeWidth={1.5} strokeLinejoin="round" />
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
 function Aoe({ s, opacity, resolving, toX, toY, scale, uid }: { s: AoeShape; opacity: number; resolving: boolean; toX: (x: number) => number; toY: (y: number) => number; scale: number; uid: string }) {
   const x = toX(s.x), y = toY(s.y);
   const r = s.range * scale;
   const b = (s.bearing * Math.PI) / 180;
   if (s.style === "tower" && s.kind === "circle") return <Tower x={x} y={y} r={r} opacity={opacity} resolving={resolving} uid={uid} soakers={s.soakers} />;
   if (s.style === "knockback") return <Knockback s={s} x={x} y={y} r={r} scale={scale} opacity={opacity} />;
+  if (s.kind === "cross" && s.star && !resolving) return <StarPoints s={s} x={x} y={y} r={r} scale={scale} opacity={opacity} />;
   const c = AOE_COLORS[s.style];
   const base = resolving ? c.flash : c.fill;
   const grad = `aoe-${uid}`;
