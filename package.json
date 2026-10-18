@@ -2,7 +2,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "check:ff": "node scripts/validate.js --check --game ff",
+    "check:wow": "node scripts/validate.js --check --game wow"
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",

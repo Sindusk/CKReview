@@ -135,8 +135,8 @@ inputs to the `wrong` status:
   candidate.
 
 Ledgers go in `docs/wowa-audit/<class>-<spec>.md`, with the same layout
-as the FFXIV ones plus a `talents` column, and one pointer line per spec
-in [open-items.md](open-items.md).
+as the FFXIV ones plus a `talents` column, and one entry per spec in
+[wowa-audit/STATUS.md](wowa-audit/STATUS.md).
 
 ## Phase 3: verify against logs (ongoing, one spec at a time)
 

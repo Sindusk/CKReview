@@ -17,7 +17,7 @@ sampling it.
 
 | Task | Read |
 |---|---|
-| Researching a boss/mechanic model | [lib/mechanics/MODEL-RESEARCH-GUIDE.md](lib/mechanics/MODEL-RESEARCH-GUIDE.md) |
+| Researching a boss/mechanic model | the `/research-boss` skill, which follows [lib/mechanics/MODEL-RESEARCH-GUIDE.md](lib/mechanics/MODEL-RESEARCH-GUIDE.md) |
 | Building or changing mechanic detection (**mandatory reading**: severity definitions, attribution philosophy, log semantics) | [lib/mechanics/README.md](lib/mechanics/README.md) and [lib/mechanics/PITFALLS.md](lib/mechanics/PITFALLS.md), then the module's own header comment, which is the authoritative model for that mechanic |
 | Building a boss module from its research model and logs | the `/build-module` skill |
 | Refining a module with a reviewed log / VOD answers | the `/refine-module` skill |
@@ -137,6 +137,8 @@ Standing preferences, each learned from a real correction.
 - **Validation:** before considering any mechanic change done, run
   `node scripts/validate.js --check` (compares mechanic output against
   local `expectations/` baselines and rulings) and `npx tsc --noEmit`.
+  Shortcuts: `npm run check:ff` / `npm run check:wow` (append scoping
+  args after `--`) and `npm run typecheck`.
   - **Scope `--check`** (user, 2026-10-12); a full run takes minutes. After
     a boss module change, pass its mechanic name(s) and the
     `sampledata/<game>/<code>` folders whose `meta.json` names that boss.

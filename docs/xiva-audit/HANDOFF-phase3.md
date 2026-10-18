@@ -2,8 +2,7 @@
 
 For the next session working the FFXIV audit. Written 2026-10-18. The plan
 is [../xiva-audit-plan.md](../xiva-audit-plan.md); each job's ledger is in
-this folder, and [../open-items.md](../open-items.md) ("Plans in progress
-or not started") has one line per job.
+this folder, and [STATUS.md](STATUS.md) has one entry per job.
 
 ## Read first
 
@@ -49,7 +48,7 @@ Ordered by what needs only you. For each: premise check, value it as
 damage lost (against what the player would have done instead), build it
 in the job's file, sweep for false positives with
 `node scripts/ff-findings.js <Job> "<label regex>"`, then update the ledger
-row, its Open list, the job header and the open-items line together.
+row, its Open list, the job header and the STATUS.md entry together.
 
 1. **ast/Macrocosmos/underuse** ([ast.md](ast.md)). Back to `candidate`
    on 2026-10-18: the user said it's an AoE, so on multi-target pulls it

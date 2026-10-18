@@ -139,8 +139,8 @@ measured for it.
 >    `wrong` or `no-damage` row: the review comes after every spec is
 >    done. Write the evidence into the row's notes instead.
 > 6. Update the ledger (statuses, notes, a "Phase 3" bullet in the
->    header), the role file's header, and the spec's pointer line in
->    docs/open-items.md.
+>    header), the role file's header, and the spec's entry in
+>    docs/wowa-audit/STATUS.md.
 >
 > **Rules:** WoWAnalyzer is AGPL, reference only: clone it read-only
 > into the scratchpad if you need it (`git clone --depth 50 --branch

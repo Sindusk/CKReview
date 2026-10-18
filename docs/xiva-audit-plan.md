@@ -118,10 +118,9 @@ Write the result to `docs/xiva-audit/<job>.md`, one file per job:
 - an "Open" list at the bottom: every `covered` without a firing test and
   every `candidate`, in priority order (biggest damage cost first).
 
-Add one line per job to [open-items.md](open-items.md) under "Plans in progress or not
-started" (later "Todos") pointing at its ledger and giving its open count. Don't copy the
-records into open-items.md; at 15–25 rules per job they'd bury everything
-else.
+Add one entry per job to [xiva-audit/STATUS.md](xiva-audit/STATUS.md)
+pointing at its ledger and giving its open count. open-items.md keeps only
+a short pointer to that file; don't copy records there.
 
 ## Phase 3: verify against logs (ongoing, one job at a time)
 
