@@ -15,11 +15,26 @@
 // sample, and the header says it's often not logged at all, so the effect
 // centres on the bait cones' origin (40145), and with no cast logged its
 // element comes from the Sinsmoke / Sinsmite hits after the cones.
+//
+// The same dragon shows through two more casts (user, 2026-10-17), drawn
+// for the cast only (CAST_DRAGONS):
+// - Utopian Sky on Fatebreaker: 40154 fire = Sinbound Fire III stacks,
+//   40155 lightning = Sinbound Thunder III spreads (both pulls: 40155, then
+//   Thunder at 0:50.7).
+// - Turn of the Heavens on the untargetable clone parked at (100, 92.5)
+//   after the second Cyclonic Break: it says which halos explode big.
+//   40150 = fire: the flame halos' Brightfire was the 10y 40153, levin the
+//   5y 40152 (JZ1KXhDbqkNH3jxR 24); 40151 = lightning: the reverse
+//   (M9Nagmnw2LzHZPVq 1). Both parties stood among the small halos.
+// The halos themselves (four "halo of flame", four "halo of levin") show
+// as element rings at their Brightfire size from their begincast, 8s
+// before they go off (HALO).
 
 import { sampleNear, type ReplayData } from "@/lib/replay/ffxiv-replay";
 
 export type CasterEffect = {
-  kind:    "fire-dragon" | "lightning-dragon";
+  kind:    "fire-dragon" | "lightning-dragon" | "fire-halo" | "lightning-halo";
+  radius?: number;              // halos: the Brightfire it will cast (centi-yalms)
   label:   string;              // what it means, under the boss
   actor?:  string;              // follows this actor while it has samples
   x: number; y: number;         // else stays here (centi-yalms)
@@ -35,16 +50,43 @@ const CYCLONIC_CAST_MS = 6700;        // the second set's cast; the first is 620
 const BAIT_AFTER_CAST_MS = 600;       // bait cones land this long after the cast ends
 const REPEATS_WITHIN_MS = 8000;
 
-const LABELS: Record<CasterEffect["kind"], string> = {
-  "fire-dragon": "Fire: pairs",
-  "lightning-dragon": "Lightning: spread",
+const LABELS = { "fire-dragon": "Fire: pairs", "lightning-dragon": "Lightning: spread" };
+
+// Dragons shown for a cast's own duration, by cast id.
+const CAST_DRAGONS: Record<number, { kind: "fire-dragon" | "lightning-dragon"; label: string }> = {
+  40154: { kind: "fire-dragon", label: "Fire: stacks" },                 // Utopian Sky
+  40155: { kind: "lightning-dragon", label: "Lightning: spread" },
+  40150: { kind: "fire-dragon", label: "Fire halos explode: lightning side safe" },   // Turn of the Heavens
+  40151: { kind: "lightning-dragon", label: "Lightning halos explode: fire side safe" },
 };
+const CASTER_HOLD_MS = 20000;         // parked clones log one sample, often well before the cast
+
+// Turn of the Heavens' halos: Brightfire casts, element from the actor's name.
+const HALO_BRIGHTFIRE = [40152, 40153];
 
 export function buildCasterEffects(data: ReplayData): CasterEffect[] {
   const casts = data.enemyCasts ?? [];
   const hits = data.enemyHits ?? [];
   const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
   const out: CasterEffect[] = [];
+
+  for (const c of casts) {
+    const dragon = c[4] !== undefined && c[3] > 0 ? CAST_DRAGONS[c[4]] : undefined;
+    const halo = c[4] !== undefined && c[3] > 0 && HALO_BRIGHTFIRE.includes(c[4]);
+    if (!dragon && !halo) continue;
+    const caster = actorByKey.get(c[1]);
+    const p = caster && sampleNear(caster, c[0] + c[3], CASTER_HOLD_MS);
+    if (!caster || !p) continue;
+    if (dragon) {
+      out.push({ ...dragon, actor: caster.samples.length > 20 ? caster.key : undefined, x: p.x, y: p.y, start: c[0], end: c[0] + c[3] + 300 });
+      continue;
+    }
+    const element = /flame|fire/i.test(caster.name) ? "fire-halo" : /levin|lightning|thunder/i.test(caster.name) ? "lightning-halo" : undefined;
+    const range = data.actionGeometry?.[c[4]!]?.range;
+    if (element && range) {
+      out.push({ kind: element, label: "", radius: range * 100, x: p.x, y: p.y, start: c[0], end: c[0] + c[3] + 200 });
+    }
+  }
 
   // Each bait volley (the first 40145 of a burst) is one Cyclonic Break.
   const baits = casts.filter((c) => c[4] === CYCLONIC_BAIT && c[3] === 0);
@@ -75,5 +117,5 @@ export function buildCasterEffects(data: ReplayData): CasterEffect[] {
       end: lastRepeat ? lastRepeat[0] + 400 : t + 3000,
     });
   }
-  return out;
+  return out.sort((a, b) => a.start - b.start);
 }

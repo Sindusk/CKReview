@@ -41,6 +41,13 @@
 // - Utopian Sky 40154 fire / 40155 lightning; Blasting Zone 40157, Sinbound
 //   Fire III 40159 (4 + 4), Sinbound Thunder III 40160 (8 spreads). The fog
 //   clones' casts are logged only in some pulls (Concealed 1001621).
+// - Utopian Sky and Turn of the Heavens show the same element dragon as
+//   Cyclonic Break during their casts (user, 2026-10-17). Turn of the
+//   Heavens is cast by the untargetable clone at (100, 92.5): 40150 = fire,
+//   the four "halo of flame" cast the 10y Brightfire 40153 and the four
+//   "halo of levin" the 5y 40152 (JZ1KXhDbqkNH3jxR 24); 40151 = lightning,
+//   the reverse (M9Nagmnw2LzHZPVq 1). The safe side is the other element's
+//   (small) halos: both parties stood there at the Brightfire.
 // - Turn of the Heavens 40150/40151: Brightfire 40152/40153 (halos), Burnt
 //   Strike 40163 + Burnout 40164 (lightning), Burnt Strike 40161 + Blastburn
 //   40162 (fire; no damage, a knockback). All of them give Damage Down.

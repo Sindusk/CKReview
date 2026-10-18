@@ -43,7 +43,7 @@ import { ffMapImageUrl, fitReplayView, mapImageBounds, poseAt, type ReplayActor,
 import { aoesAt, buildAoeShapes, buildHeadMarkers, buildTethers, type AoeShape } from "@/lib/replay/action-shapes";
 import { getFFAbilityIconUrl } from "@/lib/ability-icons";
 import { buildCasterEffects } from "@/lib/replay/ffxiv-effects";
-import { ElementDragon } from "@/components/ReplayEffects";
+import { ElementDragon, ElementHalo } from "@/components/ReplayEffects";
 import { sampleNear } from "@/lib/replay/ffxiv-replay";
 import { facingToCompassBearing } from "@/lib/mechanics/geometry";
 import { detectFFRoles } from "@/lib/mechanics/ffxiv/roles";
@@ -330,8 +330,9 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
               const follow = e.actor ? actorByKey.get(e.actor) : undefined;
               const p = follow && poseAt(follow, t);
               const at = p && !p.stale ? p : e;
+              if (e.radius !== undefined) return <ElementHalo key={`${e.kind}-${e.start}-${e.x}-${e.y}`} e={e} x={toX(e.x)} y={toY(e.y)} r={e.radius * scale} t={t} />;
               const hitbox = follow?.hitbox ?? 500;
-              return <ElementDragon key={`${e.kind}-${e.start}`} e={e} x={toX(at.x)} y={toY(at.y)} r={Math.max(BOSS_ICON / 2 + 34, hitbox * scale * 1.05)} t={t} />;
+              return <ElementDragon key={`${e.kind}-${e.start}-${e.x}`} e={e} x={toX(at.x)} y={toY(at.y)} r={Math.max(BOSS_ICON / 2 + 34, hitbox * scale * 1.05)} t={t} />;
             })}
           </g>
           <text x={S / 2} y={24} textAnchor="middle" fill="#fff" fontSize={20} fontWeight={700} {...LABEL}>N</text>

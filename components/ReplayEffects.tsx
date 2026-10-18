@@ -9,6 +9,7 @@
 // ElementDragon: FRU Cyclonic Break's dragon, after the game's: a white
 // serpent with dark bands circling the boss, wrapped in its element. Fire
 // trails flames and embers; lightning crackles with bolts off its body.
+// ElementHalo: Turn of the Heavens' fire and lightning halos on the floor.
 
 import type { CasterEffect } from "@/lib/replay/ffxiv-effects";
 
@@ -27,7 +28,7 @@ const COLORS = {
 const rand = (seed: number) => { const v = Math.sin(seed * 12.9898) * 43758.5453; return v - Math.floor(v); };
 
 export function ElementDragon({ e, x, y, r, t }: { e: CasterEffect; x: number; y: number; r: number; t: number }) {
-  const c = COLORS[e.kind];
+  const c = COLORS[e.kind === "fire-dragon" || e.kind === "fire-halo" ? "fire-dragon" : "lightning-dragon"];
   const opacity = Math.max(0, Math.min(1, (t - e.start) / FADE_MS, (e.end - t) / FADE_MS));
   if (opacity <= 0) return null;
 
@@ -115,6 +116,35 @@ export function ElementDragon({ e, x, y, r, t }: { e: CasterEffect; x: number; y
 
       <text x={x} y={y + r * 1.15 + 26} textAnchor="middle" fill={c.text} fontSize={16} fontWeight={800}
         stroke="rgba(0,0,0,0.8)" strokeWidth={4} paintOrder="stroke">{e.label}</text>
+    </g>
+  );
+}
+
+/**
+ * One of Turn of the Heavens' halos: an element ring on the floor at the
+ * size of the Brightfire it will cast (5y or 10y), with a slow-turning
+ * dashed inner ring and the element's glyph in the middle. The big ones
+ * (the dragon's element) are the dangerous side.
+ */
+export function ElementHalo({ e, x, y, r, t }: { e: CasterEffect; x: number; y: number; r: number; t: number }) {
+  const c = COLORS[e.kind === "fire-halo" ? "fire-dragon" : "lightning-dragon"];
+  const opacity = Math.max(0, Math.min(1, (t - e.start) / FADE_MS, (e.end - t) / 200));
+  if (opacity <= 0) return null;
+  const spin = ((t - e.start) / 40) % 360;
+  const g = Math.max(8, r * 0.28);   // glyph size
+  return (
+    <g opacity={opacity} pointerEvents="none">
+      <circle cx={x} cy={y} r={r} fill={c.glow} fillOpacity={0.14} stroke={c.glow} strokeWidth={10} strokeOpacity={0.35} filter="url(#replay-glow)" />
+      <circle cx={x} cy={y} r={r} fill="none" stroke={c.hot} strokeWidth={2.5} />
+      <circle cx={x} cy={y} r={r * 0.8} fill="none" stroke={c.glow} strokeWidth={2} strokeOpacity={0.8}
+        strokeDasharray={`${r * 0.25} ${r * 0.12}`} transform={`rotate(${spin} ${x} ${y})`} />
+      {e.kind === "fire-halo" ? (
+        <path d={`M${x} ${y - g} Q${x + g * 0.9} ${y - g * 0.1} ${x + g * 0.5} ${y + g * 0.6} Q${x} ${y + g} ${x - g * 0.5} ${y + g * 0.6} Q${x - g * 0.9} ${y - g * 0.1} ${x} ${y - g} Z`}
+          fill={c.deep} stroke={c.hot} strokeWidth={1.5} />
+      ) : (
+        <path d={`M${x + g * 0.2} ${y - g} L${x - g * 0.5} ${y + g * 0.1} L${x} ${y + g * 0.1} L${x - g * 0.2} ${y + g} L${x + g * 0.5} ${y - g * 0.1} L${x} ${y - g * 0.1} Z`}
+          fill={c.hot} stroke={c.deep} strokeWidth={1.5} />
+      )}
     </g>
   );
 }
