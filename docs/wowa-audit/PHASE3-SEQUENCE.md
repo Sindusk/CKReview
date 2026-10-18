@@ -79,7 +79,7 @@ damage rows are measured.
 | 35 | Discipline | [priest-discipline.md](priest-discipline.md) | done 2026-10-17: Power Infusion drift (tracked, `twinCastMs` merges Twins of the Sun Priestess pairs: checks.ts, types.ts); Radiance and Flash Heal not judged by their own heal; filler Void Blast / Smite (healer.ts) |
 | 36 | Holy Priest | [priest-holy.md](priest-holy.md) | done 2026-10-17: Power Infusion drift; heal-GCD check turned off for Holy Priest, pending the user |
 | 37 | Outlaw | [rogue-outlaw.md](rogue-outlaw.md) | done 2026-10-17: finisher below 6 combo points (outlaw.ts); Opportunity expiry (procs.ts); Preparation a GCD press (game.ts); Energy cap removed for Outlaw; verified by the main session |
-| 38 | Protection Warrior | [warrior-protection.md](warrior-protection.md) | |
+| 38 | Protection Warrior | [warrior-protection.md](warrior-protection.md) | done 2026-10-17: Avatar held, Shield Slam held, Rage at the cap wired (it separates top from weak here) (protwarrior.ts); Thunder Blast and Burst of Power expiries (procs.ts); Demolish a GCD press (game.ts); verified by the main session |
 | 39 | Protection Paladin | [paladin-protection.md](paladin-protection.md) | |
 
 ## The agent prompt
@@ -487,6 +487,11 @@ measured for it.
   Energy waste rows, Sinister Strike with Opportunity up; kept `wrong`:
   Blade Rush / Killing Spree efficiency. Evidence in
   [rogue-outlaw.md](rogue-outlaw.md).
+- Protection Warrior (2026-10-17): proposed `wrong`: Ravager ticks
+  (nobody presses Ravager). Note: the combat potion check prices 0 on
+  every Protection Warrior pull (Light's Potential's bonus can't be
+  measured there), a limit of the shared potion check. Evidence in
+  [warrior-protection.md](warrior-protection.md).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
