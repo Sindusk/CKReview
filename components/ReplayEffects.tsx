@@ -202,13 +202,12 @@ export function ElementTether({ x1, y1, x2, y2, element, t }: { x1: number; y1: 
 /**
  * A player held aloft in a cage (FRU Floating Fetters): a pale cyan
  * bubble with vertical bars around the icon, a ring at top and bottom, and
- * a swirl turning inside. Fades in as they're lifted; tightens and
- * brightens in its last second.
+ * a swirl turning inside. Snaps in over 150ms and brightens until the hit.
  */
 export function JailCage({ x, y, r, t, start, end }: { x: number; y: number; r: number; t: number; start: number; end: number }) {
   const R = r * 1.35;
-  const appear = Math.min(1, (t - start) / 400);
-  const final = Math.max(0, 1 - (end - t) / 1000);   // 0 → 1 over the last second
+  const appear = Math.min(1, (t - start) / 150);
+  const final = Math.max(0, Math.min(1, (t - start) / Math.max(1, end - start)));   // 0 → 1 as it closes in
   const bars = 5;
   const turn = (t / 15) % 360;
   return (

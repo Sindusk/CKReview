@@ -107,8 +107,10 @@ const COMMON_STATUSES = new Set([1002941, 1002940, 1004162, 1000043, 1000044]);
 // (action-shapes.ts's buildHeadMarkers), or this long when unknown.
 const HEAD_MARKER_PLAIN_MS = 5000;
 // Statuses that lift a player into a cage: FRU Floating Fetters, 4s on
-// each tethered carrier before their hit (user, 2026-10-17).
+// each tethered carrier before their hit (user, 2026-10-17). The lift
+// lasts the whole status; the cage only its last second, as in game.
 const JAIL_STATUSES = new Set([1002304]);
+const JAIL_CAGE_MS = 1000;
 const STATUS_W = 15, STATUS_H = 20;   // SVG units at icon scale 1 (the game's icons are 24x32)
 const PLAYER_ICON = 34;   // SVG units, at icon scale 1
 const BOSS_ICON = 46;
@@ -390,7 +392,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
                 <image href={wow && info ? getPlayerSpecIcon("wow", info.specId, info.className) : getPlayerClassIcon(game, info?.className ?? a.job ?? "")}
                   x={x - r} y={iy - r} width={size} height={size}
                   filter={dead ? "url(#replay-gray)" : "url(#replay-shadow)"} />
-                {jail && <JailCage x={x} y={iy} r={r} t={t} start={jail[0]} end={jail[1]} />}
+                {jail && t >= jail[1] - JAIL_CAGE_MS && <JailCage x={x} y={iy} r={r} t={t} start={jail[1] - JAIL_CAGE_MS} end={jail[1]} />}
                 {dead && (
                   <path d={`M${x - r * 0.6} ${y - r * 0.6} L${x + r * 0.6} ${y + r * 0.6} M${x + r * 0.6} ${y - r * 0.6} L${x - r * 0.6} ${y + r * 0.6}`} stroke="#ff4d4d" strokeWidth={4} strokeLinecap="round" />
                 )}
