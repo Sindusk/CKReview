@@ -213,10 +213,10 @@ and delete them from the header.
     `noDamageCasts`'s (2026-10-16).
   - [brd.md](xiva-audit/brd.md): Bard, 0 candidates, 5 covered (a
     burst buff that never met the other two built 2026-10-18 from weak
-    Lindwurm II / The Tyrant parses).
+    Lindwurm II / The Tyrant parses, matched on two xivanalysis pages).
   - [dnc.md](xiva-audit/dnc.md): Dancer, 0 candidates, 9 covered (dance
-    checks, Devilment outside Technical Finish and no dance partner
-    built, awaiting xivanalysis pages). Partner value from partnercalc's
+    checks, Devilment outside Technical Finish; no dance partner built
+    and matched on a xivanalysis page 2026-10-18). Partner value from partnercalc's
     model (dnc-partner.ts), matched against partnercalc.app on one Enuo
     kill (tanks within 1% without auto-attacks, others within ~10%).
     Crit / direct-hit rates from DoT ticks need samples fetched since
@@ -254,7 +254,7 @@ and delete them from the header.
     Offerings overcap and Reawaken left at a kill, Death Rattle / Last
     Lash, the coils' Bites built 2026-10-16; all but the wrong-Bite case
     matched xivanalysis pages; coils skipped after Vicewinder built
-    2026-10-18, the coil rule measured on disk).
+    2026-10-18, the coil rule measured on disk, matched on two pages).
   - [rpr.md](xiva-audit/rpr.md): Reaper, 0 candidates, 9 covered
     (Soul Reaver / Executioner drops and Enhanced overwrites built
     2026-10-16; the drops matched two pages, overwrites untested on a

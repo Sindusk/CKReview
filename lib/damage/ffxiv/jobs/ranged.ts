@@ -92,12 +92,16 @@
 //   Devilment outside Technical Finish (Technicalities.tsx "bad
 //   Devilments", 2026-10-16): `devilmentMisaligned` below. Not matched
 //   against a page yet. No dance partner (Closed Position uptime,
-//   2026-10-18): `dancePartnerLost` below, found in weak parses. Not
-//   adopted: Flourishing Starfall / Finish overwrites (both last under
+//   2026-10-18): `dancePartnerLost` below, found in weak parses; matched
+//   xivanalysis's Closed Position uptime (35.12%) on J2xNa9WqfQKgrMFw
+//   fight 9 (no partner after 3:50 of a 10:56 kill). Not adopted: Flourishing Starfall / Finish overwrites (both last under
 //   their 120s source's cooldown: never refreshed on 442 pulls).
 // Bard: Caustic Bite / Stormbite (below), Hawk's Eye overwrites, AoE on
 //   one target, the burst window, a burst buff that never met the other
-//   two (`bardBuffMisaligned`, 2026-10-18), cooldowns (OGCDDowntime.ts).
+//   two (`bardBuffMisaligned`, 2026-10-18; its lone Radiant Finales match
+//   xivanalysis's misaligned list on KzamJYNWgqx3TLdw fight 27 and
+//   Hy87F2VJhBqkLnt1 fight 1, which also lists the two buffs each one
+//   missed), cooldowns (OGCDDowntime.ts).
 //   Rechecked on dDar482XvFKBPJYh FRU kill (7.1, 2026-10-12): its 17
 //   Hawk's Eye overwrites match by time; Empyreal Arrow 55/59 is 3 by
 //   drift; Battle Voice / Radiant Finale / Raging Strikes / Barrage 9/10

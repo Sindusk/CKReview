@@ -104,7 +104,9 @@
 //     and jXG76ba43VDLAvYz. The coils' Bites (`viperBites`, from that
 //     jXG76ba43VDLAvYz page's third dropped proc). A coil skipped after
 //     Vicewinder (Vices.tsx, 2026-10-18): `viperCoils`, with when a coil
-//     stops being available measured on disk.
+//     stops being available measured on disk. Matched xivanalysis's coil
+//     counts on cZ42C1y3JRNGXWLH (Anzu Kano) and ymbRNcMgaKqB86Zj fight 6
+//     (Jungleboy Mowglii; the coils the kill cut off are forced here).
 // Monk (checked against xivanalysis on qjCMx4bRfgNKwX9T fight 16, 7.5,
 // 2026-10-13, the first Monk sample):
 //   - Riddle of Fire (RiddleOfFire.tsx): 11 GCDs; +15% (FFLogs multiplier

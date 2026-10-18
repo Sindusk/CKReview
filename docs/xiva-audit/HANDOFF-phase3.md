@@ -84,11 +84,11 @@ row, its Open list, the job header and the open-items line together.
   `wrong`. The user wants to go through them one by one in a later
   session: bring them one job at a time with the evidence (pull, MM:SS,
   numbers), per the plan.
-- **xivanalysis pages** for the checks built 2026-10-18, so they can be
-  matched: KzamJYNWgqx3TLdw fight 27 (Bard), J2xNa9WqfQKgrMFw fight 9
-  (Dancer), ymbRNcMgaKqB86Zj fight 6 (Black Mage), cZ42C1y3JRNGXWLH (Viper,
-  the Red Hot and Deep Blue kill). Pages go in `sampledata/damage-ff/`;
-  read them with `.claude/skills/damage-analysis/tools/xiva-html.js`.
+- ~~xivanalysis pages for the checks built 2026-10-18~~: supplied and
+  matched the same day (Bard ×2, Dancer, Black Mage, Viper ×2,
+  Astrologian ×2, Black Mage 7.1 ×4; see each ledger row). Pages are in
+  `sampledata/damage-ff/`; read them with
+  `.claude/skills/damage-analysis/tools/xiva-html.js`.
 - **Dancer thresholds**, builder's choices not yet confirmed: the 5s
   swap grace after Closed Position is ready (`PARTNER_SWAP_GRACE_MS`) and
   the weaker-partner bar (20k and 20%, `PARTNER_CHOICE_*`), in

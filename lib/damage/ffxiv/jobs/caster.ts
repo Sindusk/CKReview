@@ -121,8 +121,10 @@
 //     stack (a lost instant costs damage only if movement later needed it).
 //     Before 7.2, a Firestarter spent inside Astral Fire after its Paradox
 //     (RotationWatchdog FirestarterUsageEvaluator, 2026-10-18):
-//     `firestarterPre72` below; 4 on rFQT8XZckzvH1LNx (7.1), not matched
-//     against a page.
+//     `firestarterPre72` below; 4 on rFQT8XZckzvH1LNx (7.1). xivanalysis
+//     (2026-10-18, all four pages) counts only pull 13's 6:01.0: it judges
+//     a window by its first Paradox, normally the ice one before Astral
+//     Fire III, so a window with one always passes.
 //   - SMN Searing Light with one Searing Flash (SearingLight.tsx).
 //     Checked against xivanalysis on qjCMx4bRfgNKwX9T fight 16 (7.5,
 //     2026-10-13, the first Summoner sample): Searing Flash 10/10, every
@@ -967,7 +969,10 @@ function despairSkipped(ctx: PlayerCheckContext, gauge: BlmGauge, cycle: number)
     // Manafont before Despair (xivanalysis ManafontTiming): the refill
     // throws away the 800+ MP a Despair would have spent. ymbRNcMgaKqB86Zj
     // The Tyrant pull 1 (Yuui Kobayashi, a 0.1-percentile kill, 2026-10-18):
-    // Manafont at 1200 MP at 2:21.4, 8:13.8 and 10:08.9.
+    // Manafont at 1200 MP at 2:21.4, 8:13.8 and 10:08.9. Its page counts
+    // only 10:08.9: it calls a Manafont below Astral Fire III neutral (2:21
+    // and 8:13 came after Transpose and Fire IV), though a Despair there
+    // would still have spent the MP and given Astral Fire III.
     if (c.abilityId === A.MANAFONT.id && before.af > 0 && !despaired && since !== undefined &&
         c.mp !== undefined && c.mp >= DESPAIR_MIN_MP && c.timestamp >= 0) {
       const gcdMs = ctx.baseGcdMs * ctx.factorAt(c.timestamp);

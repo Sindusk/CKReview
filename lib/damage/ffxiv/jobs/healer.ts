@@ -32,7 +32,8 @@
 //   multiplier: Technical Finish + Divination = 1.11).
 // - Cooldown drift: tracked-cooldowns.ts. Astrologian's Macrocosmos
 //   (2026-10-18) is valued only from casts that hit two or more enemies:
-//   on one it's level with Fall Malefic (macrocosmosValue there).
+//   on one it's level with Fall Malefic (macrocosmosValue there). Matched
+//   xivanalysis's "only 1 cast" on fJxTNgwtRKjYbvZp fight 7 (Passel Teale).
 // - Hardcast AoE spells on one target (aoeOnOneTarget, below).
 // - Astrologian, checked against xivanalysis on jN3XDrf2z8PmLgRJ Vamp pull
 //   8: its missed Lightspeed (Divination at 4:08) isn't a finding of its
