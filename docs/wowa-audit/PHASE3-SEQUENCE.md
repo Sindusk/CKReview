@@ -75,9 +75,9 @@ damage rows are measured.
 | 31 | Survival | [hunter-survival.md](hunter-survival.md) | done 2026-10-17: Tip of the Spear wasted, spender without Tip of the Spear, Takedown held (per-player cooldown), Focus cap removed for Survival (survival.ts); Kill Command pet hit counts as GCD damage (game.ts); Moonlight Chakram expiry at 15s for Survival (procs.ts); verified by the main session |
 | 32 | Fire | [mage-fire.md](mage-fire.md) | done 2026-10-17: Fire Blast under Hot Streak, Combustion window valued per press, tracked Combustion valued with `burstHold` (fire.ts); verified by the main session |
 | 33 | Frost Mage | [mage-frost.md](mage-frost.md) | done 2026-10-17: Fingers of Frost wasted, Frozen Orb valued, Ray of Frost `burstHold` (frostmage.ts); Fingers of Frost expiry (procs.ts); verified by the main session |
-| 34 | Holy Paladin | [paladin-holy.md](paladin-holy.md) | |
-| 35 | Discipline | [priest-discipline.md](priest-discipline.md) | |
-| 36 | Holy Priest | [priest-holy.md](priest-holy.md) | |
+| 34 | Holy Paladin | [paladin-holy.md](paladin-holy.md) | done 2026-10-17 (healer pass with 35, 36): no check built; heal GCDs worth 0 except a Holy Power heal near the paladin's own Shield of the Righteous (healer.ts); verified by the main session |
+| 35 | Discipline | [priest-discipline.md](priest-discipline.md) | done 2026-10-17: Power Infusion drift (tracked, `twinCastMs` merges Twins of the Sun Priestess pairs: checks.ts, types.ts); Radiance and Flash Heal not judged by their own heal; filler Void Blast / Smite (healer.ts) |
+| 36 | Holy Priest | [priest-holy.md](priest-holy.md) | done 2026-10-17: Power Infusion drift; heal-GCD check turned off for Holy Priest, pending the user |
 | 37 | Outlaw | [rogue-outlaw.md](rogue-outlaw.md) | |
 | 38 | Protection Warrior | [warrior-protection.md](warrior-protection.md) | |
 | 39 | Protection Paladin | [paladin-protection.md](paladin-protection.md) | |
@@ -465,6 +465,22 @@ measured for it.
     ~40s Frostfire players hold Comet Storm a cycle. Lengthen it?
   Kept `wrong`: Ray of Frost ticks, Comet Storm targets. Evidence in
   [mage-frost.md](mage-frost.md).
+- Holy Paladin, Discipline, Holy Priest (2026-10-17), about the app's own
+  heal-GCD check:
+  - **Turned off for Holy Priest, for the user to approve or reject:** it
+    read 4.2–4.3M on two 100th-percentile Holy Priests who dealt 0.5M in
+    all (Benediction pressed 11–14 times a minute; Echo of Light logs
+    apart, so each heal's own share reads low).
+  - Holy Paladin: a heal GCD is now worth 0 (every damage press has a
+    cooldown; Crusader Strike pressed 0 times in 109 pulls), except a
+    Holy Power heal near the paladin's own Shield of the Righteous. It
+    had read 0.25–2.27M on the top three.
+  - Should a healer's Power Infusion be judged at all? (Its loss is
+    another player's damage; Busiekk Yz4PLrZ2CcAdMVxG 1.58M.)
+  Proposed `no-damage`: Holy Paladin's Holy Power waste, Holy Shock
+  efficiency, Imbued Infusions, Avenging Wrath / Divine Toll drift;
+  Discipline's Ultimate Penitence; Holy Priest's Shadow Word: Pain.
+  Proposed `wrong`: Crusader's Might. Evidence in the three ledgers.
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
