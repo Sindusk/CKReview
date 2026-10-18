@@ -101,6 +101,13 @@
 // resolution killed 3+ 2 (D17, D20), enrage 2, dead at Hello World 2 (A46,
 // C9). Every wipe has one; the 13 clears have none.
 // Their Majors: the centre (B66) and the Oversampled Wave Cannon doubles.
+// Replay (2026-10-18, bNcrLh7Y4dkHxM9q fight 17, a kill; 31561 at 4:36.8):
+// players log every 3s through the transition, with an 11s gap over the
+// rings (4:44.8-4:55.8), so ring and arm positions can't be checked there.
+// Tethers: 224 Local / 225 Remote, 200 / 201 their preparation from the
+// Code Smells; the Regression statuses end at the breaks. Tower helpers
+// log their spot at the resolution. Loading 1003452 right / 1003453 left.
+// Built in replay.ts.
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-top3-avoidable (Major on death, else Minor): rings, arms, centre.

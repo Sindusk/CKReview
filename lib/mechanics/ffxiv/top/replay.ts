@@ -358,12 +358,166 @@ function p2Stacks(data: ReplayData): AoeShape[] {
   return out;
 }
 
+// ── P3 Omega Reconfigured (omega-reconfiguredd.ts) ──────────────────────────
+
+const WAVE_REPEATER = [31567, 31568, 31569, 31570];   // 0-6y, then 6-12, 12-18, 18-24y rings
+const COLOSSAL_BLOW = 31566;
+const SNIPER = 31571, HP_SNIPER = 31572;
+const SNIPER_FODDER = 1003425, HP_SNIPER_FODDER = 1003426;
+const TOWER_RED = 31583, TOWER_BLUE = 31584;
+const STACK_BUG = 31574, DEFAMATION_BUG = 31575;
+const STACK_STATUS = 1003524, DEFAMATION_STATUS = 1003525;
+const ROT_RED = 31578, ROT_BLUE = 31579;
+const ROT_RED_STATUS = 1003526, ROT_BLUE_STATUS = 1003429;
+const MONITOR_BOSS: Record<number, "right" | "left"> = { 31595: "right", 31596: "left" };
+const MONITOR_STATUS: Record<number, "right" | "left"> = { 1003452: "right", 1003453: "left" };
+const MARK_LEAD_MS = 5000;   // spreads, stacks and defamations shown on their owner this long before they go off
+
+Object.assign(OVERRIDES, {
+  // The rings are drawn by p3Rings (exact donut holes; the helper casting
+  // them logs one sample, 2s before the first).
+  ...Object.fromEntries(WAVE_REPEATER.map((id) => [id, { hidden: true }])),
+  // Colossal Blow: the arms' 11y blows (BossMod), shown for their 1.7s cast.
+  // Unresolved: at the first set (fight 17 4:53.9) all eight stood 6-10y
+  // from the logged arms and none was hit; at the second (4:56.4) they
+  // stood 11.3-12.1y away.
+  [COLOSSAL_BLOW]: { telegraph: true },
+  [HP_SNIPER]: { style: "stack" },
+  // Hello World's towers are drawn by p3Towers in their colour from their
+  // 9.7s begincast, at the helper's spot (the cast's target is its
+  // soaker, 2-5y off the tower: fight 17 5:33.2).
+  [TOWER_RED]: { hidden: true }, [TOWER_BLUE]: { hidden: true },
+  // The stack and the defamation land on their owner, whose bug just ran
+  // out; a hit on several players loses the cast target, and the helper
+  // casting it sits at (100, 90).
+  [STACK_BUG]: { holder: STACK_STATUS, style: "stack" },
+  [DEFAMATION_BUG]: { holder: DEFAMATION_STATUS },
+  // Rot expiries: no damage to the holder (header), drawn in the rot's colour.
+  [ROT_RED]: { style: "top-rot-red" }, [ROT_BLUE]: { style: "top-rot-blue" },
+  31558: { hidden: true },   // a 1y circle under the boss before the monitors (7:07.7)
+} satisfies Record<number, Override>);
+
+Object.assign(TETHERS, {
+  // Hello World's tethers (omega-reconfiguredd.ts; fight 17 5:12.1 on):
+  // 200 / 201 the Local / Remote pair's 20s preparation, 224 / 225 the live
+  // Local (green) / Remote (blue) tether, broken by closing in / moving
+  // apart, which the log shows only as Local / Remote Regression ending.
+  200: { element: "top-local-prep", payoff: [], endStatus: [1003503] },
+  201: { element: "top-remote-prep", payoff: [], endStatus: [1003441] },
+  224: { element: "top-local", payoff: [], endStatus: [1003529] },
+  225: { element: "top-remote", payoff: [], endStatus: [1003530] },
+} satisfies Record<number, TetherKind>);
+
+const shape = (o: Partial<AoeShape> & Pick<AoeShape, "kind" | "x" | "y" | "range" | "name" | "start" | "resolve" | "style">): AoeShape =>
+  ({ bearing: 0, width: 0, angle: 0, inner: 0, estimated: false, ...o });
+
+// Wave Repeater: four rings out from the middle, 2s apart, twice. Each
+// shows from the one before it (the first from its 4.7s cast bar), so the
+// wave reads as moving out (BossMod radii: 6, 12, 18, 24y).
+function p3Rings(data: ReplayData): AoeShape[] {
+  const casts = data.enemyCasts ?? [];
+  const out: AoeShape[] = [];
+  for (const c of casts) {
+    const k = c[3] === 0 ? WAVE_REPEATER.indexOf(c[4] ?? 0) : -1;
+    if (k < 0) continue;
+    let start = c[0] - 2100;
+    if (k === 0) {
+      const begin = casts.find((b) => b[4] === c[4] && b[3] > 0 && Math.abs(b[0] + b[3] - c[0]) < 800);
+      if (begin) start = begin[0];
+    }
+    out.push(shape({
+      kind: k === 0 ? "circle" : "donut", x: ARENA.x, y: ARENA.y, range: 600 * (k + 1), inner: 600 * k,
+      name: "Wave Repeater", start, resolve: c[0], style: "aoe",
+    }));
+  }
+  return out;
+}
+
+// Hello World's towers: red (31583, for the red rot) and blue (31584), at
+// the helper's spot from the begincast until soaked.
+function p3Towers(data: ReplayData): AoeShape[] {
+  const casts = data.enemyCasts ?? [];
+  const hits = data.enemyHits ?? [];
+  const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  const out: AoeShape[] = [];
+  for (const c of casts) {
+    if (c[3] !== 0 || (c[4] !== TOWER_RED && c[4] !== TOWER_BLUE)) continue;
+    const a = actorByKey.get(c[1]);
+    const hit = hits.find((h) => h[2] === c[1] && h[1] === c[4] && h[0] >= c[0] && h[0] - c[0] <= 1500 && h[4] !== null);
+    const p = (a && sampleNear(a, c[0], 1500)) ?? (hit ? { x: hit[4]!, y: hit[5]! } : undefined);
+    const begin = casts.find((b) => b[1] === c[1] && b[4] === c[4] && b[3] > 0 && Math.abs(b[0] + b[3] - c[0]) < 800);
+    if (!p) continue;
+    out.push(shape({
+      kind: "circle", x: p.x, y: p.y, range: 600, soakers: 1, name: c[4] === TOWER_RED ? "Cascading Latent Defect" : "Latent Performance Defect",
+      start: begin ? begin[0] : c[0] - 300, resolve: c[0], style: c[4] === TOWER_RED ? "top-tower-red" : "top-tower-blue",
+    }));
+  }
+  return out;
+}
+
+// What rides on players: each rot (5y, its colour) for as long as it's
+// held; the Sniper marks (6y spreads, 6y High-powered stacks) and Hello
+// World's stacks (5y) and defamations (20y) for the last 5s before they go
+// off. Statuses that end without their attack (a death) are left out.
+function p3Marks(data: ReplayData): AoeShape[] {
+  const hits = data.enemyHits ?? [];
+  const casts = data.enemyCasts ?? [];
+  const out: AoeShape[] = [];
+  const MARKS: Record<number, { range: number; style: AoeShape["style"]; name: string; ability: number }> = {
+    [SNIPER_FODDER]: { range: 600, style: "top-spread", name: "Sniper Cannon", ability: SNIPER },
+    [HP_SNIPER_FODDER]: { range: 600, style: "stack", name: "High-Powered Sniper Cannon", ability: HP_SNIPER },
+    [STACK_STATUS]: { range: 500, style: "stack", name: "Critical Synchronization Bug", ability: STACK_BUG },
+    [DEFAMATION_STATUS]: { range: 2000, style: "top-spread", name: "Critical Overflow Bug", ability: DEFAMATION_BUG },
+  };
+  for (const [start, end, key, id] of data.playerAuras ?? []) {
+    if (id === ROT_RED_STATUS || id === ROT_BLUE_STATUS) {
+      out.push(shape({
+        kind: "circle", x: 0, y: 0, range: 500, name: id === ROT_RED_STATUS ? "Critical Underflow Bug" : "Critical Performance Bug",
+        start, resolve: end, follow: key, noFlash: true, style: id === ROT_RED_STATUS ? "top-rot-red-held" : "top-rot-blue-held",
+      }));
+      continue;
+    }
+    const m = MARKS[id];
+    if (!m) continue;
+    const fired = casts.some((c) => c[4] === m.ability && c[3] === 0 && Math.abs(c[0] - end) <= 1500)
+      || hits.some((h) => h[1] === m.ability && Math.abs(h[0] - end) <= 1500);
+    if (!fired) continue;
+    out.push(shape({ kind: "circle", x: 0, y: 0, range: m.range, name: m.name, start: Math.max(start, end - MARK_LEAD_MS), resolve: end, follow: key, noFlash: true, style: m.style }));
+  }
+  return out;
+}
+
+// Oversampled Wave Cannon: the boss's monitor (31595 right / 31596 left,
+// for its 9.7s cast) and the three players' (Loading right / left), on the
+// side each will fire to, turning with its holder.
+function p3Monitors(data: ReplayData): CasterEffect[] {
+  const casts = data.enemyCasts ?? [];
+  const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  const out: CasterEffect[] = [];
+  for (const c of casts) {
+    const side = c[3] > 0 && c[4] !== undefined ? MONITOR_BOSS[c[4]] : undefined;
+    const a = side && actorByKey.get(c[1]);
+    const p = a && poseAt(a, c[0]);
+    if (side && p) out.push({ kind: `top-monitor-${side}`, label: "", actor: c[1], x: p.x, y: p.y, start: c[0], end: c[0] + c[3] });
+  }
+  for (const [start, end, key, id] of data.playerAuras ?? []) {
+    const side = MONITOR_STATUS[id];
+    const a = side && actorByKey.get(key);
+    const p = a && poseAt(a, start);
+    if (side && p) out.push({ kind: `top-monitor-${side}`, label: "", actor: key, x: p.x, y: p.y, start, end });
+  }
+  return out;
+}
+
 function buildShapes(data: ReplayData): AoeShape[] {
-  return [...p1Towers(data), ...p1Puddles(data), ...p1Sets(data), ...p2Clones(data), ...p2Stacks(data)];
+  return [
+    ...p1Towers(data), ...p1Puddles(data), ...p1Sets(data), ...p2Clones(data), ...p2Stacks(data),
+    ...p3Rings(data), ...p3Towers(data), ...p3Marks(data),
+  ];
 }
 
 function buildEffects(data: ReplayData): CasterEffect[] {
-  return [...p2Effects(data)];
+  return [...p2Effects(data), ...p3Monitors(data)];
 }
 
 export const TOP_REPLAY: FightReplay = {

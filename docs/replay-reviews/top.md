@@ -115,3 +115,53 @@ its centre, on the edge of the 10y line.
    the party. Does the game telegraph it that long?
 7. Pull 17, 3:51.0 to 3:55: Beyond Defense jumped the WAR, and Pile Pitch
    then hit the WAR too (Doom). Did the WAR stay in the stack?
+
+## Phase 3: Omega Reconfigured (4:37 to 7:27)
+
+### What's drawn
+- **Transition:** Wave Repeater as four rings out from the middle (0-6,
+  6-12, 12-18, 18-24y, BossMod), each shown from the one before so the wave
+  reads as moving out, twice. Colossal Blow's 11y circles from the arms for
+  their 1.7s cast. Sniper marks as dashed red 6y spreads and High-powered
+  as orange 6y stacks on their players for their last 5s.
+- **Hello World:** red and blue towers in their colour from their 9.7s
+  cast, at the tower's own spot (the game data put them on the soaker).
+  Each rot as a soft ring in its colour around whoever holds it, for as
+  long as they hold it, with a burst as it runs out. Stacks (orange 5y) and
+  defamations (dashed red 20y) ride on their owners for their last 5s and
+  land on the owner (the cast lost its target when it hit two). Local
+  tethers green, Remote blue; their 20s preparation tethers thin and
+  dashed; each ends when the pair breaks it.
+- **Oversampled Wave Cannon:** a cyan monitor with chevrons on the side the
+  boss and the three Loading players will fire to, turning with them; the
+  7y circles flash on the picked players.
+
+### Fit check
+Clean apart from same-name pairs. Wave Repeater and Colossal Blow show
+players inside rings and blows who weren't hit: players log every 3s here
+and not at all from 4:44.8 to 4:55.8, so their drawn spots there are
+guesses.
+
+### Couldn't find out
+- The lethal centre during the transition (an event object, not in the log):
+  not drawn.
+- Whether the first arm set's blows (4:53.9) land where the arms are logged:
+  every player stood 6-10y from them, unhit, but on stale positions.
+- The arms' and monitors' in-game look; Local / Remote tether colours are
+  the header's (Local red/green, Remote blue).
+
+### VOD checks: Pull 17 (bNcrLh7Y4dkHxM9q)
+1. Pull 17, 4:37 to 4:56: the rings drawn going out from the middle every
+   2s, twice. Where did the party stand for each ring, and is the first
+   ring a 6y circle in the middle?
+2. Pull 17, 4:51.9 to 4:56.4: the arms' blows drawn as 11y circles at
+   W-SW, E-SE and N, then S, W-NW and E-NE. Do the arms sit there, and how
+   big are their blows?
+3. Pull 17, 5:23.3 to 5:33.2: blue towers NW and NE, red SW and SE. Do the
+   colours and spots match?
+4. Pull 17, 5:32.1 to 5:37.3: the Remote tether (WHM-DRG, blue) breaks at
+   5:34.6, then the Local (SCH-RPR, green) at 5:37.2. Do those tethers show
+   in those colours?
+5. Pull 17, 7:08.9 to 7:19.0: the boss's monitor on its east side, the SCH's
+   on the left, the WAR's and PCT's on the right. Do the monitors face
+   that way?

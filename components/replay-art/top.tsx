@@ -10,6 +10,8 @@
 // pulses running to the holder, so it reads apart from the pink generic
 // tethers. A VOD check (docs/replay-reviews/top.md).
 
+import { facingToCompassBearing } from "@/lib/mechanics/geometry";
+import { poseAt } from "@/lib/replay/ffxiv-replay";
 import type { EffectArtProps, FightArt, ShapeArtProps, TetherArtProps } from "./types";
 
 const BLASTER = { glow: "#ff3355", core: "#ffd0d8", deep: "#a0102a" };
@@ -163,12 +165,113 @@ function BladedanceTether({ x1, y1, x2, y2, t }: TetherArtProps) {
   );
 }
 
+// ── P3 Hello World ──────────────────────────────────────────────────────────
+
+const ROT = {
+  red:  { fill: "#ff3b3b", rim: "#ffb3b3", deep: "#8a0d0d" },
+  blue: { fill: "#3b8bff", rim: "#b8d6ff", deep: "#0d3a8a" },
+};
+
+/** Hello World's coloured towers (red 31583, blue 31584): soaked by a carrier of that rot colour. */
+function ColorTower({ s, x, y, r, t, opacity, resolving }: ShapeArtProps) {
+  const c = ROT[s.style === "top-tower-red" ? "red" : "blue"];
+  const spin = (t / 30) % 360;
+  return (
+    <g opacity={Math.max(opacity, 0.75)} pointerEvents="none">
+      <circle cx={x} cy={y} r={r} fill={c.fill} fillOpacity={resolving ? 0.55 : 0.22} stroke={c.fill} strokeWidth={8} strokeOpacity={0.35} filter="url(#replay-glow)" />
+      <circle cx={x} cy={y} r={r} fill="none" stroke={c.rim} strokeWidth={2.5} />
+      <circle cx={x} cy={y} r={r * 0.75} fill="none" stroke={c.rim} strokeWidth={1.5} strokeOpacity={0.7}
+        strokeDasharray={`${r * 0.3} ${r * 0.18}`} transform={`rotate(${spin} ${x} ${y})`} />
+      <text x={x} y={y + 6} textAnchor="middle" fill="#fff" fontSize={16} fontWeight={900} stroke={c.deep} strokeWidth={4} paintOrder="stroke">1</text>
+    </g>
+  );
+}
+
+/** A held rot (Critical Underflow red / Performance blue): a soft ring in its colour around its carrier, at its 5y blast size. */
+function RotHeld({ s, x, y, r, t }: ShapeArtProps) {
+  const c = ROT[s.style === "top-rot-red-held" ? "red" : "blue"];
+  const pulse = 0.75 + 0.25 * Math.sin(t / 250);
+  return (
+    <g pointerEvents="none">
+      <circle cx={x} cy={y} r={r} fill={c.fill} fillOpacity={0.1 * pulse} stroke={c.fill} strokeWidth={2} strokeOpacity={0.7 * pulse} />
+    </g>
+  );
+}
+
+/** A rot running out on its holder: a burst in its colour (no damage to them). */
+function RotBurst({ s, x, y, r, opacity }: ShapeArtProps) {
+  const c = ROT[s.style === "top-rot-red" ? "red" : "blue"];
+  return <circle cx={x} cy={y} r={r} fill={c.fill} fillOpacity={0.45 * opacity} stroke={c.rim} strokeWidth={2} strokeOpacity={opacity} pointerEvents="none" />;
+}
+
+/** A spread or defamation on its owner: a dashed red ring, faintly filled, so the players inside stay visible. */
+function SpreadRing({ x, y, r, t }: ShapeArtProps) {
+  return (
+    <g pointerEvents="none">
+      <circle cx={x} cy={y} r={r} fill="#ff4a3d" fillOpacity={0.08} stroke="#ff7a6e" strokeWidth={2.5} strokeDasharray="10 7" strokeDashoffset={-(t / 40) % 17} />
+    </g>
+  );
+}
+
+/** Hello World's Local (green) and Remote (blue) tethers; their preparation versions are thin and dashed. */
+const REGRESSION = { local: "#4ef07a", remote: "#4da3ff" };
+const regressionTether = (color: string, prep: boolean) => function Regression({ x1, y1, x2, y2, t }: TetherArtProps) {
+  return (
+    <g pointerEvents="none">
+      {!prep && <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={10} strokeOpacity={0.35} strokeLinecap="round" filter="url(#replay-glow)" />}
+      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={prep ? 1.5 : 3} strokeOpacity={prep ? 0.7 : 1}
+        strokeDasharray={prep ? "4 6" : undefined} strokeDashoffset={prep ? -(t / 40) % 10 : undefined} strokeLinecap="round" />
+    </g>
+  );
+};
+
+/**
+ * An Oversampled Wave Cannon monitor: a cyan screen on the side it fires
+ * to (right or left of its holder's facing, turning with them), with
+ * chevrons pointing that way.
+ */
+function Monitor({ e, x, y, t, actor, scale }: EffectArtProps) {
+  const o = fade(e, t);
+  const p = actor && poseAt(actor, t);
+  if (o <= 0 || !p) return null;
+  const side = e.kind.endsWith("right") ? 90 : -90;
+  const b = ((facingToCompassBearing(p.facing) + side) * Math.PI) / 180;
+  const ux = Math.sin(b), uy = -Math.cos(b), px = -uy, py = ux;
+  const d = actor.kind === "player" ? 30 : (actor.hitbox ?? 500) * scale + 22;
+  const mx = x + ux * d, my = y + uy * d;
+  const w = 14, h = 34;
+  const deg = (Math.atan2(uy, ux) * 180) / Math.PI;
+  const flow = ((t / 300) % 1) * 14;
+  return (
+    <g opacity={o} pointerEvents="none">
+      <rect x={mx - w / 2} y={my - h / 2} width={w} height={h} rx={2} fill="#5ff2ff" fillOpacity={0.55} stroke="#d8fdff" strokeWidth={2.5}
+        transform={`rotate(${deg} ${mx} ${my})`} filter="url(#replay-glow)" />
+      {[0, 1, 2].map((k) => {
+        const cx = mx + ux * (18 + k * 14 + flow), cy = my + uy * (18 + k * 14 + flow);
+        return <path key={k} d={`M${cx - ux * 8 + px * 10} ${cy - uy * 8 + py * 10} L${cx} ${cy} L${cx - ux * 8 - px * 10} ${cy - uy * 8 - py * 10}`}
+          fill="none" stroke="#5ff2ff" strokeWidth={3.5} strokeOpacity={0.95 - k * 0.25} strokeLinecap="round" />;
+      })}
+    </g>
+  );
+}
+
 export const TOP_ART: FightArt = {
   effects: {
     "top-clone-sword": Clone, "top-clone-shield": Clone, "top-clone-staff": Clone, "top-clone-legs": Clone,
     "top-eye": Eye,
     "top-symbol-416": SymbolMarker, "top-symbol-417": SymbolMarker, "top-symbol-418": SymbolMarker, "top-symbol-419": SymbolMarker,
+    "top-monitor-right": Monitor, "top-monitor-left": Monitor,
   },
-  tethers: { "top-blaster": BlasterTether, "top-glitch": GlitchTether, "top-bladedance": BladedanceTether },
-  shapes: { "top-ballistic": BallisticPuddle },
+  tethers: {
+    "top-blaster": BlasterTether, "top-glitch": GlitchTether, "top-bladedance": BladedanceTether,
+    "top-local": regressionTether(REGRESSION.local, false), "top-remote": regressionTether(REGRESSION.remote, false),
+    "top-local-prep": regressionTether(REGRESSION.local, true), "top-remote-prep": regressionTether(REGRESSION.remote, true),
+  },
+  shapes: {
+    "top-ballistic": BallisticPuddle,
+    "top-tower-red": ColorTower, "top-tower-blue": ColorTower,
+    "top-rot-red-held": RotHeld, "top-rot-blue-held": RotHeld,
+    "top-rot-red": RotBurst, "top-rot-blue": RotBurst,
+    "top-spread": SpreadRing,
+  },
 };
