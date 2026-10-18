@@ -434,9 +434,19 @@ function passedTethers(data: ReplayData, kinds: Record<number, TetherKind>): Map
     const list = (live.get(id) ?? []).filter((j) => t - data.tethers![j][0] <= TETHER_MAX_MS);
     if (list.length >= n) {
       const at = (j: number) => { const [, s, g] = data.tethers![j]; const a = actorByKey.get(playerEnd(data, s, g)); return a && poseAt(a, t); };
+      // From the same enemy if one is live (TOP's Bladedance: one tether
+      // per clone), else from any.
+      const other = (j: number) => { const [, s, g] = data.tethers![j]; return playerEnd(data, s, g) === s ? g : s; };
+      const mine = other(i);
+      const same = list.some((j) => other(j) === mine);
       const me = at(i);
       let pick = 0, best = Infinity;
-      list.forEach((j, k) => { const p = at(j); const dd = me && p ? Math.hypot(p.x - me.x, p.y - me.y) : k; if (dd < best) { best = dd; pick = k; } });
+      list.forEach((j, k) => {
+        if (same && other(j) !== mine) return;
+        const p = at(j);
+        const dd = me && p ? Math.hypot(p.x - me.x, p.y - me.y) : k;
+        if (dd < best) { best = dd; pick = k; }
+      });
       out.set(list[pick], t);
       list.splice(pick, 1);
     }

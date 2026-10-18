@@ -87,7 +87,8 @@ export type TetherKind = {
   payoff: number[];
   // A tether players take from each other, this many at once (TOP's
   // Blaster: two). The log logs each take as a new tether, so a new one
-  // beyond the count ends the live one held nearest its new holder; a
+  // beyond the count ends the live one from the same enemy, else the one
+  // held nearest its new holder; a
   // payoff then ends only a tether nobody took. Payoffs land on the
   // player end, whichever end that is.
   passed?: number;
