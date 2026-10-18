@@ -43,7 +43,7 @@ import { ffMapImageUrl, fitReplayView, mapImageBounds, poseAt, type ReplayActor,
 import { aoesAt, buildAoeShapes, buildHeadMarkers, buildTethers, tetherEndAt, type AoeShape } from "@/lib/replay/action-shapes";
 import { getFFAbilityIconUrl } from "@/lib/ability-icons";
 import { buildCasterEffects } from "@/lib/replay/ffxiv-effects";
-import { ElementDragon, ElementHalo, ElementTether } from "@/components/ReplayEffects";
+import { ElementDragon, ElementHalo, ElementTether, JailCage } from "@/components/ReplayEffects";
 import { sampleNear } from "@/lib/replay/ffxiv-replay";
 import { facingToCompassBearing } from "@/lib/mechanics/geometry";
 import { detectFFRoles } from "@/lib/mechanics/ffxiv/roles";
@@ -89,13 +89,14 @@ const FFLOGS_ICON = (name: string) => `https://assets.rpglogs.com/img/ff/icons/$
 // AoE colours by kind: red AoEs (user, 2026-10-17; were guide-style
 // blue), yellow towers, purple tankbusters, orange stacks (shared hits:
 // stand in them), pale blue knockbacks; light rims. `flash` is the fill as
-// it resolves.
+// it resolves. Lightning-element cleaves are blue.
 const AOE_COLORS: Record<AoeShape["style"], { fill: string; flash: string; rim: string; glow: string }> = {
   aoe:        { fill: "#d9342b", flash: "#ff7a70", rim: "#ffe1dc", glow: "#ff5a4a" },
   tower:      { fill: "#f2c230", flash: "#ffe27a", rim: "#fff6c8", glow: "#ffb84a" },   // non-circle towers only; circles use Tower
   tankbuster: { fill: "#8a3dff", flash: "#c99bff", rim: "#f1e2ff", glow: "#b47bff" },
   stack:      { fill: "#f08a24", flash: "#ffc070", rim: "#fff0d8", glow: "#ffa040" },
   knockback:  { fill: "#5fb4e8", flash: "#a8dcff", rim: "#e6f6ff", glow: "#7cc8ff" },
+  lightning:  { fill: "#2f7dff", flash: "#9fd0ff", rim: "#eaf6ff", glow: "#4aa8ff" },   // FRU Bow Shock
 };
 // Status icons under each player: at most this many, mechanic statuses
 // before the common ones (vulnerabilities, Weakness) that a raid carries
@@ -105,6 +106,9 @@ const COMMON_STATUSES = new Set([1002941, 1002940, 1004162, 1000043, 1000044]);
 // Head markers show from the marker until the hit it announced
 // (action-shapes.ts's buildHeadMarkers), or this long when unknown.
 const HEAD_MARKER_PLAIN_MS = 5000;
+// Statuses that lift a player into a cage: FRU Floating Fetters, 4s on
+// each tethered carrier before their hit (user, 2026-10-17).
+const JAIL_STATUSES = new Set([1002304]);
 const STATUS_W = 15, STATUS_H = 20;   // SVG units at icon scale 1 (the game's icons are 24x32)
 const PLAYER_ICON = 34;   // SVG units, at icon scale 1
 const BOSS_ICON = 46;
@@ -371,20 +375,27 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             const deg = facingToCompassBearing(p.facing);
             const size = PLAYER_ICON * iconScale;
             const r = size / 2;
+            // Lifted and jailed (FRU Floating Fetters): the icon rises off
+            // its spot, which keeps a shadow, inside a cage.
+            const jail = !dead ? (aurasByKey.get(a.key) ?? []).find((s) => JAIL_STATUSES.has(s[3]) && s[0] <= t && t < s[1]) : undefined;
+            const lift = jail ? Math.min(1, (t - jail[0]) / 400) * 12 * iconScale : 0;
+            const iy = y - lift;
             return (
               <g key={a.key} style={{ cursor: "pointer" }} opacity={dead ? 0.5 : p.stale ? 0.75 : 1}
                 onMouseEnter={() => setHoverKey(a.key)} onMouseLeave={() => setHoverKey((k) => (k === a.key ? null : k))}
                 onClick={(e) => { e.stopPropagation(); setSelectedKey(a.key); }}>
                 {selectedKey === a.key && <TargetRing x={x} y={y} r={Math.max(r + 10, (a.hitbox ?? 50) * scale)} deg={deg} />}
-                {!dead && <FacingWedge x={x} y={y} r={r} b={(deg * Math.PI) / 180} color={roleColor} size={8 * iconScale} />}
+                {jail && <ellipse cx={x} cy={y + r * 0.7} rx={r * 0.8} ry={r * 0.28} fill="#000" fillOpacity={0.45} />}
+                {!dead && <FacingWedge x={x} y={iy} r={r} b={(deg * Math.PI) / 180} color={roleColor} size={8 * iconScale} />}
                 <image href={wow && info ? getPlayerSpecIcon("wow", info.specId, info.className) : getPlayerClassIcon(game, info?.className ?? a.job ?? "")}
-                  x={x - r} y={y - r} width={size} height={size}
+                  x={x - r} y={iy - r} width={size} height={size}
                   filter={dead ? "url(#replay-gray)" : "url(#replay-shadow)"} />
+                {jail && <JailCage x={x} y={iy} r={r} t={t} start={jail[0]} end={jail[1]} />}
                 {dead && (
                   <path d={`M${x - r * 0.6} ${y - r * 0.6} L${x + r * 0.6} ${y + r * 0.6} M${x + r * 0.6} ${y - r * 0.6} L${x - r * 0.6} ${y + r * 0.6}`} stroke="#ff4d4d" strokeWidth={4} strokeLinecap="round" />
                 )}
                 {showStatuses && !dead && (
-                  <StatusRow x={x} bottom={y - r - 2} t={t} scale={iconScale} spans={activeStatuses(aurasByKey.get(a.key), t, data.durationMs)} info={data.auraInfo ?? {}} />
+                  <StatusRow x={x} bottom={iy - r - 2} t={t} scale={iconScale} spans={activeStatuses(aurasByKey.get(a.key), t, data.durationMs)} info={data.auraInfo ?? {}} />
                 )}
               </g>
             );

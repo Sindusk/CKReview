@@ -123,7 +123,7 @@ export type AoeShape = {
   angle: number;                 // cone full angle, degrees
   inner: number;                 // donut inner radius, centi-yalms
   estimated: boolean;            // angle or inner radius guessed (not drawn differently)
-  style: "aoe" | "tower" | "tankbuster" | "stack" | "knockback";
+  style: "aoe" | "tower" | "tankbuster" | "stack" | "knockback" | "lightning";
   soakers?: number;              // towers: players it needs, when the ability says
   name: string;
   start: number; resolve: number; // ms from pull start: telegraph start, resolution
@@ -190,7 +190,8 @@ const FRU_OVERRIDES: Record<number, Override> = {
   // Fall of Faith lightning: three 120° Bow Shock cones from the carrier
   // (the Sinsmite 40142 target) through each helper. The helpers' own
   // samples lag a tether behind (1:52.6 put one at the previous carrier).
-  40143: { angle: 120, originAt: 40142 },
+  // Lightning blue, as in game (user, 2026-10-17).
+  40143: { angle: 120, originAt: 40142, style: "lightning" },
   // Towers: Burnt Strike towers' Explosion id is the soaker count
   // (lightning 40131/40122/40123/40124, fire 40135/40125/40126/40127).
   40131: { style: "tower", soakers: 1 }, 40122: { style: "tower", soakers: 2 }, 40123: { style: "tower", soakers: 3 }, 40124: { style: "tower", soakers: 4 },

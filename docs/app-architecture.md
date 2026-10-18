@@ -344,6 +344,9 @@ file's header comment. Mechanic detection has its own guide:
   tether's end sits where it logged a position during the tether: FRU's
   clones move from the south (Utopian Sky) to the north wall (Fall of Faith)
   with nothing logged between.
+- **Jailed players** (FRU Floating Fetters, `JAIL_STATUSES` in
+  ReplayPanel): the icon lifts off its spot, leaving a shadow, inside a
+  cage for the status's 4s.
 - **Layers menu:** AoEs, map, 5y rings, 5y grid (0,0 at the arena centre),
   helper actors, statuses and head markers (FFXIV), and an icon-size slider.
 - **Roster HP / MP bars.** Once a pull's replay is loaded, each roster

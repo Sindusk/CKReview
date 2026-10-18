@@ -62,7 +62,11 @@
 //   stacks, Fall of Faith's Sinblaze), 287 lightning (Sinsmite). Fall of
 //   Faith's tethers 2-4 come from clones on the north wall (NW, N, NE in
 //   order; JZ1KXhDbqkNH3jxR 24 and M9Nagmnw2LzHZPVq 1), the same clones
-//   that held the Utopian tethers from the SE/SW.
+//   that held the Utopian tethers from the SE/SW. In game the carrier is
+//   lifted and jailed before the hit (user); the log has Floating Fetters
+//   (40171 cast, status 1002304) on them 4.0s before it, Solemn Charge 2.0s
+//   before (M9Nagmnw2LzHZPVq 1, all four tethers and both Utopian ones).
+//   Bow Shock's cones are lightning blue in game.
 // - Fall of Faith 40137/40140: Prey order = tether order, Floating Fetters
 //   1002304 on the carrier ~4s before its hit (Solemn Charge 40138/40141/
 //   40166). Fire = Sinblaze 40156 on four (fewer: Mark of Mortality);
