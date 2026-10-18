@@ -82,7 +82,16 @@ export type MarkerAoe = { ability: number; name: string };
  * are built in; any other name is looked up in the fight's art `tethers`)
  * and ended by one of `payoff` hitting the tethered player.
  */
-export type TetherKind = { element: string; payoff: number[] };
+export type TetherKind = {
+  element: string;
+  payoff: number[];
+  // A tether players take from each other, this many at once (TOP's
+  // Blaster: two). The log logs each take as a new tether, so a new one
+  // beyond the count ends the live one held nearest its new holder; a
+  // payoff then ends only a tether nobody took. Payoffs land on the
+  // player end, whichever end that is.
+  passed?: number;
+};
 
 /**
  * A boss cue: an effect drawn on the arena for a while, art chosen by

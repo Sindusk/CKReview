@@ -390,9 +390,17 @@ export function buildTethers(data: ReplayData): TetherSpan[] {
   const hits = data.enemyHits ?? [];
   const tethers = data.tethers ?? [];
   const TETHER_KINDS: Record<number, TetherKind> = Object.assign({}, ...fightReplaysFor(data).map((f) => f.tethers ?? {}));
-  return tethers.map(([t, source, target, id]) => {
+  const passedAt = passedTethers(data, TETHER_KINDS);
+  return tethers.map(([t, source, target, id], i) => {
     let end = t + TETHER_MAX_MS;
     const kind = TETHER_KINDS[id];
+    if (kind?.passed) {
+      const holder = playerEnd(data, source, target);
+      const taken = passedAt.get(i);
+      const hit = taken === undefined ? hits.find((h) => h[3] === holder && h[0] > t && h[0] < end && kind.payoff.includes(h[1])) : undefined;
+      end = taken ?? (hit ? hit[0] + TETHER_GRACE_MS : end);
+      return { source, target, id, start: t, end, element: kind.element };
+    }
     if (kind) {
       // Only its own payoff ends it: the boss's other casts on the player
       // (Fall of Faith's first tether) and the clones' are unrelated.
@@ -406,6 +414,36 @@ export function buildTethers(data: ReplayData): TetherSpan[] {
     if (payoff) end = Math.min(end, payoff[0] + TETHER_GRACE_MS);
     return { source, target, id, start: t, end };
   });
+}
+
+const playerEnd = (data: ReplayData, source: string, target: string) =>
+  data.actors.find((a) => a.key === source)?.kind === "player" ? source : target;
+
+/**
+ * Passed tethers (TetherKind.passed): tether index -> when it was taken.
+ * A new tether beyond the count takes the live one whose holder stood
+ * nearest the new holder.
+ */
+function passedTethers(data: ReplayData, kinds: Record<number, TetherKind>): Map<number, number> {
+  const out = new Map<number, number>();
+  const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  const live = new Map<number, number[]>();   // tether id -> live indices
+  (data.tethers ?? []).forEach(([t, source, target, id], i) => {
+    const n = kinds[id]?.passed;
+    if (!n) return;
+    const list = (live.get(id) ?? []).filter((j) => t - data.tethers![j][0] <= TETHER_MAX_MS);
+    if (list.length >= n) {
+      const at = (j: number) => { const [, s, g] = data.tethers![j]; const a = actorByKey.get(playerEnd(data, s, g)); return a && poseAt(a, t); };
+      const me = at(i);
+      let pick = 0, best = Infinity;
+      list.forEach((j, k) => { const p = at(j); const dd = me && p ? Math.hypot(p.x - me.x, p.y - me.y) : k; if (dd < best) { best = dd; pick = k; } });
+      out.set(list[pick], t);
+      list.splice(pick, 1);
+    }
+    list.push(i);
+    live.set(id, list);
+  });
+  return out;
 }
 
 /**
