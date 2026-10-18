@@ -600,11 +600,60 @@ function Rings({ cx, cy, half, toX, toY, scale }: { cx: number; cy: number; half
  * the rim, and a crisp rim line. Brighter as it resolves. Towers get their
  * own art (Tower). `uid` keeps each shape's gradient id unique.
  */
+/**
+ * A knockback as the push it is, not an area to avoid: pale blue arrows
+ * pointing the way players are thrown. A line (Blastburn) pushes out to
+ * both sides of its centreline; a circle pushes out from its centre. A
+ * filled 50y-wide Blastburn covered the whole arena (user, 2026-10-17).
+ */
+const KB_SPACING = 500;     // centi-yalms between arrows along a line, or around a ring
+const KB_ARROW = 350;       // arrow length, centi-yalms
+function Knockback({ s, x, y, r, scale, opacity }: { s: AoeShape; x: number; y: number; r: number; scale: number; opacity: number }) {
+  const c = AOE_COLORS.knockback;
+  const len = KB_ARROW * scale;
+  const arrow = (ax: number, ay: number, dx: number, dy: number, k: string) => {
+    const bx = ax + dx * len, by = ay + dy * len;
+    const hx = -dy * len * 0.28, hy = dx * len * 0.28;
+    return (
+      <g key={k}>
+        <line x1={ax} y1={ay} x2={bx} y2={by} stroke={c.glow} strokeWidth={7} strokeOpacity={0.4} strokeLinecap="round" />
+        <line x1={ax} y1={ay} x2={bx - dx * len * 0.2} y2={by - dy * len * 0.2} stroke={c.rim} strokeWidth={3} strokeLinecap="round" />
+        <path d={`M${bx} ${by} L${bx - dx * len * 0.38 + hx} ${by - dy * len * 0.38 + hy} L${bx - dx * len * 0.38 - hx} ${by - dy * len * 0.38 - hy} Z`} fill={c.rim} />
+      </g>
+    );
+  };
+  const out: React.ReactNode[] = [];
+  if (s.kind === "rect") {
+    const b = (s.bearing * Math.PI) / 180;
+    const ux = Math.sin(b), uy = -Math.cos(b);   // along the line (screen)
+    const px = -uy, py = ux;                       // across it
+    const n = Math.floor(s.range / KB_SPACING);
+    const off = 120 * scale;                       // start just off the centreline
+    for (let k = 1; k < n; k++) {
+      const ax = x + ux * k * KB_SPACING * scale, ay = y + uy * k * KB_SPACING * scale;
+      // Only over the arena: the view's inscribed circle (lines run 80y).
+      if (Math.hypot(ax - 500, ay - 500) > 430) continue;
+      out.push(arrow(ax + px * off, ay + py * off, px, py, `a${k}`), arrow(ax - px * off, ay - py * off, -px, -py, `b${k}`));
+    }
+    out.unshift(<line key="c" x1={x} y1={y} x2={x + ux * r} y2={y + uy * r} stroke={c.rim} strokeWidth={2} strokeOpacity={0.6} strokeDasharray="8 8" />);
+  } else {
+    const ring = Math.max(r * 0.5, 150 * scale);
+    const n = Math.max(6, Math.min(12, Math.round((2 * Math.PI * ring) / (KB_SPACING * scale))));
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2;
+      out.push(arrow(x + Math.sin(a) * ring, y - Math.cos(a) * ring, Math.sin(a), -Math.cos(a), `r${k}`));
+    }
+    out.unshift(<circle key="c" cx={x} cy={y} r={6} fill={c.rim} />);
+  }
+  return <g opacity={opacity} pointerEvents="none">{out}</g>;
+}
+
 function Aoe({ s, opacity, resolving, toX, toY, scale, uid }: { s: AoeShape; opacity: number; resolving: boolean; toX: (x: number) => number; toY: (y: number) => number; scale: number; uid: string }) {
   const x = toX(s.x), y = toY(s.y);
   const r = s.range * scale;
   const b = (s.bearing * Math.PI) / 180;
   if (s.style === "tower" && s.kind === "circle") return <Tower x={x} y={y} r={r} opacity={opacity} resolving={resolving} uid={uid} soakers={s.soakers} />;
+  if (s.style === "knockback") return <Knockback s={s} x={x} y={y} r={r} scale={scale} opacity={opacity} />;
   const c = AOE_COLORS[s.style];
   const base = resolving ? c.flash : c.fill;
   const grad = `aoe-${uid}`;
