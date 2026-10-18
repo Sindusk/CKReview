@@ -7,12 +7,12 @@
 // 19, Elemental 13, Beast Mastery 11, Balance 11, Shadow 9, Demonology 9,
 // Marksmanship 8, Devastation 7, Affliction 6; Augmentation 3, Fire 2,
 // Devourer 2, Frost Mage 1, Destruction 1 (under 3: unverified;
-// Destruction since measured on 34 in its phase 3, below).
+// Destruction since measured on 34 in its phase 3, Fire on 12, below).
 //
 // - Main cooldown window (burstGcdFindings, bonus read from the hits,
 //   inference): Arcane Surge, Combustion, Incarnation, Bestial Wrath,
 //   Trueshot, Voidform, Ascendance, Malevolence, Demonic Tyrant,
-//   Dragonrage. Frost Mage and Augmentation have none here (Icy Veins
+//   Dragonrage (Combustion's is fire.ts's since 2026-10-17). Frost Mage and Augmentation have none here (Icy Veins
 //   wasn't cast in the samples; Augmentation has no burst window of its
 //   own: augmentation.ts). Devourer's Void Metamorphosis window is in
 //   devourer.ts (its bonus is the window's GCD value, not the hits').
@@ -174,6 +174,18 @@
 //   banks). It proposed the Salvo ladder for Barrage and Missiles and the
 //   Orb efficiency rule as `wrong`; docs/wowa-audit/mage-arcane.md.
 //
+// Fire has no case study. The WoWAnalyzer audit's phase 3 (2026-10-17;
+// docs/wowa-audit/mage-fire.md, 12 player-pulls, seven of them 89–100th)
+// moved the Combustion window to fire.ts and priced it by Combustion's own
+// premium per press (+72–280%; the shared bonus reads non-crit hits, which
+// Combustion hardly has, and capped at 30%): top players none, weak up to
+// 2.25M (Splean). The tracked Combustion was worth 0 a use (no hits of its
+// own): valued now from fire.ts (1.4–7.8M a use); it fires on none of the
+// 12 (a flat 60s; Vashnik's holds for the Venoms are excused). Built: Fire
+// Blast under Hot Streak (a sure crit spent while Hot Streak is up; top
+// 0–304k, weak up to 1.60M). Hot Streak never runs out, so it isn't in
+// procs.ts. Mages log only mana: no resource check.
+//
 // Marksmanship, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Shadowmeld; reference: 3Vz6Qt2RyTPXwpJn's Imnotanorc, 100th
 // percentile, page saved too; checked 2026-10-13):
@@ -248,6 +260,7 @@ import { DESTRUCTION_CHECKS } from "./destruction";
 import { DEVASTATION_CHECKS } from "./devastation";
 import { DEVOURER_CHECKS } from "./devourer";
 import { ELEMENTAL_CHECKS } from "./elemental";
+import { FIRE_CHECKS } from "./fire";
 import { MARKSMANSHIP_CHECKS } from "./marksmanship";
 import { SHADOW_CHECKS } from "./shadow";
 import { burstGcdFindings, dotUptimeFindings, k, observedWindowBonus, primaryResourceCapFindings, spentCooldownDrift } from "./shared";
@@ -376,7 +389,7 @@ const dot = (name: string, ...statusIds: number[]): JobCheck => (ctx) => dotUpti
 
 export const RANGED_CHECKS: Record<string, JobCheck[]> = {
   "Arcane Mage":          [window(365362, "Arcane Surge"), ...ARCANE_CHECKS],
-  "Fire Mage":            [window(190319, "Combustion")],
+  "Fire Mage":            [...FIRE_CHECKS],   // the Combustion window is fire.ts's (its bonus per press)
   "Frost Mage":           [],
   "Balance Druid":        [window(102560, "Incarnation"), primaryResourceCapFindings, dot("Moonfire", 164812), dot("Sunfire", 164815), ...BALANCE_CHECKS],
   "Beast Mastery Hunter": [window(19574, "Bestial Wrath"), (ctx) => primaryResourceCapFindings(ctx, [BARBED_SHOT]), ...BEAST_MASTERY_CHECKS],

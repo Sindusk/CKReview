@@ -37,6 +37,7 @@ import { shadowDanceValue } from "./specs/subtlety";
 import { ascendanceValue, voltaicBlazeValue } from "./specs/enhancement";
 import { infernalValue, malevolenceValue } from "./specs/destruction";
 import { armyOfTheDeadValue, darkTransformationValue } from "./specs/unholy";
+import { combustionValue } from "./specs/fire";
 
 /**
  * One Vanish's worth to an Assassination Rogue: the damage of a Garrote cast
@@ -269,8 +270,13 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
     { name: "Touch of the Magi", actionIds: [321507], cooldownMs: 45_000, charges: 1, firstUseOffsetMs: 4_000 }, // 45.0 / 46.8s, 3.2s
     { name: "Arcane Surge", actionIds: [365350], cooldownMs: 91_000, charges: 1, firstUseOffsetMs: 2_000 },      // 91.0 / 94.4s, 0.9s
   ],
-  "Fire Mage": [   // unverified (2 players)
-    { name: "Combustion", actionIds: [190319], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 23_000 },  // 60.0 / 60.9s, 22.4s
+  // Fire's Combustion: a flat 60s on every top player outside Stasis (12
+  // player-pulls, the WoWAnalyzer audit's phase 3, 2026-10-17); Vashnik's
+  // top players hold it for the Venoms after each Imbibe (burstHold). It
+  // has no hits of its own, so a use was worth 0 and its drift never
+  // showed: specs/fire.ts values it by what its window adds per press.
+  "Fire Mage": [
+    { name: "Combustion", actionIds: [190319], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 23_000, burstHold: true, valuePerUse: combustionValue },  // 60.0 / 60.9s, 22.4s
   ],
   "Frost Mage": [   // unverified (1 player)
     { name: "Frozen Orb", actionIds: [84714], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 2_000 },   // 60.3 / 62.2s, 1.8s
