@@ -111,6 +111,10 @@
 // VOD review 2026-10-17 (user): report F = Q9zqJb4VLmjhd1B6 pulls 2 (#2
 //   no knockback resist; facing Cruise Chaser shortens the knockback a lot)
 //   and 10 (#1 angled the sword wrong), rulings in expectations/rulings.json.
+// Replay findings (2026-10-18, tea/replay.ts): a Hawk Blaster hit's source
+//   position is its circle's centre, 15y out (A35 fight 36 2:20.7: (85.0,
+//   100.0)); the casts carry none. Each set's start pair can differ (A35's
+//   second set started W/E); the kill F4 ran clockwise from NE/SW in both.
 // OPEN QUESTIONS:
 // 1. A charge through two or more players names the even holder and the
 //    players hit (A45 #2, A50 #8, B9 #2). Which was it?

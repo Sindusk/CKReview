@@ -252,13 +252,112 @@ function phaseOneEffects(data: ReplayData): CasterEffect[] {
   return out;
 }
 
+// ── Intermission: Limit Cut ─────────────────────────────────────────────────
+
+const HAWK_BLASTER = 18480;
+const ALPHA_SWORD = 18484, BLASSTY_CHARGE = 19279;
+
+// Alpha Sword: CC's 90° cone ([BM]) from behind each odd number along its
+// facing; the data has no angle. Fit check exact, all four on the kill.
+OVERRIDES[ALPHA_SWORD] = { angle: 90 };
+// Hawk Blaster: drawn by hawkBlaster() below.
+OVERRIDES[HAWK_BLASTER] = { hidden: true };
+
+/**
+ * Limit Cut's numbers: head markers 79..86 = 1..8 (intermission-limit-cut.ts),
+ * shown until the holder's sword (odd) or charge (even) lands: 9.5s (#1)
+ * to 25s (#8) after the markers on the kill (1:45.1 -> 2:10.0).
+ */
+const LIMIT_CUT_MARKERS = Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8].map((n) =>
+  [78 + n, { label: String(n), abilities: n % 2 ? [ALPHA_SWORD] : [BLASSTY_CHARGE], lookaheadMs: 30000 }]));
+
+// Optical Sight's Hawk Blaster: two sets of four steps 2.2s apart, each a
+// pair of opposite 10y circles turning 45° per step, then one in the
+// middle (header). The casts don't place them (both helpers stand in the
+// middle and log one sample), but a hit's source position is its circle's
+// centre: 1NG4Zah79yKYHCDv 36 (Pull 35) 2:20.7, (85.0, 100.0), 15y west
+// of the middle ([BM] said ~14y). Each set's first pair and turning
+// direction are fitted to the pull: hit sources must sit on a drawn
+// centre, then the fewest living players inside a circle as it lands.
+// Q9zqJb4VLmjhd1B6 4: clockwise from NE/SW in both sets, nobody inside;
+// Pull 35's second set starts W/E (its hit), so sets are fitted apart.
+const HAWK_RING = 1500, HAWK_RADIUS = 1000;
+const HAWK_STEP_MS = 2200;
+// Shown this long before landing: a guess (VOD check). Under one step, so
+// only the next pair shows (3s stacked two steps of circles).
+const HAWK_LEAD_MS = 2000;
+const HAWK_DAMAGE_LAG_MS = 600;
+
+function hawkBlaster(data: ReplayData): AoeShape[] {
+  const casts = (data.enemyCasts ?? []).filter((c) => c[4] === HAWK_BLASTER && c[3] === 0);
+  if (!casts.length) return [];
+  const hits = (data.enemyHits ?? []).filter((h) => h[1] === HAWK_BLASTER && h[6] !== null);
+  const cx = data.map ? -data.map.offsetX * 100 : 10000, cy = data.map ? -data.map.offsetY * 100 : 10000;
+  // Steps: casts within 0.5s; one cast = the middle one.
+  const steps: { t: number; n: number }[] = [];
+  for (const c of casts) {
+    const s = steps.find((x) => Math.abs(x.t - c[0]) < 500);
+    if (s) s.n++; else steps.push({ t: c[0], n: 1 });
+  }
+  steps.sort((a, b) => a.t - b.t);
+  // Sets: the outer steps before each middle one (a cutoff pull may end mid-set).
+  const sets: { t: number; k: number }[][] = [];
+  let cur: { t: number; k: number }[] = [];
+  const middles: number[] = [];
+  for (const s of steps) {
+    if (s.n === 1 && cur.length) { middles.push(s.t); sets.push(cur); cur = []; continue; }
+    if (s.n === 1) { middles.push(s.t); continue; }
+    if (cur.length && s.t - cur[cur.length - 1].t > HAWK_STEP_MS * 1.6) { sets.push(cur); cur = []; }
+    cur.push({ t: s.t, k: 0 });
+  }
+  if (cur.length) sets.push(cur);
+  for (const set of sets) {
+    // Number the steps from the set's middle blast, so a missing cast
+    // doesn't shift the turn.
+    const mid = middles.find((m) => m > set[0].t && m - set[set.length - 1].t < HAWK_STEP_MS * 1.6);
+    for (const s of set) s.k = mid !== undefined ? 4 - Math.round((mid - s.t) / HAWK_STEP_MS) : Math.round((s.t - set[0].t) / HAWK_STEP_MS);
+  }
+  const players = data.actors.filter((a) => a.kind === "player");
+  const centres = (start: number, dir: number, k: number) => [1, -1].map((g) => {
+    const a = ((start + dir * 45 * k) * Math.PI) / 180;
+    return { x: cx + g * Math.sin(a) * HAWK_RING, y: cy - g * Math.cos(a) * HAWK_RING };
+  });
+  const out: AoeShape[] = [];
+  const circle = (x: number, y: number, t: number): AoeShape => ({
+    kind: "circle", x, y, bearing: 0, range: HAWK_RADIUS, width: 0, angle: 0, inner: 0, estimated: false,
+    style: "aoe", name: "Hawk Blaster", start: t - HAWK_LEAD_MS, resolve: t,
+  });
+  for (const set of sets) {
+    let best = { start: 0, dir: 1, cost: Infinity };
+    for (const dir of [1, -1]) for (const start of [0, 45, 90, 135]) {
+      let cost = dir === 1 ? 0 : 0.5;   // the guides' clockwise wins a tie
+      for (const s of set) {
+        const cs = centres(start, dir, s.k);
+        for (const p of players) {
+          const q = poseAt(p, s.t + HAWK_DAMAGE_LAG_MS);
+          if (q && q.hp !== 0 && cs.some((c) => Math.hypot(q.x - c.x, q.y - c.y) < HAWK_RADIUS + 50)) cost++;
+        }
+        for (const h of hits) {
+          if (Math.abs(h[0] - s.t - HAWK_DAMAGE_LAG_MS) >= 700 || h[4] === null) continue;
+          if (!cs.some((c) => Math.hypot(h[4]! - c.x, h[5]! - c.y) < 200)) cost += 20;
+        }
+      }
+      if (cost < best.cost) best = { start, dir, cost };
+    }
+    for (const s of set) for (const c of centres(best.start, best.dir, s.k)) out.push(circle(c.x, c.y, s.t));
+  }
+  for (const m of middles) out.push(circle(cx, cy, m));
+  return out;
+}
+
 export const TEA_REPLAY: FightReplay = {
   key: "tea",
   game: "ffxiv",
   name: "The Epic of Alexander",
   signature: [FLUID_SWING, CASCADE, WAVE_BOSS_VISIBLE, WAVE_TORNADO_VISIBLE],
   overrides: OVERRIDES,
+  headMarkers: { ...LIMIT_CUT_MARKERS },
   tethers: TETHERS,
   effects: (data) => [...phaseOneEffects(data)],
-  shapes: (data) => [...protean(data), ...sluice(data)],
+  shapes: (data) => [...protean(data), ...sluice(data), ...hawkBlaster(data)],
 };

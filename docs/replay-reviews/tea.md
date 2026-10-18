@@ -88,3 +88,45 @@ Two boss-wave cones caught a player on a 1-second-old position (kill
 2. **Pull 35, 1:59-2:09** — the second Pressurize's two orbs drawn from
    the W and E tornadoes; Living Liquid dies at ~2:09. Do the orbs vanish
    with it?
+
+## Intermission: Limit Cut (1:45 to 2:16 on the kill)
+
+Checked on the kill (Pull 4) and 1NG4Zah79yKYHCDv Pull 35 (2:07-2:30).
+
+### What's drawn
+- **Numbers:** head markers 79-86 read 1-8 over each player until their
+  sword (odd) or charge (even) lands. The engine confirmed a marker only
+  if its hit came within 12s, so #5-#8 read "Marker 8x" and vanished;
+  a generic per-marker lookahead was added (commit 167dcdf, default
+  unchanged for other fights).
+- **Hawk Blaster:** 10y circles 15y out, two at a time, turning 45° per
+  step, then the middle one, twice. Shown 2s before each lands. The casts
+  don't say where the circles are, so each set's first pair and direction
+  is the one that fits the pull: no hit outside a drawn circle (a hit's
+  source position is its circle's centre: Pull 35, 2:20.7, 15y west), then
+  the fewest players standing in a circle as it lands. The kill fits
+  clockwise from NE/SW in both sets with nobody inside; Pull 35's second
+  set starts W/E.
+- **Alpha Sword** 90° cones and **Super Blassty Charge** 10y lines from
+  game data, exact on the kill (all eight).
+
+### Fit check
+Hawk Blaster 17 of 18 exact on the kill; the miss is a player at the
+middle blast's edge (9.7y) on a stale sample. Pull 35's misses are the
+script pairing its one hit with the wrong circle of the pair.
+
+### Not known
+- How long before landing each Hawk Blaster circle shows in game (2s
+  drawn; 3s stacked two steps on screen).
+
+### VOD checks: Q9zqJb4VLmjhd1B6 Pull 4
+8. **Pull 4, 1:45-1:47** — the first Hawk Blaster pair drawn NE and SW,
+   then turning clockwise (E/W at 1:49.4). Do the in-game circles start
+   NE/SW and turn clockwise?
+9. **Pull 4, 1:45-1:47** — when do the circles first show, compared with
+   the drawn 2s before each lands?
+10. **Pull 4, 1:45 onward** — numbers drawn: 1 dragoon, 2 dancer,
+    3 warrior, 4 white mage, 5 monk, 6 sage, 7 paladin, 8 black mage.
+    Same on screen?
+11. **Pull 4, 1:56-1:58** — the second set's first pair, drawn NE/SW again
+    at 1:58.2. Right?
