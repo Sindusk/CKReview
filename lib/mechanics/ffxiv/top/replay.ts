@@ -649,11 +649,73 @@ function p5Worlds(data: ReplayData): AoeShape[] {
   return out;
 }
 
+// ── P6 Alpha Omega (alpha-omega.ts) ─────────────────────────────────────────
+
+const FLASH_GALE = 32223, ARROW_FIRST = 31651, DIVE_BUSTER = 31655, DIVE_SHARE = 31656;
+const EXA_START = 31661, EXA_REPEAT = 31662, P6_PUDDLE = 31663, WILD_CHARGE = 31658;
+const METEOR_BAIT = 31666, METEOR_STACK = 31667, METEOR_FLARE = 31668;
+const EXA_STEP = 800, EXA_STEPS = 6, EXA_GAP_MS = 1040;
+
+Object.assign(OVERRIDES, {
+  // Flash Gale: 5y on the two tanks each volley (header: the MT close, the
+  // OT far), drawn as busters.
+  [FLASH_GALE]: { style: "tankbuster" },
+  // Cosmo Arrow's first lines show their 7.7s telegraph (general02wf);
+  // the advancing lines (31652) flash as they come.
+  [ARROW_FIRST]: { telegraph: true },
+  // Cosmo Dive: 8y busters on the two tanks, a 6y share on the other six.
+  [DIVE_BUSTER]: { style: "tankbuster" }, [DIVE_SHARE]: { style: "stack" },
+  // Exaflares are drawn by p6Exaflares; the repeats' helpers often log
+  // the boss's spot (fight 17 15:36.6 at (100, 90)).
+  [EXA_START]: { hidden: true }, [EXA_REPEAT]: { hidden: true },
+  // Unlimited's six puddle rounds: one under each player, shown faint for
+  // their 2.7s cast (96 per pull, 131 of 157 Wave Cannon shapes exact).
+  [P6_PUDDLE]: { telegraph: true, style: "top-ballistic" },
+  // Wild Charge: an 8y line shared by all eight.
+  [WILD_CHARGE]: { style: "stack" },
+  // Cosmo Meteor: eight 10y centre baits shown for their 3.7s cast; the
+  // five-player stack 31667 (6y).
+  [METEOR_BAIT]: { telegraph: true }, [METEOR_STACK]: { style: "stack" },
+} satisfies Record<number, Override>);
+
+Object.assign(HEAD_MARKERS, {
+  // Marker 346 again for Cosmo Meteor's three flares (17:39.7 -> 17:47.8).
+  346: { label: "Meteor", abilities: [METEOR, METEOR_FLARE] },
+} satisfies Record<number, HeadMarkerDef>);
+
+// Unlimited Wave Cannon's exaflares: four lines, each a start (31661, an
+// 8y circle with an arrow telegraph, 11.7s cast) then six more 8y circles
+// 8y apart, ~1.04s apart, along the start's facing, across the arena.
+// Fight 17 15:34.4: (117, 83) facing SW, then (111.3, 88.7), (105.7, 94.3),
+// (100, 100) ... (83, 117). The start shows its arrow from its begincast.
+function p6Exaflares(data: ReplayData): AoeShape[] {
+  const casts = data.enemyCasts ?? [];
+  const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  const repeats = casts.filter((c) => c[4] === EXA_REPEAT && c[3] === 0).map((c) => c[0]);
+  const out: AoeShape[] = [];
+  for (const c of casts) {
+    if (c[4] !== EXA_START || c[3] !== 0) continue;
+    const a = actorByKey.get(c[1]);
+    const p = a && sampleNear(a, c[0], 1500);
+    if (!p) continue;
+    const bearing = bearingOf(p.facing);
+    const begin = casts.find((b) => b[1] === c[1] && b[4] === EXA_START && b[3] > 0 && Math.abs(b[0] + b[3] - c[0]) < 800);
+    out.push(shape({ kind: "circle", x: p.x, y: p.y, bearing, range: EXA_STEP, name: "Wave Cannon", start: begin ? begin[0] : c[0] - 300, resolve: c[0], style: "top-exa" }));
+    for (let k = 1; k <= EXA_STEPS; k++) {
+      const due = c[0] + k * EXA_GAP_MS;
+      const t = repeats.find((r) => Math.abs(r - due) < 450) ?? due;
+      const q = along(p.x, p.y, bearing, k * EXA_STEP);
+      out.push(shape({ kind: "circle", x: q.x, y: q.y, bearing, range: EXA_STEP, name: "Wave Cannon", start: t - 900, resolve: t, style: "aoe" }));
+    }
+  }
+  return out;
+}
+
 function buildShapes(data: ReplayData): AoeShape[] {
   return [
     ...p1Towers(data), ...p1Puddles(data), ...p1Sets(data), ...p2Clones(data), ...p2Stacks(data),
     ...p3Rings(data), ...p3Towers(data), ...p3Marks(data), ...p4Stacks(data),
-    ...p5Towers(data), ...p5Worlds(data),
+    ...p5Towers(data), ...p5Worlds(data), ...p6Exaflares(data),
   ];
 }
 

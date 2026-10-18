@@ -60,8 +60,9 @@ players standing on a puddle at the moment it lands, likely sample lag.
 - **Solar Ray:** marker 343 reads "Tank buster" on both tanks; 5y purple
   busters.
 - **Party Synergy:** the four PlayStation symbols (markers 416-419) under
-  each pair in their usual colours, and a teal partner tether between the
-  two of each symbol, both until the Fire spreads. The eye on the arena
+  each pair in their usual colours until the Fire spreads, and a teal
+  partner tether between the two of each symbol for as long as their
+  glitch lasts (to 3:04.5). The eye on the arena
   edge where its laser enters (the unit logs one spot, 45y out), labelled
   with the pull's glitch ("Remote Glitch: partners 35y+").
 - **The clones:** each real clone shows 5.1s before its attack (BossMod's
@@ -237,3 +238,41 @@ was (Damage Down). Her logged facing may be stale there.
    south-west. Right direction?
 6. Pull 17, 12:15 to 12:20.2: Omega-F with legs in the south-west; the DNC
    took the leg sweep. Where was the safe strip, and where was the DNC?
+
+## Phase 6: Alpha Omega (14:40 to 18:52, the kill)
+
+### What's drawn
+- **Flash Gale:** purple 5y busters on the two tanks each volley.
+- **Cosmo Arrow:** the first lines' telegraphs for their whole cast (both
+  sets at once, as they begin together), then the advancing lines flash.
+- **Cosmo Dive:** purple 8y busters on the tanks, the orange 6y share on the
+  other six.
+- **Unlimited Wave Cannon:** each exaflare's start with a yellow arrow the
+  way it will travel, from its 11.7s cast; then its six circles 8y apart
+  as they go off (the log's own repeat positions are often the boss's
+  spot). The six puddle rounds as faint closing rings under the players.
+- **Wave Cannon spreads** flash from game data; **Wild Charge** flashes as
+  a stack line.
+- **Cosmo Meteor:** the eight centre baits telegraphed for their 3.7s
+  cast, the spreads, "Meteor" on the three flare players, the stack.
+
+### Fit check
+Exaflares: 6 shapes held a player who wasn't hit (24 before the rebuild);
+the rest of the Wave Cannon misses are the tool lumping five ids under one
+name. Cosmo Arrow: 22 of 72 advancing lines held unhit players, likely the
+5y lines' timing against 1-2 samples a second.
+
+### Couldn't find out
+- Whether the game shows both Cosmo Arrow sets' telegraphs at once (the log
+  begins both casts together).
+- The flare radius (proximity damage; not drawn).
+
+### VOD checks: Pull 17 (bNcrLh7Y4dkHxM9q)
+1. Pull 17, 14:48.6 to 14:58.3: Cosmo Arrow drawn as a full grid of lines
+   from the start. What does the game show first, the cross or the border?
+2. Pull 17, 15:22.4 to 15:43.6: four exaflare starts with arrows (NE going
+   SW, E going W, SE going NW, S going N). Do the arrows and lines match?
+3. Pull 17, 15:57.0: Wild Charge. Who stood in front, and did all eight
+   share it?
+4. Pull 17, 17:28.5: the eight Meteor baits in the middle. Is that where
+   the party baited them?

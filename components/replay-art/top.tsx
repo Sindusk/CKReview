@@ -230,6 +230,24 @@ const worldRing = (color: string) => function WorldRing({ x, y, r, t }: ShapeArt
   );
 };
 
+/**
+ * An exaflare's start (P6 Unlimited Wave Cannon): its 8y circle with the
+ * game's arrow (omen "yazirushi") pointing the way the line will travel,
+ * shown through the cast, then flashing red as it goes off.
+ */
+function ExaStart({ s, x, y, r, opacity, resolving }: ShapeArtProps) {
+  const b = (s.bearing * Math.PI) / 180, ux = Math.sin(b), uy = -Math.cos(b), px = -uy, py = ux;
+  const tip = { x: x + ux * r * 0.8, y: y + uy * r * 0.8 }, tail = { x: x - ux * r * 0.5, y: y - uy * r * 0.5 };
+  const hw = r * 0.32, neck = { x: x + ux * r * 0.2, y: y + uy * r * 0.2 };
+  return (
+    <g opacity={opacity} pointerEvents="none">
+      <circle cx={x} cy={y} r={r} fill="#ff4a3d" fillOpacity={resolving ? 0.5 : 0.18} stroke="#ffb3a8" strokeWidth={2} />
+      <path d={`M${tail.x + px * hw * 0.4} ${tail.y + py * hw * 0.4} L${neck.x + px * hw * 0.4} ${neck.y + py * hw * 0.4} L${neck.x + px * hw} ${neck.y + py * hw} L${tip.x} ${tip.y} L${neck.x - px * hw} ${neck.y - py * hw} L${neck.x - px * hw * 0.4} ${neck.y - py * hw * 0.4} L${tail.x - px * hw * 0.4} ${tail.y - py * hw * 0.4} Z`}
+        fill="#ffe08a" fillOpacity={0.9} stroke="#8a2a00" strokeWidth={1.5} strokeLinejoin="round" />
+    </g>
+  );
+}
+
 /** Hello World's Local (green) and Remote (blue) tethers; their preparation versions are thin and dashed. */
 const REGRESSION = { local: "#4ef07a", remote: "#4da3ff" };
 const regressionTether = (color: string, prep: boolean) => function Regression({ x1, y1, x2, y2, t }: TetherArtProps) {
@@ -292,5 +310,6 @@ export const TOP_ART: FightArt = {
     "top-rot-red": RotBurst, "top-rot-blue": RotBurst,
     "top-spread": SpreadRing,
     "top-world-near": worldRing("#3de0c0"), "top-world-far": worldRing("#b07aff"),
+    "top-exa": ExaStart,
   },
 };

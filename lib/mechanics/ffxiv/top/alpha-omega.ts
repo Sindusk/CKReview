@@ -29,6 +29,10 @@
 // +216.1, its aura 1003532 on everyone alive 2s later. Run 31648 +241.2.
 // No Damage Down anywhere in P6, and the Brilliant Dynamis buffs aren't in
 // the fetched buff stream.
+// Replay (2026-10-18, L16 = bNcrLh7Y4dkHxM9q fight 17, Cosmo Memory 14:40.0):
+// each exaflare start (31661) logs its spot and facing; its six repeats
+// land 8y further along every ~1.04s (7 circles, edge to edge), and the
+// repeats' own helpers often log the boss's spot. Built in replay.ts.
 // Findings:
 // - Deaths cascade. A player raised in P6 has lost Brilliant Dynamis: the
 //   raised DRG took 82k from the Dive share the others took 43-53k from
