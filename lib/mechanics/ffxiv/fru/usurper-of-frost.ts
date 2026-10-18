@@ -55,7 +55,9 @@
 //   no actor for them. Sinbound Holy's last about 6s (user, VOD of
 //   M9Nagmnw2LzHZPVq 1); Hammer's and Hiemal Ray's are unchecked.
 // - Shining Armor 40185 hits everyone for 0; looking at it gives Stun
-//   1004163 + Damage Down (10 pulls). Thin Ice 1000911 +48.8 to ~+60.
+//   1004163 + Damage Down (10 pulls). Thin Ice 1000911 +48.8 to ~+60: on
+//   all eight 0.3s after Frost Armor 40184 for 11.9-12.1s (JZ1KXhDbqkNH3jxR
+//   24, M9Nagmnw2LzHZPVq 1); the whole field turns to ice and players slide.
 //   Twin Stillness 40193 (first) / 40196 (second), Twin Silence 40195 /
 //   40194: every hit lethal. No twin casts are logged.
 // - Hallowed Ray 40211: 8 of 8 in all 138 resolutions with everyone alive

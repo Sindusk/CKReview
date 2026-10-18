@@ -42,8 +42,8 @@ import type { Pull } from "@/types/Pull";
 import { ffMapImageUrl, fitReplayView, mapImageBounds, poseAt, type ReplayActor, type ReplayData, type ReplayPose } from "@/lib/replay/ffxiv-replay";
 import { aoesAt, buildAoeShapes, buildHeadMarkers, buildTethers, tetherEndAt, type AoeShape } from "@/lib/replay/action-shapes";
 import { getFFAbilityIconUrl } from "@/lib/ability-icons";
-import { buildCasterEffects } from "@/lib/replay/ffxiv-effects";
-import { ElementDragon, ElementHalo, ElementTether, JailCage } from "@/components/ReplayEffects";
+import { buildCasterEffects, SLIDE_STATUSES } from "@/lib/replay/ffxiv-effects";
+import { ElementDragon, ElementHalo, ElementTether, IceFloor, JailCage } from "@/components/ReplayEffects";
 import { sampleNear } from "@/lib/replay/ffxiv-replay";
 import { facingToCompassBearing } from "@/lib/mechanics/geometry";
 import { detectFFRoles } from "@/lib/mechanics/ffxiv/roles";
@@ -313,6 +313,10 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             )}
             {showGrid && <Grid cx={cx} cy={cy} half={half} toX={toX} toY={toY} S={S} />}
             {showRings && <Rings cx={cx} cy={cy} half={half} toX={toX} toY={toY} scale={scale} />}
+            {/* Floor effects (FRU Thin Ice) under everything else. */}
+            {showAoes && casterEffects.filter((e) => e.kind === "ice-floor" && t >= e.start && t <= e.end).map((e) => (
+              <IceFloor key={`floor-${e.start}`} e={e} x={toX(e.x)} y={toY(e.y)} r={(e.radius ?? 2000) * scale} t={t} />
+            ))}
             {showAoes && aoesAt(aoes, t).map(({ s, opacity, resolving }, i) => {
               // An aura shape rides on its actor (WoW Plague Froth).
               const rider = s.follow ? actorByKey.get(s.follow) : undefined;
@@ -336,7 +340,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
               );
             })}
             {/* Boss cues (FRU Cyclonic Break's dragon), around the caster. */}
-            {showAoes && casterEffects.filter((e) => t >= e.start && t <= e.end).map((e) => {
+            {showAoes && casterEffects.filter((e) => e.kind !== "ice-floor" && t >= e.start && t <= e.end).map((e) => {
               const follow = e.actor ? actorByKey.get(e.actor) : undefined;
               const p = follow && poseAt(follow, t);
               const at = p && !p.stale ? p : e;
@@ -390,7 +394,8 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
                 onMouseEnter={() => setHoverKey(a.key)} onMouseLeave={() => setHoverKey((k) => (k === a.key ? null : k))}
                 onClick={(e) => { e.stopPropagation(); setSelectedKey(a.key); }}>
                 {selectedKey === a.key && <TargetRing x={x} y={y} r={Math.max(r + 10, (a.hitbox ?? 50) * scale)} deg={deg} />}
-                {jail && <ellipse cx={x} cy={y + r * 0.7} rx={r * 0.8} ry={r * 0.28} fill="#000" fillOpacity={0.45} />}
+                {!dead && showAoes && <SlideTrail a={a} t={t} toX={toX} toY={toY} auras={aurasByKey.get(a.key)} />}
+                {jail &&<ellipse cx={x} cy={y + r * 0.7} rx={r * 0.8} ry={r * 0.28} fill="#000" fillOpacity={0.45} />}
                 {!dead && <FacingWedge x={x} y={iy} r={r} b={(deg * Math.PI) / 180} color={roleColor} size={8 * iconScale} />}
                 <image href={wow && info ? getPlayerSpecIcon("wow", info.specId, info.className) : getPlayerClassIcon(game, info?.className ?? a.job ?? "")}
                   x={x - r} y={iy - r} width={size} height={size}
@@ -868,6 +873,29 @@ function Tower({ x, y, r, opacity, resolving, uid, soakers }: { x: number; y: nu
 }
 
 type AuraSpan = NonNullable<ReplayData["playerAuras"]>[number];
+
+/**
+ * A player sliding on ice (FRU Thin Ice): a fading pale-blue streak along
+ * where they were over the last 0.8s, drawn only while they move.
+ */
+const SLIDE_TRAIL_MS = 800;
+function SlideTrail({ a, t, toX, toY, auras }: { a: ReplayActor; t: number; toX: (x: number) => number; toY: (y: number) => number; auras: AuraSpan[] | undefined }) {
+  if (!auras?.some((s) => SLIDE_STATUSES.has(s[3]) && s[0] <= t && t < s[1])) return null;
+  const pts: { x: number; y: number }[] = [];
+  for (let k = 4; k >= 0; k--) {
+    const p = poseAt(a, t - (SLIDE_TRAIL_MS * k) / 4);
+    if (p) pts.push({ x: toX(p.x), y: toY(p.y) });
+  }
+  if (pts.length < 2 || Math.hypot(pts[0].x - pts[pts.length - 1].x, pts[0].y - pts[pts.length - 1].y) < 6) return null;
+  return (
+    <g pointerEvents="none">
+      {pts.slice(1).map((p, i) => (
+        <line key={i} x1={pts[i].x} y1={pts[i].y} x2={p.x} y2={p.y} stroke="#dff5ff"
+          strokeWidth={3 + i * 2.5} strokeOpacity={0.15 + i * 0.15} strokeLinecap="round" />
+      ))}
+    </g>
+  );
+}
 
 /** Hover-card lines naming every status up at `t`: "Prey", "Lightsteeped ×3  12s". */
 function statusLines(spans: AuraSpan[] | undefined, t: number, data: ReplayData): string[] {

@@ -229,6 +229,61 @@ export function JailCage({ x, y, r, t, start, end }: { x: number; y: number; r: 
   );
 }
 
+/**
+ * The arena turned to ice (FRU Thin Ice): a frosted pale-blue sheet over
+ * the floor with a crackle of fine fracture lines, a bright sheen sweeping
+ * across it, and its meaning written along the top edge. Fades in and out.
+ */
+export function IceFloor({ e, x, y, r, t }: { e: CasterEffect; x: number; y: number; r: number; t: number }) {
+  const opacity = Math.max(0, Math.min(1, (t - e.start) / 600, (e.end - t) / 600));
+  if (opacity <= 0) return null;
+  const id = `ice-${e.start}`;
+  // Fracture lines: fixed per effect, so they don't crawl.
+  const cracks: string[] = [];
+  for (let k = 0; k < 26; k++) {
+    const a = rand(e.start + k * 3.1) * Math.PI * 2;
+    const d0 = r * (0.1 + 0.85 * rand(e.start + k * 7.7));
+    let px = x + Math.sin(a) * d0, py = y - Math.cos(a) * d0;
+    let d = `M${px.toFixed(1)} ${py.toFixed(1)}`;
+    let dir = rand(e.start + k * 1.3) * Math.PI * 2;
+    for (let s = 0; s < 3; s++) {
+      const len = r * (0.06 + 0.08 * rand(e.start + k * 11 + s));
+      dir += (rand(e.start + k * 5 + s) - 0.5) * 1.4;
+      px += Math.sin(dir) * len; py -= Math.cos(dir) * len;
+      d += ` L${px.toFixed(1)} ${py.toFixed(1)}`;
+    }
+    cracks.push(d);
+  }
+  // The sheen: a soft diagonal band sliding across every 2.4s.
+  const sweep = ((t - e.start) % 2400) / 2400;
+  const sx = x - r * 1.6 + sweep * r * 3.2;
+  return (
+    <g opacity={opacity} pointerEvents="none">
+      <defs>
+        <clipPath id={`${id}-clip`}><circle cx={x} cy={y} r={r} /></clipPath>
+        <radialGradient id={`${id}-fill`} gradientUnits="userSpaceOnUse" cx={x} cy={y} r={r}>
+          <stop offset="0%" stopColor="#e8f8ff" stopOpacity={0.16} />
+          <stop offset="80%" stopColor="#bfe8ff" stopOpacity={0.26} />
+          <stop offset="100%" stopColor="#9fd8ff" stopOpacity={0.45} />
+        </radialGradient>
+        <linearGradient id={`${id}-sheen`} gradientUnits="userSpaceOnUse" x1={sx - r * 0.25} y1={y} x2={sx + r * 0.25} y2={y}>
+          <stop offset="0%" stopColor="#ffffff" stopOpacity={0} />
+          <stop offset="50%" stopColor="#ffffff" stopOpacity={0.35} />
+          <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
+        </linearGradient>
+      </defs>
+      <circle cx={x} cy={y} r={r} fill={`url(#${id}-fill)`} />
+      <g clipPath={`url(#${id}-clip)`}>
+        {cracks.map((d, k) => <path key={k} d={d} fill="none" stroke="#f4fcff" strokeOpacity={0.45} strokeWidth={1.2} />)}
+        <rect x={sx - r * 0.25} y={y - r} width={r * 0.5} height={r * 2} fill={`url(#${id}-sheen)`} transform={`rotate(25 ${sx} ${y})`} />
+      </g>
+      <circle cx={x} cy={y} r={r} fill="none" stroke="#dff5ff" strokeWidth={3} strokeOpacity={0.7} />
+      <text x={x} y={y - r + 26} textAnchor="middle" fill="#dff5ff" fontSize={15} fontWeight={800}
+        stroke="rgba(0,0,0,0.75)" strokeWidth={4} paintOrder="stroke">{e.label}</text>
+    </g>
+  );
+}
+
 /** The head: a horned wedge pointing along the direction of travel. */
 function DragonHead({ p, c }: { p: { x: number; y: number; w: number; a: number }; c: (typeof COLORS)[keyof typeof COLORS] }) {
   // Travel is counterclockwise: the head faces along -a's tangent.

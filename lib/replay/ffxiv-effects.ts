@@ -38,7 +38,7 @@
 import { sampleNear, type ReplayData } from "@/lib/replay/ffxiv-replay";
 
 export type CasterEffect = {
-  kind:    "fire-dragon" | "lightning-dragon" | "fire-halo" | "lightning-halo";
+  kind:    "fire-dragon" | "lightning-dragon" | "fire-halo" | "lightning-halo" | "ice-floor";
   radius?: number;              // halos: the Brightfire it will cast (centi-yalms)
   label:   string;              // what it means, under the boss
   actor?:  string;              // follows this actor while it has samples
@@ -65,6 +65,15 @@ const CAST_DRAGONS: Record<number, { kind: "fire-dragon" | "lightning-dragon"; l
   40133: { kind: "lightning-dragon", label: "Lightning: out" },
 };
 const CASTER_HOLD_MS = 20000;         // parked clones log one sample, often well before the cast
+
+// Statuses that change the whole floor while the party carries them: FRU
+// P2's Thin Ice (Shining Armor turns the field to ice and players slide;
+// user, 2026-10-17). On all eight at Frost Armor +0.3s for ~12s in both
+// pulls. Drawn over the arena: the map's centre (FFLogs offsets) and this
+// radius, the FRU arena's 20y.
+const FLOOR_STATUSES: Record<number, { kind: "ice-floor"; label: string; radius: number }> = {
+  1000911: { kind: "ice-floor", label: "Thin Ice: players slide", radius: 2000 },
+};
 
 // Turn of the Heavens' halos: Brightfire casts, element from the actor's name.
 const HALO_BRIGHTFIRE = [40152, 40153];
@@ -122,5 +131,21 @@ export function buildCasterEffects(data: ReplayData): CasterEffect[] {
       end: end ? end[0] : t - BAIT_AFTER_CAST_MS,
     });
   }
+  // Floor statuses: one effect per burst of applications (within 2s), from
+  // the first to the last one ending.
+  const cx = data.map ? -data.map.offsetX * 100 : 10000, cy = data.map ? -data.map.offsetY * 100 : 10000;
+  for (const [id, floor] of Object.entries(FLOOR_STATUSES)) {
+    const spans = (data.playerAuras ?? []).filter((a) => a[3] === Number(id)).sort((a, b) => a[0] - b[0]);
+    let i = 0;
+    while (i < spans.length) {
+      let j = i, end = spans[i][1];
+      while (j + 1 < spans.length && spans[j + 1][0] - spans[i][0] <= 2000) { j++; end = Math.max(end, spans[j][1]); }
+      out.push({ kind: floor.kind, label: floor.label, radius: floor.radius, x: cx, y: cy, start: spans[i][0], end });
+      i = j + 1;
+    }
+  }
   return out.sort((a, b) => a.start - b.start);
 }
+
+/** The floor statuses' ids, for the panel's slide trails. */
+export const SLIDE_STATUSES = new Set(Object.keys(FLOOR_STATUSES).map(Number));
