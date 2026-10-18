@@ -30,7 +30,7 @@ import * as geometry from "./wow-spell-geometry.json";
 import type { AoeShape } from "./action-shapes";
 import { poseAt, sampleNear, type ReplayData } from "./ffxiv-replay";
 import type { WowAuraShape } from "./fight-spec";
-import { allWowAuraShapes, fightReplaysFor } from "./fights";
+import { allWowAuraShapes, fightReplaysFor, overridesFor } from "./fights";
 
 type SpellGeometry = { r: number; t: number[] };
 const GEOMETRY = geometry as unknown as Record<string, SpellGeometry>;
@@ -72,6 +72,10 @@ export function buildWowAoeShapes(data: ReplayData): AoeShape[] {
   const specs = fightReplaysFor(data);
   const auraShapes: Record<number, WowAuraShape> = Object.assign({}, ...specs.map((f) => f.wowAuraShapes ?? {}));
   const HIDDEN_HITS = new Set(specs.flatMap((f) => f.hiddenHits ?? []));
+  // A spec's overrides apply to hit circles by `hidden`, `style` and
+  // `soakers` (the FFXIV-only options are ignored here).
+  const over = overridesFor(data);
+  for (const [id, o] of Object.entries(over)) if (o.hidden) HIDDEN_HITS.add(Number(id));
 
   // ── Debuff auras ──
   const open = new Map<string, number>();   // "id:target" -> applied at
@@ -104,7 +108,8 @@ export function buildWowAoeShapes(data: ReplayData): AoeShape[] {
     const geo = GEOMETRY[id];
     const r = geo.r * 100;
     const name = names[id] ?? String(id);
-    const base = { kind: "circle" as const, range: r, name, start: g.t - LEAD_MS, resolve: g.t, estimated: true };
+    const base = { kind: "circle" as const, range: r, name, start: g.t - LEAD_MS, resolve: g.t, estimated: true,
+      style: over[id]?.style ?? "aoe", ...(over[id]?.soakers ? { soakers: over[id].soakers } : {}) };
     if (geo.t.some((x) => CASTER_TARGETS.has(x))) {
       const caster = actorByKey.get(g.hits[0][2]);
       const p = caster && sampleNear(caster, g.t, 3000);
