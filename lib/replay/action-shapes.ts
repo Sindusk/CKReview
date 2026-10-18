@@ -135,7 +135,7 @@ export type AoeShape = {
   noFlash?: boolean;
   star?: boolean;                // cross: star points while telegraphed (FRU Frigid Needle)
   lineStack?: boolean;           // rect: a line stack, its marker shown until it fires (marker 525)
-  marked?: string;               // line stack: the player carrying the marker
+  marked?: string[];             // line stack: the marked player, or the group it sits in the middle of
 };
 
 /**
@@ -516,15 +516,15 @@ const MARKER_AOES: Record<number, { ability: number; name: string }> = {
 };
 
 /**
- * Who carries a line stack's marker. In game it's on a player (user,
- * 2026-10-17); FRU's log puts it on Shiva instead, so then it's the player
- * in the middle of the party the beam hit (nearest their centre).
+ * Where a line stack's marker sits. In game it's on a player (user,
+ * 2026-10-17). FRU's log puts it on Shiva instead and nothing else names
+ * the player (her facing stays north through the channel; the user
+ * couldn't tell from VOD either), so then it rides on the centre of
+ * everyone the beam hit rather than on a guessed player.
  */
-function lineStackTarget(markedKey: string, hits: ReplayHit[], actorByKey: Map<string, ReplayActor>): string | undefined {
-  if (actorByKey.get(markedKey)?.kind === "player") return markedKey;
-  if (!hits.length) return undefined;
-  const mx = hits.reduce((s, h) => s + h[6]!, 0) / hits.length, my = hits.reduce((s, h) => s + h[7]!, 0) / hits.length;
-  return hits.reduce((b, h) => (Math.hypot(h[6]! - mx, h[7]! - my) < Math.hypot(b[6]! - mx, b[7]! - my) ? h : b))[3];
+function lineStackTarget(markedKey: string, hits: ReplayHit[], actorByKey: Map<string, ReplayActor>): string[] | undefined {
+  if (actorByKey.get(markedKey)?.kind === "player") return [markedKey];
+  return hits.length ? [...new Set(hits.map((h) => h[3]))] : undefined;
 }
 
 export type TetherSpan = {

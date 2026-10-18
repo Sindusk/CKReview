@@ -323,9 +323,9 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
               const rider = s.follow ? actorByKey.get(s.follow) : undefined;
               const at = rider && poseAt(rider, t);
               if (s.follow && !at) return null;
-              // A line stack's marker rides on its player.
-              const carrier = s.marked ? actorByKey.get(s.marked) : undefined;
-              const cp = carrier && poseAt(carrier, t);
+              // A line stack's marker rides on its player, or the middle of its group.
+              const ps = (s.marked ?? []).map((k) => actorByKey.get(k)).map((a) => a && poseAt(a, t)).filter((p): p is ReplayPose => !!p && p.hp !== 0);
+              const cp = ps.length ? { x: ps.reduce((a, p) => a + p.x, 0) / ps.length, y: ps.reduce((a, p) => a + p.y, 0) / ps.length } : undefined;
               return <Aoe key={i} uid={`${i}-${s.resolve}`} s={at ? { ...s, x: at.x, y: at.y } : s} opacity={opacity} resolving={resolving} toX={toX} toY={toY} scale={scale} t={t}
                 marked={cp ? { x: toX(cp.x), y: toY(cp.y) } : undefined} />;
             })}
