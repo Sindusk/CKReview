@@ -41,6 +41,10 @@ const LEAD_MS = 1000;
 // db2 ImplicitTarget values that put the area on the caster: UNIT_CASTER,
 // DEST_CASTER, SRC_CASTER.
 const CASTER_TARGETS = new Set([1, 18, 22]);
+// db2 ImplicitTarget 104 (UNIT_CONE_CASTER_TO_DEST_ENEMY): a cone from the
+// caster. Its angle isn't in the tables wago serves.
+const CONE_TARGET = 104;
+const CONE_ANGLE = 60;
 // A raid-wide spell that lands more often than this is ambient damage
 // (Toxic Vapor, Burning Presence), not an event worth a label.
 const RAIDWIDE_MIN_GAP_MS = 8000;
@@ -100,6 +104,13 @@ export function buildWowAoeShapes(data: ReplayData): AoeShape[] {
 
   // ── Hit circles ──
   const hits = (data.enemyHits ?? []).filter((h) => !HIDDEN_HITS.has(h[1]));
+  // "caster:ability" -> [begincast ms, cast end ms] for cones' telegraphs.
+  const castBegins = new Map<string, [number, number][]>();
+  for (const c of data.enemyCasts ?? []) {
+    if (c[3] <= 0 || c[4] === undefined) continue;
+    const k = `${c[1]}:${c[4]}`;
+    castBegins.set(k, [...(castBegins.get(k) ?? []), [c[0], c[0] + c[3]]]);
+  }
   const groups = new Map<number, { t: number; hits: typeof hits }>();
   const flush = (id: number) => {
     const g = groups.get(id);
@@ -110,6 +121,26 @@ export function buildWowAoeShapes(data: ReplayData): AoeShape[] {
     const name = names[id] ?? String(id);
     const base = { kind: "circle" as const, range: r, name, start: g.t - LEAD_MS, resolve: g.t, estimated: true,
       style: over[id]?.style ?? "aoe", ...(over[id]?.soakers ? { soakers: over[id].soakers } : {}) };
+    const spots: { x: number; y: number }[] = [];
+    for (const h of g.hits) {
+      const target = actorByKey.get(h[3]);
+      const p = h[6] !== null && h[7] !== null ? { x: h[6], y: h[7] } : target && poseAt(target, h[0]);
+      if (p) spots.push(p);
+    }
+    // A cone (implicit target 104): from its caster toward the players it
+    // hit, shown for the cast bar when there was one. db2 has no angle, so
+    // it's the spec's override or CONE_ANGLE.
+    if (geo.t.includes(CONE_TARGET)) {
+      const caster = actorByKey.get(g.hits[0][2]);
+      const p = caster && sampleNear(caster, g.t, 3000);
+      if (!p || spots.length === 0) return;
+      const mx = spots.reduce((s, q) => s + q.x, 0) / spots.length, my = spots.reduce((s, q) => s + q.y, 0) / spots.length;
+      const bearing = ((Math.atan2(mx - p.x, -(my - p.y)) * 180) / Math.PI + 360) % 360;
+      const begin = castBegins.get(`${g.hits[0][2]}:${id}`)?.filter((b) => b[1] <= g.t + CLUSTER_MS && g.t - b[1] <= 1500).pop();
+      out.push(shape({ ...base, kind: "cone", x: p.x, y: p.y, bearing, angle: over[id]?.angle ?? CONE_ANGLE,
+        start: begin ? begin[0] : base.start }));
+      return;
+    }
     if (geo.t.some((x) => CASTER_TARGETS.has(x))) {
       const caster = actorByKey.get(g.hits[0][2]);
       const p = caster && sampleNear(caster, g.t, 3000);
@@ -118,10 +149,7 @@ export function buildWowAoeShapes(data: ReplayData): AoeShape[] {
     }
     // Players close enough to stand in one circle share it.
     const clusters: { x: number; y: number }[][] = [];
-    for (const h of g.hits) {
-      const target = actorByKey.get(h[3]);
-      const p = h[6] !== null && h[7] !== null ? { x: h[6], y: h[7] } : target && poseAt(target, h[0]);
-      if (!p) continue;
+    for (const p of spots) {
       const c = clusters.find((cl) => Math.hypot(cl[0].x - p.x, cl[0].y - p.y) <= r * 2);
       if (c) c.push(p); else clusters.push([p]);
     }
