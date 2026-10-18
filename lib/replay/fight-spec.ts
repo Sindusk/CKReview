@@ -122,7 +122,11 @@ export type FightReplay = {
   overrides?: Record<number, Override>;
   headMarkers?: Record<number, HeadMarkerDef>;
   markerAoes?: Record<number, MarkerAoe>;
-  tethers?: Record<number, TetherKind>;
+  // An array: one tether id with several meanings (Dancing Mad's statue
+  // tethers are all 45, yellow or purple by what they pay off); the first
+  // whose payoff then hits the tethered player is it, and with none it's
+  // drawn plain.
+  tethers?: Record<number, TetherKind | TetherKind[]>;
   effects?: (data: ReplayData) => CasterEffect[];
   floorStatuses?: Record<number, FloorStatus>;
   slideStatuses?: number[];

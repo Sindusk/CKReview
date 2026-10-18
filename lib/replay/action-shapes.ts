@@ -389,11 +389,16 @@ export function buildTethers(data: ReplayData): TetherSpan[] {
   const casts = data.enemyCasts ?? [];
   const hits = data.enemyHits ?? [];
   const tethers = data.tethers ?? [];
-  const TETHER_KINDS: Record<number, TetherKind> = Object.assign({}, ...fightReplaysFor(data).map((f) => f.tethers ?? {}));
+  const KIND_LISTS: Record<number, TetherKind | TetherKind[]> = Object.assign({}, ...fightReplaysFor(data).map((f) => f.tethers ?? {}));
+  const TETHER_KINDS: Record<number, TetherKind> = Object.fromEntries(
+    Object.entries(KIND_LISTS).filter(([, k]) => !Array.isArray(k)).map(([id, k]) => [id, k as TetherKind]));
   const passedAt = passedTethers(data, TETHER_KINDS);
   return tethers.map(([t, source, target, id], i) => {
     let end = t + TETHER_MAX_MS;
-    const kind = TETHER_KINDS[id];
+    const options = KIND_LISTS[id];
+    const kind = Array.isArray(options)
+      ? options.find((k) => hits.some((h) => h[3] === target && h[0] > t && h[0] < end && k.payoff.includes(h[1])))
+      : options;
     if (kind?.passed) {
       const holder = playerEnd(data, source, target);
       const taken = passedAt.get(i);

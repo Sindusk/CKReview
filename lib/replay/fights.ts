@@ -32,7 +32,7 @@ function signatureOf(f: FightReplay): Set<number> {
   for (const id of Object.keys(f.overrides ?? {})) ids.add(Number(id));
   for (const def of Object.values(f.headMarkers ?? {})) for (const id of def.abilities) ids.add(id);
   for (const m of Object.values(f.markerAoes ?? {})) ids.add(m.ability);
-  for (const k of Object.values(f.tethers ?? {})) for (const id of k.payoff) ids.add(id);
+  for (const k of Object.values(f.tethers ?? {}).flat()) for (const id of k.payoff) ids.add(id);
   for (const id of Object.keys(f.wowAuraShapes ?? {})) ids.add(Number(id));
   for (const id of f.hiddenHits ?? []) ids.add(id);
   return ids;
