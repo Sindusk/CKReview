@@ -330,8 +330,9 @@ file's header comment. Mechanic detection has its own guide:
   caster in fire or lightning for the length of the cast bar: Cyclonic
   Break (pairs / spread), Utopian Sky (stacks / spread) and the clone's
   Turn of the Heavens (which halos explode). Turn of the Heavens' eight halos show as
-  element rings at their Brightfire size from when they appear. Shown with
-  the AoEs layer.
+  element rings at their Brightfire size from when they appear. FRU's Thin
+  Ice frosts the whole arena while the party carries it, and moving players
+  leave a short slide trail. Shown with the AoEs layer.
 - **Head markers** show as a label over the marked actor. The log gives
   only a number, so `buildHeadMarkers` names the ones it knows (FRU's) when
   the ability they announce follows. The label stays until that hit; an
