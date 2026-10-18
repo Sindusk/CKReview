@@ -260,3 +260,35 @@ VOD checks, Pull 1 (vRPGT4MN6VALQWFh fight 7):
    carriers burned at 2:09.
 5. Pull 1, 3:04: Invoke; the purple pools vanish from the replay. Check
    where the pools actually moved.
+
+## Nymrissa Wavecaller
+
+Pull: Nymrissa kill, Pull 2 (Kag91qVZ2YJ7MQAb fight 22, 3:49). No detection
+module exists, so the model is Method's Mythic guide for the Tidebound
+Grotto lair, checked against this kill.
+
+Drawn:
+- **Chilling Frost**: a pale blue ring on each of the 3 targets (~4.5s).
+- **Frost Orbs**: an icy orb where each target stood when Chilling Frost
+  ended, until the first player within 4y takes the soak debuff. In the
+  kill some orbs sat 10-15s before being soaked.
+- **Lingering Frost**: a pale ice patch (5y, assumed) where each orb was
+  soaked, until the last player slid in it (at least 5s).
+- **Water Jet**: a blue 4y jet from Nymrissa through the tank, from the 3s
+  cast to the end of the 6s push.
+
+Not drawn: the Alluring Bubble and Swirling Whirlpools (no actor or
+position in the log; the murlocs are drawn as adds), Pop!, Shatter (none
+in the kill).
+
+Open questions:
+- Lingering Frost's real size, and does Water Jet wash a patch away (the
+  replay ends a patch at its last victim instead)?
+
+VOD checks, Pull 2 (Kag91qVZ2YJ7MQAb fight 22):
+1. Pull 2, 0:38-0:43: Chilling Frost rings on three players, then three
+   orbs at 0:42. Check the orbs land at their feet.
+2. Pull 2, 0:43-0:58: two orbs wait until 0:52 and 0:57. Check who soaked
+   each and where the Lingering Frost appears.
+3. Pull 2, 0:27-0:36 and 0:49-0:58: Water Jet from Nymrissa through the
+   tank. Check the jet's direction and that the tank is pushed along it.

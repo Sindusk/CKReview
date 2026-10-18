@@ -210,6 +210,24 @@ function Corpse({ e, x, y, t }: EffectArtProps) {
 const NEK_FLAME = ring({ color: "#ff9a3a", glow: "#e05a00", motes: 4, spinMs: 1800 });
 const NEK_BARRAGE = ring({ color: "#9ad7ff", glow: "#3b7fc4", motes: 5, spinMs: 1200 });
 
+// ── Nymrissa ──
+
+/** A Frost Orb waiting to be soaked: an icy sphere with a slow pulse. */
+function FrostOrb({ e, x, y, t, scale }: EffectArtProps) {
+  const opacity = Math.max(0, Math.min(1, (t - e.start) / FADE_MS, (e.end - t) / 150));
+  if (opacity <= 0) return null;
+  const r = Math.max(7, 120 * scale) * (1 + 0.06 * Math.sin(t / 220));
+  return (
+    <g opacity={opacity} pointerEvents="none">
+      <circle cx={x} cy={y} r={r * 1.7} fill="#9fe0ff" fillOpacity={0.25} filter="url(#replay-glow)" />
+      <circle cx={x} cy={y} r={r} fill="#2b8fd9" stroke="#e8f8ff" strokeWidth={1.5} />
+      <circle cx={x - r * 0.3} cy={y - r * 0.3} r={r * 0.3} fill="#e8f8ff" fillOpacity={0.8} />
+    </g>
+  );
+}
+
+const NYM_CHILL = ring({ color: "#cfefff", glow: "#4aa8e0", motes: 3, spinMs: 2400 });
+
 // Shell Spin: Nama's target (sea green, three shells circling) and a stun (grey).
 const LE_SHELL = ring({ color: "#3fd6b0", glow: "#1a8f74", motes: 3, spinMs: 900 });
 const LE_STUN = ring({ color: "#d8d8d8", glow: "#7a7a7a", motes: 4, spinMs: 700 });
@@ -237,6 +255,8 @@ export const VA_ART: FightArt = {
     "va-nekzali-corpse": Corpse,
     "va-nekzali-flame": NEK_FLAME,
     "va-nekzali-barrage": NEK_BARRAGE,
+    "va-nymrissa-orb": FrostOrb,
+    "va-nymrissa-chill": NYM_CHILL,
   },
   shapes: {
     "va-entombed-sentinels-pool": BloodPool,
@@ -244,6 +264,7 @@ export const VA_ART: FightArt = {
     "va-lost-explorers-frost-patch": pool("#1d5f9e", "#9fd8ff"),
     "va-lost-explorers-aftershock": pool("#6b4a2a", "#c99a5e"),
     "va-nekzali-cultist": pool("#3a1f5e", "#9b6bff"),
+    "va-nymrissa-frost": pool("#7fc8f0", "#e8f8ff"),
   },
   colors: {
     "va-vashnik-bile": VASHNIK_BILE,
@@ -258,5 +279,7 @@ export const VA_ART: FightArt = {
     "va-lost-explorers-fire": { fill: "#ff6a1a", flash: "#ffc070", rim: "#ffe0b0", glow: "#d94a00" },
     // Soul Transfer: the Echo's spirit beam.
     "va-nekzali-beam": { fill: "#59e0d0", flash: "#c8fff6", rim: "#e0fffa", glow: "#1fa597" },
+    // Water Jet: sea blue.
+    "va-nymrissa-jet": { fill: "#1f8fe0", flash: "#9fd8ff", rim: "#d8f0ff", glow: "#0a5fa8" },
   },
 };
