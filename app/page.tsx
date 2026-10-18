@@ -537,15 +537,45 @@ export default function Home() {
   };
 
   const [pauseToken, setPauseToken] = useState(0);
-  const [playToken, setPlayToken] = useState(0);   // the replay's play button
-  const [vodPlaying, setVodPlaying] = useState(false);
+  const [playToken, setPlayToken] = useState(0);   // resumes the VOD after the replay
   useEffect(() => {
     if (showDamage || showMitigation) setPauseToken((t) => t + 1);
   }, [showDamage, showMitigation]);
+
+  // The replay runs its own clock while it shows, so scrubbing never waits
+  // on the video (user, 2026-10-17). Opening it pauses the VOD and starts
+  // the replay at the VOD's time; going back seeks the VOD to where the
+  // replay was, playing if the replay was playing.
+  const [replayStartMs, setReplayStartMs] = useState(0);
+  const replayPlayingRef = useRef(false);
+  const handleReplayPlayingChange = useCallback((p: boolean) => { replayPlayingRef.current = p; }, []);
+  function showReplayView() {
+    if (centerView === "replay") return;
+    const usable = (selectedVod?.isCalibrated ?? false) && coverageGap === null;
+    if (usable) {
+      setPauseToken((t) => t + 1);
+      setReplayStartMs(timeline.playbackTimeMs);
+      setReplayTimeMs(timeline.playbackTimeMs);
+    } else {
+      setReplayStartMs(replayTimeMs);
+    }
+    replayPlayingRef.current = false;
+    setCenterView("replay");
+  }
+  function showVideoView() {
+    if (centerView === "video") return;
+    const usable = (selectedVod?.isCalibrated ?? false) && coverageGap === null;
+    if (usable && replayKey && replays[replayKey]) {
+      handleSeekToMs(replayTimeMs);
+      if (replayPlayingRef.current) setPlayToken((n) => n + 1);
+    }
+    setCenterView("video");
+  }
   const canSeekFromDialog = !!selectedVod && isSynced(selectedVod);
   const handleDialogSeek = useCallback((pullId: number, ms: number) => {
     setShowDamage(false);
     setShowMitigation(false);
+    setCenterView("video");   // it plays the VOD, which the replay would hide
     timeline.seekInPull(pullId, ms / 1000);
     if (pullId !== activePull?.id) handleSelectPullFromList(pullId);
   // handleSelectPullFromList is a plain function re-created each render.
@@ -1407,10 +1437,10 @@ export default function Home() {
   // Synced and showing footage of the selected pull (not the no-coverage
   // card), so playback time means something for that pull.
   const videoUsable = isCalibrated && coverageGap === null;
-  // With no usable VOD, a showing replay runs its own clock: the roster and
-  // analysis panels follow it (highlighting what has happened), and clicking
-  // an event seeks the replay instead of the video.
-  const replayClock = !videoUsable && centerView === "replay" && !!replayKey && !!replays[replayKey];
+  // A showing replay runs its own clock (the VOD is paused behind it): the
+  // roster and analysis panels follow it (highlighting what has happened),
+  // and clicking an event seeks the replay instead of the video.
+  const replayClock = centerView === "replay" && !!replayKey && !!replays[replayKey];
   const panelTimeMs = replayClock ? replayTimeMs : timeline.playbackTimeMs;
 
   const syncPointLabels = selectedVod
@@ -1599,7 +1629,7 @@ export default function Home() {
             <AnalysisPanel
               pull={activePull}
               playbackTimeMs={panelTimeMs}
-              onSeekToTime={videoUsable ? handleSeekToMs : replayClock ? (ms) => setReplaySeek((s) => ({ ms, n: s.n + 1 })) : undefined}
+              onSeekToTime={replayClock ? (ms) => setReplaySeek((s) => ({ ms, n: s.n + 1 })) : videoUsable ? handleSeekToMs : undefined}
               onCallWipe={handleCallWipe}
               onAddError={handleAddError}
               onRemoveError={handleRemoveError}
@@ -1612,15 +1642,15 @@ export default function Home() {
 
         <Panel diamondBottom>
           {/* The Video | Replay switch sits centred in the video header. The
-              replay draws over the player, which stays mounted so its clock
-              keeps driving the timeline (and the replay). */}
+              replay draws over the player, which stays mounted and paused
+              while the replay runs its own clock. */}
           <div style={{ flex: 1, minHeight: 0 }}>
             <VideoPanel
               headerCenter={
                 <div style={{ display: "flex", gap: 4 }}>
-                  <button className={`ck-tab ck-tab--sm${centerView === "video" ? " ck-tab--active" : ""}`} onClick={() => setCenterView("video")}>Video</button>
-                  <button className={`ck-tab ck-tab--sm${centerView === "replay" ? " ck-tab--active" : ""}`} onClick={() => setCenterView("replay")}
-                    title="Top-down positions from the log, following the VOD when one is synced">Replay</button>
+                  <button className={`ck-tab ck-tab--sm${centerView === "video" ? " ck-tab--active" : ""}`} onClick={showVideoView}>Video</button>
+                  <button className={`ck-tab ck-tab--sm${centerView === "replay" ? " ck-tab--active" : ""}`} onClick={showReplayView}
+                    title="Top-down positions from the log. Pauses the VOD and starts at its time; going back to Video resumes from the replay's time">Replay</button>
                 </div>
               }
               titleOverride={centerView === "replay" ? "Replay" : undefined}
@@ -1632,19 +1662,16 @@ export default function Home() {
                   progress={replayLoad?.key === replayKey ? replayLoad.progress : null}
                   error={replayLoad?.key === replayKey ? replayLoad.error : null}
                   onLoad={handleLoadReplay}
-                  syncedTimeMs={videoUsable ? timeline.playbackTimeMs : undefined}
-                  vodPlaying={vodPlaying}
-                  onVodPlay={() => setPlayToken((n) => n + 1)}
-                  onVodPause={() => setPauseToken((n) => n + 1)}
                   onTimeChange={setReplayTimeMs}
                   seekRequest={replaySeek}
+                  startTimeMs={replayStartMs}
+                  onPlayingChange={handleReplayPlayingChange}
                 />
               ) : undefined}
               vod={selectedVod}
               seekRequest={timeline.seekRequest}
               pauseRequest={pauseToken}
               playRequest={playToken}
-              onPlayingChange={setVodPlaying}
               onCurrentTimeChange={handleVideoTimeUpdate}
               onUnsync={handleUnsyncVod}
               onResync={resyncFromPull}
@@ -1656,10 +1683,11 @@ export default function Home() {
               onDurationKnown={handleVodDuration}
             />
           </div>
-          {/* The same timeline under both views, so flipping to the replay
-              leaves it exactly where it was. */}
+          {/* The VOD's timeline, under the video (and under a replay that
+              hasn't loaded yet). */}
           <div style={{ flexShrink: 0 }}>
-            {videoBottom}
+            {/* Hidden while the replay runs its own clock: it seeks the paused VOD. */}
+            {!replayClock && videoBottom}
           </div>
         </Panel>
 

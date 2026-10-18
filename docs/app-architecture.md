@@ -334,13 +334,13 @@ file's header comment. Mechanic detection has its own guide:
   geometry.ts's `facingToCompassBearing`. The replay's
   auto-attack check is what showed that helper returned the back until
   2026-10-17.
-- **Play/pause with a synced VOD** drives the hidden video through
-  VideoPanel's `playRequest` / `pauseRequest` tokens. The button's state
-  comes from the player (`onPlayingChange`, polled with the time), never
-  from whether the time moved: a paused player's repeated reading changes
-  no state, so a time-based guess stayed on "playing".
-- **The page's timeline bar stays under both views**, unchanged, and is
-  the replay's scrubber when synced.
+- **The replay always runs its own clock** (user, 2026-10-17: following
+  the VOD made scrubbing lag behind the video's seeks). Opening Replay
+  pauses the VOD (`pauseRequest`) and starts the replay at the VOD's time
+  (`startTimeMs`); going back to Video seeks the VOD to the replay's time
+  and plays it (`playRequest`) if the replay was playing. The page's
+  timeline bar is hidden while a loaded replay shows. ReplayPanel still
+  has a `syncedTimeMs` mode the page no longer uses.
 - **Map art** comes from FFLogs' `fights.maps` + `gameData.map` (filename,
   sizeFactor, offsets). The browser loads the texture from XIVAPI v2
   (`v2.xivapi.com/api/asset/map/<id>/<index>`), not from FFLogs' CDN. The
@@ -351,9 +351,8 @@ file's header comment. Mechanic detection has its own guide:
   the session. Positions arrive about 1 to 2 per player per second and stop
   for 25 to 35s at phase transitions; the module header explains the
   interpolation.
-- **Clock.** With a synced VOD the replay follows the video. The video
-  stays mounted (hidden) under the replay so its clock keeps running.
-  Without a VOD the panel has its own play/pause, speed and scrubber.
+- **Clock.** The panel has its own play/pause, speed and scrubber. The
+  video stays mounted (hidden, paused) under the replay.
 
 ## Design sources
 

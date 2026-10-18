@@ -30,6 +30,10 @@
 //   video is playing, which keeps the dots moving smoothly.
 // - No VOD synced: the panel keeps its own clock with play/pause, speed
 //   and scrubber.
+// The page uses only the own clock (user, 2026-10-17: following the VOD
+// made scrubbing wait on the video). Opening the replay pauses the VOD and
+// starts the clock at its time (`startTimeMs`); going back to Video seeks
+// the VOD to the replay's time and plays it if the replay was playing.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Pull } from "@/types/Pull";
@@ -64,6 +68,10 @@ type Props = {
   onTimeChange?: (ms: number) => void;
   // Moves the panel's own clock (no VOD synced): a new `n` seeks to `ms`.
   seekRequest?:  { ms: number; n: number };
+  // Where the own clock starts when the panel mounts (the paused VOD's time).
+  startTimeMs?:  number;
+  // The own clock's play state, so the page can resume the VOD the same way.
+  onPlayingChange?: (playing: boolean) => void;
 };
 
 const SPEEDS = [0.5, 1, 2, 4];
@@ -89,13 +97,14 @@ const TETHER_COLOR = "#ff5fd2";
 const TETHER_LOOKUP_MS = 20000;
 const GRID_STEP = 500;    // 5y, centi-yalms
 
-export default function ReplayPanel({ pull, data, loading, progress, error, onLoad, syncedTimeMs, vodPlaying = false, onVodPlay, onVodPause, onTimeChange, seekRequest }: Props) {
+export default function ReplayPanel({ pull, data, loading, progress, error, onLoad, syncedTimeMs, vodPlaying = false, onVodPlay, onVodPause, onTimeChange, seekRequest, startTimeMs = 0, onPlayingChange }: Props) {
   const synced = syncedTimeMs !== undefined;
   const durationMs = data?.durationMs ?? (pull ? (pull.endTime - pull.startTime) * 1000 : 0);
 
   // ── Clock ────────────────────────────────────────────────────────────────
-  const [ownTimeMs, setOwnTimeMs] = useState(0);
+  const [ownTimeMs, setOwnTimeMs] = useState(startTimeMs);
   const [playing, setPlaying] = useState(false);
+  useEffect(() => { onPlayingChange?.(playing); }, [playing, onPlayingChange]);
   const [speed, setSpeed] = useState(1);
   const [frameMs, setFrameMs] = useState(0);
 
@@ -121,7 +130,14 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
     extRef.current = { value: syncedTimeMs, at: performance.now() };
   }, [syncedTimeMs]);
 
-  useEffect(() => { setOwnTimeMs(0); setPlaying(false); setSelectedKey(null); }, [pull?.id]);
+  // A pull change restarts the clock; the first run is the mount, which
+  // keeps startTimeMs.
+  const mountedPullRef = useRef(pull?.id);
+  useEffect(() => {
+    if (mountedPullRef.current === pull?.id) return;
+    mountedPullRef.current = pull?.id;
+    setOwnTimeMs(0); setPlaying(false); setSelectedKey(null);
+  }, [pull?.id]);
 
   // Only a new request seeks: the panel remounting with an old one doesn't.
   const lastSeekRef = useRef(seekRequest?.n ?? 0);
