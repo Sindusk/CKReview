@@ -274,8 +274,9 @@ and delete them from the header.
     (Double Check / Checkmate charge simulation and lanes 2026-10-15; Heat / Battery
     overcap, Reassemble and the rebuilt Wildfire count verified on 3
     pages 2026-10-15; Queen without Collider not adopted).
-  - [blm.md](xiva-audit/blm.md): Black Mage, 1 candidate (pre-7.2
-    Firestarter), 17 covered (Manafont before Despair built 2026-10-18; full gauge
+  - [blm.md](xiva-audit/blm.md): Black Mage, 0 candidates, 18 covered
+    (pre-7.2 Firestarter spent in Astral Fire built 2026-10-18 on the one
+    7.1 Black Mage on disk, 4 findings; Manafont before Despair built 2026-10-18; full gauge
     simulation and lanes; Polyglot, Paradox, cold Fire III, Ley Lines,
     Fire I, Umbral Soul, lukewarm Fire IV verified on 10 xivanalysis
     pages 2026-10-15; Despair skipped built 2026-10-16 from the logged MP

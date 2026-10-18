@@ -119,6 +119,10 @@
 //     2 of xivanalysis's 5; its other 3 (4:49-4:55) are in a car change
 //     with no party hits, which it doesn't excuse. Not adopted: Triplecast pressed over a
 //     stack (a lost instant costs damage only if movement later needed it).
+//     Before 7.2, a Firestarter spent inside Astral Fire after its Paradox
+//     (RotationWatchdog FirestarterUsageEvaluator, 2026-10-18):
+//     `firestarterPre72` below; 4 on rFQT8XZckzvH1LNx (7.1), not matched
+//     against a page.
 //   - SMN Searing Light with one Searing Flash (SearingLight.tsx).
 //     Checked against xivanalysis on qjCMx4bRfgNKwX9T fight 16 (7.5,
 //     2026-10-13, the first Summoner sample): Searing Flash 10/10, every
@@ -998,10 +1002,103 @@ function despairSkipped(ctx: PlayerCheckContext, gauge: BlmGauge, cycle: number)
   return out;
 }
 
+// Firestarter spent inside Astral Fire, before 7.2 (xivanalysis
+// RotationWatchdog FirestarterUsageEvaluator, Minor, no error code): a
+// Firestarter Fire III cast at Astral Fire III after that phase's Paradox,
+// with no Manafont later in the phase (its Paradox brings another). Saved,
+// it takes the next ice-to-fire swap instantly after Transpose; spent, the
+// swap is a hardcast Fire III from Umbral Ice III, which the penalty
+// weakens. Judged only when the next swap was that hardcast, and not when
+// Astral Fire's 15s timer needed the Fire III (below). Measured on
+// rFQT8XZckzvH1LNx (Queen Eternal 7.1, Moomoo Zen, base hits): Firestarter
+// Fire III in Astral Fire 46.8k, after Transpose (Astral Fire I) 36.6k,
+// hardcast from Umbral Ice 18.6k. The saved line also has one GCD fewer,
+// which goes to her average rotation GCD (cycleGcdValue). Lost = Fire III
+// after Transpose + that GCD − this Fire III − the hardcast one; the
+// Transpose Fire III is her own average (else this one × 1.4 / 1.8, the
+// Astral Fire I / III bonus), priced at the hardcast's buffs. In forced
+// time or while moving it's shown, not counted (the instant was used to
+// move). From 7.2 Firestarter is permanent and the Cold Fire III check
+// above judges the swap.
+const F3P_AF1_RATIO = 1.4 / 1.8;
+const AF_PRE72_MS = 15_000;
+const AF_REFRESH = new Set(ids("FIRE_I", "FIRE_II", "HIGH_FIRE_II", "FIRE_III", "PARADOX", "DESPAIR", "FLARE", "MANAFONT"));
+const firestarterPre72: JobCheck = (ctx) => {
+  if (!ctx.patch || !PRE_72.includes(ctx.patch)) return [];
+  const firestarter = statusWindows(ctx, S.FIRESTARTER.id);
+  const casts = ctx.player.casts.filter((c) => c.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
+  const isProc = (c: PlayerEvent) => c.abilityId === A.FIRE_III.id && firestarter.some((w) => w.startMs < c.timestamp && Math.abs(w.endMs - c.timestamp) <= 300);
+  const leaves = new Set(ids("BLIZZARD_I", "BLIZZARD_II", "HIGH_BLIZZARD_II", "BLIZZARD_III", "BLIZZARD_IV", "FREEZE", "UMBRAL_SOUL", "TRANSPOSE"));
+  const critMult = critMultOf(ctx), roll = rollGainOf(ctx, critMult);
+  const hitOf = (c: PlayerEvent) => ctx.player.damageDone.find((e) => e.abilityId === c.abilityId && !e.isDoT && !e.pet &&
+    (e.amount ?? 0) > 0 && e.timestamp >= c.timestamp && e.timestamp < c.timestamp + PARADOX_HIT_MS);
+  // Each cast's element before it: fire after a Fire III, ice after an ice
+  // spell or Transpose out of fire, "transposed" after Transpose out of ice.
+  type Step = { c: PlayerEvent; state: "none" | "fire" | "ice" | "transposed"; proc: boolean };
+  const steps: Step[] = [];
+  let state: Step["state"] = "none";
+  for (const c of casts) {
+    steps.push({ c, state, proc: isProc(c) });
+    if (c.abilityId === A.FIRE_III.id || c.abilityId === A.FLARE.id || c.abilityId === A.DESPAIR.id) state = "fire";
+    else if (c.abilityId === A.TRANSPOSE.id) state = state === "fire" ? "ice" : state === "ice" ? "transposed" : state;
+    else if (leaves.has(c.abilityId)) state = "ice";
+  }
+  const transposedBase = steps.filter((s) => s.proc && s.state === "transposed").map((s) => hitOf(s.c)).filter((h) => h)
+    .map((h) => baseValue(h!, critMult));
+  const cycle = cycleGcdValue(ctx);
+  const out: DamageFinding[] = [];
+  let paradoxAt: number | undefined;
+  for (const [i, s] of steps.entries()) {
+    const id = s.c.abilityId;
+    // Manafont starts a new window: a Firestarter after it but before the
+    // next Paradox came from the window it closed (rFQT8XZckzvH1LNx Queen
+    // Eternal pull 2, Manafont 3:48.2, Firestarter Fire III 3:49.6).
+    if (s.state !== "fire" || id === A.MANAFONT.id) { paradoxAt = undefined; continue; }
+    if (id === A.PARADOX.id) { paradoxAt = s.c.timestamp; continue; }
+    if (!s.proc || paradoxAt === undefined || s.c.timestamp < 0) continue;
+    const paradox = paradoxAt;
+    paradoxAt = undefined;
+    const rest = steps.slice(i + 1);
+    const exit = rest.findIndex((n) => leaves.has(n.c.abilityId));
+    if (exit < 0 || rest.slice(0, exit).some((n) => n.c.abilityId === A.MANAFONT.id)) continue;
+    // Before 7.2 Astral Fire lasts 15s from its last refresh. Without this
+    // Fire III everything after it comes a GCD sooner; if the next refresh
+    // (or the swap to ice) still came more than 15s after the one before,
+    // the Firestarter kept Astral Fire up and was needed (pull 2 4:17.3:
+    // Paradox 4:01.4, Despair 4:19.4, 16s a GCD sooner).
+    const prevRefresh = [...steps.slice(0, i)].reverse().find((n) => AF_REFRESH.has(n.c.abilityId))?.c.timestamp ?? paradox;
+    const nextRefresh = rest.find((n, j) => j === exit || AF_REFRESH.has(n.c.abilityId))!.c.timestamp;
+    const gcdMs = ctx.baseGcdMs * ctx.factorAt(s.c.timestamp);
+    if (nextRefresh - gcdMs - prevRefresh > AF_PRE72_MS) continue;
+    const entry = rest.slice(exit).find((n) => n.c.abilityId === A.FIRE_III.id || n.state === "transposed");
+    if (!entry || entry.c.abilityId !== A.FIRE_III.id || entry.proc || entry.state !== "ice") continue;
+    if (ctx.dead.some((d) => d.startMs >= s.c.timestamp && d.startMs <= entry.c.timestamp)) continue;
+    const mid = hitOf(s.c), cold = hitOf(entry.c);
+    if (!mid || !cold) continue;
+    const coldMult = cold.multiplier && cold.multiplier > 0 ? cold.multiplier : 1;
+    const af1Base = transposedBase.length > 0
+      ? transposedBase.reduce((a, x) => a + x, 0) / transposedBase.length : baseValue(mid, critMult) * F3P_AF1_RATIO;
+    const af1 = af1Base * coldMult * roll;
+    const lost = Math.max(0, af1 + cycle - (mid.amount ?? 0) - (cold.amount ?? 0));
+    const during = forcedPart(s.c.timestamp - 1, s.c.timestamp + 1, ctx.forced);
+    const moving = inWindows(s.c.timestamp, ctx.movement ?? []);
+    out.push(finding(ctx, {
+      kind: "wrong-gcd", startMs: s.c.timestamp, endMs: s.c.timestamp, forced: during.ms > 0 || moving,
+      movement: moving || undefined, cause: during.ms > 0 ? during.cause : undefined, inference: true,
+      label: "Firestarter spent in Astral Fire",
+      lostDamage: lost,
+      basis: `${k(af1)} Fire III after Transpose (${transposedBase.length > 0 ? `her average, ${transposedBase.length} cast${transposedBase.length === 1 ? "" : "s"}` : "this one × 1.4 / 1.8"}) + ` +
+        `${k(cycle)} her average rotation GCD (the GCD the saved line spares) − ${k(mid.amount ?? 0)} this Fire III − ${k(cold.amount ?? 0)} the hardcast one`,
+      detail: `Firestarter Fire III after the phase's Paradox (${clock(paradox)}), so the ${clock(entry.c.timestamp)} swap back to fire was a hardcast Fire III from Umbral Ice`,
+    }));
+  }
+  return out;
+};
+
 // Synced: Thunder III before High Thunder (92), a 2-Polyglot cap before
 // Enhanced Polyglot II (98), no Paradox (90) or Flare Star (100).
 export const BLM_CHECKS: JobCheck[] = [fromLevel(92, highThunder), blmAoe, fromLevel(98, polyglot), leyLines,
-  fromLevel(100, blmWrongGcds), fromLevel(100, blmGaugeChecks)];
+  fromLevel(100, blmWrongGcds), fromLevel(100, blmGaugeChecks), fromLevel(90, firestarterPre72)];
 // xivanalysis MultiHitSkills.ts, each at the highest minimum any patch
 // uses (Tri-disaster 4 from 7.3, Painflare 4 in 7.2-7.4): the damage
 // comparison lets through the patches where fewer targets win.
