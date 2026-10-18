@@ -281,6 +281,13 @@ function Globule({ e, x, y, t }: EffectArtProps) {
 
 const TF_ICHOR = ring({ color: "#c0283a", glow: "#7a0f1c", motes: 4, spinMs: 2000 });
 
+// ── Ula'tek ──
+// An egg on its carrier (pale green), a Doomscale Egg (dark, bigger motes),
+// a Grasping Fangs tether (shadow purple).
+const ULA_EGG = ring({ color: "#cfe8a0", glow: "#6e9e2a", motes: 1, spinMs: 3000 });
+const ULA_DOOMEGG = ring({ color: "#8a6bd9", glow: "#3a1f8a", motes: 2, spinMs: 2400 });
+const ULA_FANGS = ring({ color: "#b07bff", glow: "#4a1f9e", motes: 2, spinMs: 1200 });
+
 // Shell Spin: Nama's target (sea green, three shells circling) and a stun (grey).
 const LE_SHELL = ring({ color: "#3fd6b0", glow: "#1a8f74", motes: 3, spinMs: 900 });
 const LE_STUN = ring({ color: "#d8d8d8", glow: "#7a7a7a", motes: 4, spinMs: 700 });
@@ -316,6 +323,9 @@ export const VA_ART: FightArt = {
     "va-sszorak-virulence": SSZ_VIRULENCE,
     "va-twin-fangs-globule": Globule,
     "va-twin-fangs-ichor": TF_ICHOR,
+    "va-ulatek-egg": ULA_EGG,
+    "va-ulatek-doomegg": ULA_DOOMEGG,
+    "va-ulatek-fangs": ULA_FANGS,
   },
   shapes: {
     "va-entombed-sentinels-pool": BloodPool,
@@ -347,5 +357,10 @@ export const VA_ART: FightArt = {
     "va-sszorak-wind-b": { fill: "#7fe0d0", flash: "#d0fff8", rim: "#e8fffb", glow: "#2fa597" },
     // Corrosive Spit: Vexhul's acid line.
     "va-twin-fangs-spit": { fill: "#8fe03a", flash: "#d8ff9a", rim: "#eaffc8", glow: "#4a9e1a" },
+    // Ula'tek: the Coils' spectral blue soak, the Caustic Waves' venom
+    // green, Volatile Purge's acid yellow.
+    "va-ulatek-coil": { fill: "#6fb8ff", flash: "#d0e8ff", rim: "#e8f4ff", glow: "#2f6fd9" },
+    "va-ulatek-wave": { fill: "#3fbf5a", flash: "#a6ffb0", rim: "#d8ffe0", glow: "#1a8f3a" },
+    "va-ulatek-purge": { fill: "#e0d43a", flash: "#fff59a", rim: "#fffbd0", glow: "#a89a00" },
   },
 };

@@ -377,3 +377,45 @@ VOD checks, Pull 2 (vRPGT4MN6VALQWFh fight 30):
 4. Pull 2, 0:59-1:05: three Feast bites. Check where each bite landed.
 5. Pull 2, 0:43-0:49 and after: Coiling Ichor rings, then Gore pools.
    Check the pool spots and how long they last.
+
+## Ula'tek
+
+Pull: Ula'tek kill, Pull 1 (A49h3gvBnRYHZQNX fight 48, 9:50).
+
+Drawn:
+- **Spectral Coils**: a blue 10y zone (the journal's) at each impact for
+  its 4s cast. Each impact is its own "Spectral Coil" actor placed by one
+  sample, so the spot is exact.
+- **Caustic Waves (stage 1)**: each wave is cast by its own Gore Rattle
+  instance at the arena's edge, placed and faced by that cast. A 10y-wide,
+  90y-long green lane along that facing is drawn for the ~2.4s cast. Width,
+  length and speed are guesses: the 1292403 "hits" are the wave's DoT
+  ticking 1/s on one player, so they can't place the path.
+- **Serpent's Bite**: an orange 7y helper circle on each of the 3 targets
+  from the bite until the helpers' Volatile Purge (13s in all three of the
+  kill's bites); then **Volatile Purge**: a yellow 7y blast circle on each
+  helper for its 5s.
+- **Mother's Wrath**: a tankbuster ring on its tank for the 5s cast.
+- Rings on egg carriers (Noxious Shell), Doomscale Egg carriers and
+  Grasping Fangs' tethered players.
+
+Not drawn: Circling Prey's doomed platform (its centre isn't logged),
+Ula'tek's and the purges' Caustic Waves, the Grasping Fangs tether lines,
+Toxic Incubation's shots, the eggs' hatch timers (the eggs themselves are
+drawn as adds when they have positions).
+
+Open questions:
+- The stage-1 Caustic Waves: their width and reach, and do they really go
+  along the casting segment's facing?
+- Which platform does Circling Prey take: the one Ula'tek faces, or where
+  her target stands?
+
+VOD checks, Pull 1 (A49h3gvBnRYHZQNX fight 48):
+1. Pull 1, 0:35-0:38: two Caustic Waves lanes from the east edge, heading
+   west and west-south-west. Check the waves' direction and width.
+2. Pull 1, 0:36-0:44: two Spectral Coil zones (0:40.5, 0:43.3). Check
+   their spots and size against the in-game circles.
+3. Pull 1, 0:56-1:00: two more lanes from the north edge. Check them.
+4. Pull 1, 6:42-6:56: Serpent's Bite circles on three players, cleared at
+   6:55.7; Volatile Purge circles until 7:00.8. Check the helpers and that
+   the purges spread out.
