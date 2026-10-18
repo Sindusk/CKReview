@@ -502,9 +502,9 @@ export function buildHeadMarkers(data: ReplayData, plainMs: number): HeadMarkerS
   const hits = data.enemyHits ?? [];
   const casts = data.enemyCasts ?? [];
   const HEAD_MARKERS: Record<number, HeadMarkerDef> = Object.assign({}, ...fightReplaysFor(data).map((f) => f.headMarkers ?? {}));
-  const soon = (at: number, t: number) => at > t && at - t <= HEAD_MARKER_LOOKAHEAD_MS;
   const spans = (data.headMarkers ?? []).map(([t, target, id]) => {
     const known = HEAD_MARKERS[id];
+    const soon = (at: number, t: number) => at > t && at - t <= (known?.lookaheadMs ?? HEAD_MARKER_LOOKAHEAD_MS);
     // The marked player takes the hit, or (Hallowed Ray's 525 sits on
     // Shiva herself) the marked enemy casts it.
     const at = known && (hits.find((h) => h[3] === target && soon(h[0], t) && known.abilities.includes(h[1]))?.[0]

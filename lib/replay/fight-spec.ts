@@ -71,8 +71,12 @@ export type Override = {
   puddleMs?: number;
 };
 
-/** A head marker's label, shown only when one of `abilities` then hits (or is cast by) the marked actor. */
-export type HeadMarkerDef = { label: string; abilities: number[] };
+/**
+ * A head marker's label, shown only when one of `abilities` then hits (or
+ * is cast by) the marked actor, within `lookaheadMs` (default 12s; TEA's
+ * Limit Cut #8 lands 25s after its marker).
+ */
+export type HeadMarkerDef = { label: string; abilities: number[]; lookaheadMs?: number };
 
 /** A head marker that puts `ability`'s circle on its player until it drops. */
 export type MarkerAoe = { ability: number; name: string };
