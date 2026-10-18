@@ -25,19 +25,30 @@ describe", fetch-only-what-you-need).
    Plague Froth and Plague Wave lanes from a per-boss table, room-wide
    labels. Checked in the app on the Vashnik kill at 0:15 (5 Froth
    circles), 0:18 (lanes), 0:41 (Bile soaks), 0:24 (Expulsion labels).
+   Done 2026-10-18 (/build-replay, every Venomous Abyss boss):
+   - Every boss has a spec (`lib/mechanics/wow/va/<boss>-replay.ts`) and
+     art in `components/replay-art/va.tsx`; what each draws and its VOD
+     checks are in [replay-reviews/va.md](replay-reviews/va.md).
+   - Cones: implicit target 104 draws a cone from the caster toward the
+     players hit, from its begincast; angle from the spec's override
+     (default 60).
+   - The fetch keeps every debuff on a player (not only the drawn ones),
+     so a boss spec can use any debuff without a refetch. Replays saved
+     earlier (the 19WyTrzgQRvdc4Z8 Vashnik kill) have only Plague Froth.
+   - WoW pulls draw fight `effects`; spec `overrides` apply `hidden`,
+     `style` and `soakers` to hit circles; `lib/replay/wow-helpers.ts`
+     has the readers specs share (debuff spans, casts with their begin,
+     impacts placed by hits, cast-target rings, last player in a pool).
+   - Many objects have no track of their own but ARE placed once by
+     their spawn cast's sample (Coiled Altar orbs, Twin Fangs' Barbed
+     Bulwarks, Ula'tek's Spectral Coils and wave casters): a spec draws
+     them from that sample until the event that ends them.
    Left:
-   - **Cones and lines.** 4 spells in the table use implicit target 104
-     (a cone); the angle isn't in SpellEffect (wago has no
-     SpellTargetingRestrictions table), so estimate it from hits as
-     action-shapes.ts does for FFXIV.
    - **Unsoaked impacts are invisible.** A circle is placed by the players
      it hit, so a missed Catalytic Bile (1282616, raid-wide penalty) or a
      dodged impact isn't drawn.
-   - **Other bosses' per-boss tables.** Only Vashnik has one
-     (`WOW_AURA_SHAPES`, `HIDDEN_HITS`). Each module header under
-     `lib/mechanics/wow/va/` says which debuffs are drawn around a player.
-     A new debuff there also needs a refetch of saved replays, since the
-     fetch asks for those debuffs only.
+   - **Cone angles and pool sizes** are guesses wherever the review file
+     says so; the VOD checks there settle them.
    - **A VOD check of placements**, with item 1.
 
    Licensing: db2 data are game facts; don't port GPL/AGPL code

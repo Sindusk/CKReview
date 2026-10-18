@@ -52,7 +52,10 @@
 // pickups within 2s at low health; double pickups within 1.5s were also
 // survived 47 times, so a double pickup alone isn't flagged. Barbed Bulwark
 // (NPC with absorb buff 1303378, 12-15 per Deluge) sits on the globules;
-// touching one hits 1307363.
+// touching one hits 1307363. (Replay, 2026-10-18, kill vRPGT4MN6VALQWFh
+// f30: each Bulwark actor's one sample is its globule's spot, and a pickup
+// shows as an Eternal Venom 1290336 "cast" from Vexhul on the collector,
+// 1.0-2.9y from a Bulwark spot for all 15 of the first Deluge.)
 //
 // Other IDs: Uncoiled Wrath is enemy buff 1308711 (not the journal's
 // 1308583; the kill's survivor had it 0.4s, A23's Vexhul 7s). A "Writhing
