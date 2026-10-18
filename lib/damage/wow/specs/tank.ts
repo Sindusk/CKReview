@@ -5,7 +5,7 @@
 // by WoWAnalyzer's spec modules (read, not copied: AGPL); every id and number
 // here is from our own logs (lib/damage/wow/spell-data.ts and the pulls
 // named below). Specs in the samples: Blood (15 players), Protection Paladin
-// (8), Brewmaster (9 player-pulls since its WoWAnalyzer audit pass), Vengeance (24 player-pulls since its
+// (42 player-pulls since its WoWAnalyzer audit pass), Brewmaster (9 player-pulls since its WoWAnalyzer audit pass), Vengeance (24 player-pulls since its
 // WoWAnalyzer audit pass), Guardian Druid (27 since its pass) and
 // Protection Warrior (23 since its pass).
 //
@@ -92,12 +92,28 @@
 //   Strike timing and Marrowrend use (15 vs 12 flagged) aren't damage.
 //
 // ── Protection Paladin ─────────────────────────────────────────────────
+// WoWAnalyzer audit phase 3, 2026-10-17 (docs/wowa-audit/paladin-protection.md;
+// specs/protpaladin.ts holds the models and every number, 42 player-pulls).
+// - Avenger's Shield held (protpaladin.ts): Grand Crusader (its reset,
+//   6.0s) ran out unpressed while other presses went out. Top players
+//   0–38k a pull, the weaker up to 508k (Ataxs LnNK1CxVJZQ9kfX3, 13).
+// - Sentinel and Divine Toll drift are valued now (both were worth 0 a
+//   use): Sentinel by its window's bonus (0.32–0.67M), Divine Toll by its
+//   shields and Divine Resonance's (0.08–0.15M); burstHold for Vashnik.
+//   Neither fires on a top player.
+// - Divine Purpose (223819, 12s) expires in procs.ts.
 // - Sentinel (389539, the Protection Avenging Wrath): GCDs in the window.
-//   Its bonus is read from the hits (observedWindowBonus).
+//   Its bonus is read from the hits (observedWindowBonus). Top 0–19k a
+//   pull, weak up to 69k.
 // - Holy Power is logged on spenders only (Shield of the Righteous at 5 of
 //   5 on 43 of 90 casts, nRGxQ1b8LdMvzC4D pull 6), which can't tell waste
-//   from pooling. Not judged. (WoWAnalyzer rates Thatapaddlin 7.0% and the
-//   99th-percentile Holyvi 3.7% wasted, both "perfect".)
+//   from pooling. Not judged: rebuilt from the snapshots (as Retribution)
+//   it reads 0–7% of generation, top as weak (Eluviell 286k, 难说 465k).
+//   (WoWAnalyzer rates Thatapaddlin 7.0% and the 99th-percentile Holyvi
+//   3.7% wasted, both "perfect".)
+// - Not judged: Hammer of Wrath in Sentinel (pressed at the same rate top
+//   and weak), Hammer of Light (two Templar players, no top one), Holy
+//   Armaments (its damage doesn't follow the presses).
 // - Checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3 (Thatapaddlin;
 //   reference VWMbYPRyxCAmhZFj fight 9's Holyvi, 99th percentile;
 //   2026-10-13): no new check. Sentinel 98%, Divine Toll 91%, defensives
@@ -133,6 +149,7 @@
 import type { JobCheck } from "../../types";
 import { burstGcdFindings, dotUptimeFindings, observedWindowBonus } from "./shared";
 import { BLOOD_SPEC_CHECKS } from "./blood";
+import { PROT_PALADIN_SPEC_CHECKS } from "./protpaladin";
 
 const DANCING_RUNE_WEAPON_BUFF = 81256;
 const BLOOD_PLAGUE = 55078;
@@ -163,4 +180,4 @@ const protPalSentinel: JobCheck = (ctx) => burstGcdFindings(ctx, {
 export { BREWMASTER_CHECKS } from "./brewmaster";
 export { PROT_WARRIOR_CHECKS } from "./protwarrior";
 export const BLOOD_CHECKS: JobCheck[] = [bloodDrw, bloodPlague, ...BLOOD_SPEC_CHECKS];
-export const PROT_PALADIN_CHECKS: JobCheck[] = [protPalSentinel];
+export const PROT_PALADIN_CHECKS: JobCheck[] = [protPalSentinel, ...PROT_PALADIN_SPEC_CHECKS];

@@ -25,6 +25,7 @@
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { TrackedCooldown } from "../types";
 import { avengingWrathValue, divineTollValue } from "./specs/retribution";
+import { protDivineTollValue, sentinelValue } from "./specs/protpaladin";
 import { pillarOfFrostValue } from "./specs/frostdk";
 import { dancingRuneWeaponValue } from "./specs/blood";
 import { sigilValue } from "./specs/vengeance";
@@ -94,9 +95,11 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
   ],
   "Protection Paladin": [
     // min 59.9s (51 casts), first use median 1.7s (8 players)
-    { name: "Sentinel", actionIds: [389539], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 3_000 },
+    { name: "Sentinel", actionIds: [389539], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 3_000,
+      valuePerUse: sentinelValue, burstHold: true },
     // min 60.0s (47 casts), first use median 8.5s (25 players across specs)
-    { name: "Divine Toll", actionIds: [375576], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 10_000 },
+    { name: "Divine Toll", actionIds: [375576], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 10_000,
+      valuePerUse: protDivineTollValue, burstHold: true },
   ],
   // Brewmaster (the WoWAnalyzer audit's phase 3, 2026-10-17; 9 player-pulls,
   // specs/brewmaster.ts has the numbers):

@@ -65,7 +65,14 @@
 // - Infernal Bolt 20s: 7 at D, all Fwîî (gVDPhzp61Zm29HMw), max 20.02s.
 // - Lock and Load 15s: 3 at D (2 reports), max 15.02s of 369.
 // - Divine Purpose 12s: 7 at D (2 reports), max 12.02s of 1441. Spent by
-//   Final Verdict or Divine Storm.
+//   Final Verdict or Divine Storm. Protection's is another id (223819,
+//   added in its phase 3, 2026-10-17): 12s too, 3 at D of 714 gains on 42
+//   Protection player-pulls (11.99–12.00s, all in forced time), every
+//   other one spent within 11.5s by Shield of the Righteous or Word of
+//   Glory. Holy Paladins carry the same id; their most-pressed listed
+//   consumer is Word of Glory, which deals nothing, so they're never
+//   flagged. Grand Crusader (85416, 6.0s, Avenger's Shield ready) is judged
+//   in specs/protpaladin.ts instead.
 // - Storm Unleashed 20s: 2 at D (gVDPhzp61Zm29HMw, v8bmgMAdcnBCj9Ya; three
 //   Enhancement players on the samples), max 20.02s of 78.
 // - Nightfall 12s (Affliction; added in its phase 3, 2026-10-17): 14 at D
@@ -249,6 +256,7 @@ export const WOW_MEASURED_PROCS = new Map<number, MeasuredProc>([
   [433891,  { durationMs: 20_000, consumerIds: [434506] }],                       // Infernal Bolt
   [194594,  { durationMs: 15_000, consumerIds: [19434] }],                        // Lock and Load → Aimed Shot
   [408458,  { durationMs: 12_000, consumerIds: [383328, 53385] }],                // Divine Purpose → Final Verdict, Divine Storm
+  [223819,  { durationMs: 12_000, consumerIds: [53600, 85673] }],                 // Divine Purpose (Protection) → Shield of the Righteous, Word of Glory
   [1262830, { durationMs: 20_000, consumerIds: [187874] }],                       // Storm Unleashed → Crash Lightning
   [264571,  { durationMs: 12_000, consumerIds: [686, 198590, 1261153] }],         // Nightfall → Shadow Bolt, Drain Soul, Malefic Grasp
   [93622,   { durationMs: 10_000, consumerIds: [33917] }],                        // Gore → Mangle

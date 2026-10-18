@@ -720,8 +720,13 @@ and delete them from the header.
     Proposed `wrong`: Ravager ticks (never pressed). Thunderlord
     `unverifiable`.
   - [paladin-protection.md](wowa-audit/paladin-protection.md): stale
-    (unmaintained), tank, 8; Avenger's Shield after a Grand Crusader
-    reset.
+    (unmaintained), tank. Phase 3 done 2026-10-17 (42 player-pulls).
+    Built (protpaladin.ts): Avenger's Shield held (Grand Crusader run
+    out; top 0–38k, weak up to 508k); Sentinel and Divine Toll drift
+    valued per use (were worth 0) with `burstHold`; Divine Purpose
+    expiry (procs.ts). Proposed `wrong`: Holy Power waste, Hammer of
+    Wrath window; proposed `no-damage`: Shield of the Righteous with no
+    hit. Hammer of Light left unbuilt (two Templar players, no top one).
 - [wow-sim-plan.md](wow-sim-plan.md): WoW simulation pipeline (talent
   effects, budget model, simc as a dev-only oracle). Four questions for
   the user before stage 0.
