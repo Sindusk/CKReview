@@ -34,6 +34,15 @@ or not started") has one line per job.
   2026-10-18; older ones need `fetch-ff-report.js <code> --fight N
   --refetch`.
 
+## Done 2026-10-18 (second session)
+
+All four candidates below are settled: Macrocosmos drift built (valued
+only from casts that hit 2+ enemies; level with Fall Malefic on one), the
+pre-7.2 Firestarter check built (4 on rFQT8XZckzvH1LNx), the raid-buff
+overwrite left a candidate with 0 on disk, BuffGroupWindow marked
+`covered`. No candidate in the ledgers now needs only an agent; what's
+left is in "Waiting on the user".
+
 ## Candidates available now (build these)
 
 Ordered by what needs only you. For each: premise check, value it as

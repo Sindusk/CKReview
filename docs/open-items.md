@@ -206,9 +206,10 @@ and delete them from the header.
   them: declared proc consumers (Primal Rend drops went unjudged), a GCD
   ending Viper's Poised, Kunai's Bane on an add, Infuriate's wasted
   refunds. Each ledger row says what matched and what wasn't adopted.
-  - [core.md](xiva-audit/core.md): core modules, 2 candidates (raid
-    buffs of one job overlapping, rare in a fixed static; Bard's
-    BuffGroupWindow); procs on an invulnerable target are
+  - [core.md](xiva-audit/core.md): core modules, 1 candidate (raid
+    buffs of one job overlapping: 0 on the 822 pulls on disk, no pull
+    has two of a raid-buff job; Bard's BuffGroupWindow covered by
+    `bardBuffMisaligned` 2026-10-18); procs on an invulnerable target are
     `noDamageCasts`'s (2026-10-16).
   - [brd.md](xiva-audit/brd.md): Bard, 0 candidates, 5 covered (a
     burst buff that never met the other two built 2026-10-18 from weak
@@ -222,8 +223,8 @@ and delete them from the header.
     2026-10-18 (`--refetch` for older ones). Partner swaps judged since
     2026-10-18 (late swap after a death, weaker swap partner); the 5s
     swap grace and the partner-choice threshold are unconfirmed.
-  - [pct.md](xiva-audit/pct.md): Pictomancer, 1 candidate
-    (Hyperphantasia, only lost at deaths on disk), 6 covered (portrait
+  - [pct.md](xiva-audit/pct.md): Pictomancer, 0 candidates, 7 covered
+    (Hyperphantasia covered 2026-10-16, only lost at deaths on disk) (portrait
     overwrites built 2026-10-16; Striking Muse not judged on 7.2).
   - [ast.md](xiva-audit/ast.md): Astrologian, 0 candidates, 5 covered
     (Macrocosmos drift built 2026-10-18, valued only from casts that hit

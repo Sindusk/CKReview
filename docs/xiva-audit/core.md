@@ -42,8 +42,8 @@ job, and whether it has fired on a real log, is in the job's ledger.
 | core/ActionWindow/allowed-gcds-only | covered | job checks (DNC Technical fillers and others) | a GCD not on the allowed list | Per-job lists. |
 | core/ActionWindow/limited-actions | covered | job checks | more of an action than allowed in a window | Per-job lists. |
 | core/ActionWindow/players-buffed | covered | buffs.ts coverage | a party buff that missed a player | Display only in xivanalysis (`suggest` returns nothing). The app values it. |
-| core/ActionWindow/raid-buff-overwrite | candidate | — | the same buff from two players of one job overlapping | A note column only, no suggestion. Rare in a fixed static. |
-| core/BuffGroupWindow/failed-overlap | candidate | — | one of a group's buffs ending before all of them overlapped | Only jobs that use BuffGroupWindow (Bard). See brd.md. |
+| core/ActionWindow/raid-buff-overwrite | candidate | — | the same buff from two players of one job overlapping | A note column only, no suggestion. Rare in a fixed static. Counted 2026-10-18 on all 822 FFXIV pulls on disk: no pull has two players of a raid-buff job (the only duplicated jobs are two Gunbreakers and two Dark Knights in L9BzKkD2nxcVgHTC Necron pulls 7-11), so 0 overlaps. Not built; the cost would be the second buff's value lost to the overlap (same-status party buffs don't stack). |
+| core/BuffGroupWindow/failed-overlap | covered | `bardBuffMisaligned` (brd.md, brd/BurstWindow/failed-overlap) | one of a group's buffs ending before all of them overlapped | Only Bard uses BuffGroupWindow; its row is the Bard one, built 2026-10-18. |
 
 ## Not rules (display only)
 
