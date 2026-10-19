@@ -59,6 +59,18 @@ function formatMs(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
+/** Where a CasterEffect moving along `path` is at `t` (fight-spec.ts). */
+function pathAt(path: { t: number; x: number; y: number }[], t: number): { x: number; y: number } {
+  if (t <= path[0].t) return path[0];
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1], b = path[i];
+    if (t > b.t) continue;
+    const f = b.t > a.t ? (t - a.t) / (b.t - a.t) : 1;
+    return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
+  }
+  return path[path.length - 1];
+}
+
 type Props = {
   pull:          Pull | null;
   data:          ReplayData | null;
@@ -350,7 +362,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
               if (!Art) return null;
               const follow = e.actor ? actorByKey.get(e.actor) : undefined;
               const p = follow && poseAt(follow, t);
-              const at = p && !p.stale ? p : e;
+              const at = p && !p.stale ? p : e.path ? pathAt(e.path, t) : e;
               const aimActor = e.aimAt ? actorByKey.get(e.aimAt) : undefined;
               const ap = aimActor && poseAt(aimActor, t);
               return <Art key={`${e.kind}-${e.start}-${e.x}-${e.y}-${e.actor ?? ""}`} e={e} x={toX(at.x)} y={toY(at.y)} t={t} scale={scale} cx={toX(cx)} cy={toY(cy)} actor={follow}

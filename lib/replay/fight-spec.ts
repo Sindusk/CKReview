@@ -115,6 +115,11 @@ export type CasterEffect = {
   // Points at this actor: the art gets its position as `aim` (a cone from
   // the boss that tracks its tank through the cast bar, WoW Ravage).
   aimAt?:  string;
+  // Moves along these points (ms from pull start, centi-yalms), straight
+  // between them, holding the first before it and the last after it: an
+  // object the log never tracks whose motion the spec models (WoW Tempest's
+  // tornadoes).
+  path?:   { t: number; x: number; y: number }[];
   x: number; y: number;         // else stays here (centi-yalms)
   start: number; end: number;   // ms from pull start
 };
