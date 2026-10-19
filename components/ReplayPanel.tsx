@@ -52,6 +52,7 @@ import { detectFFRoles } from "@/lib/mechanics/ffxiv/roles";
 import { getClassColor, getPlayerClassIcon, getPlayerSpecIcon, getRoleColor } from "@/lib/player-display";
 import { wowEnemyIconUrl } from "@/lib/replay/wow-replay";
 import { buildWowAoeShapes, buildWowRaidwide, wowRaidwideAt } from "@/lib/replay/wow-shapes";
+import { fightReplaysFor } from "@/lib/replay/fights";
 import type { PlayerInfo } from "@/types/PlayerInfo";
 
 function formatMs(ms: number): string {
@@ -228,6 +229,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   const view = useMemo(() => (data ? fitReplayView(data) : null), [data]);
   const aoes = useMemo(() => (!data ? [] : data.game === "wow" ? buildWowAoeShapes(data) : buildAoeShapes(data)), [data]);
   const raidwide = useMemo(() => (data?.game === "wow" ? buildWowRaidwide(data) : []), [data]);
+  const fightNotes = useMemo(() => (data ? fightReplaysFor(data).flatMap((f) => f.notes ?? []) : []), [data]);
   const tethers = useMemo(() => (data && data.game !== "wow" ? buildTethers(data) : []), [data]);
   const players = useMemo(() => new Map((pull?.players ?? []).map((p) => [p.name, p])), [pull]);
   const slotByName = useMemo(() => {
@@ -453,8 +455,15 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
           )}
         </svg>
 
-        {showAoes && raidwide.length > 0 && (
-          <div style={{ position: "absolute", top: 14, right: 14, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, pointerEvents: "none" }}>
+        {showAoes && (raidwide.length > 0 || fightNotes.length > 0) && (
+          <div style={{ position: "absolute", top: 14, right: 14, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, pointerEvents: "none", maxWidth: "45%" }}>
+            {/* The fight's standing limits (FightReplay.notes): what the log can't place. */}
+            {fightNotes.map((n) => (
+              <div key={n} style={{ background: "rgba(10,10,14,0.82)", border: "1px dashed #8a8f9a", borderRadius: 4, padding: "3px 8px", fontSize: 11, color: "#c4c8d0", fontStyle: "italic" }}
+                title="A limit of the log, not something missing from this replay">
+                ⓘ {n}
+              </div>
+            ))}
             {wowRaidwideAt(raidwide, t).slice(0, 3).map((r) => (
               <div key={`${r.t}-${r.name}`} style={{ background: "rgba(60,20,90,0.85)", border: "1px solid #b47bff", borderRadius: 4, padding: "3px 8px", fontSize: 12, color: "#f1e2ff", whiteSpace: "nowrap" }}
                 title="A room-wide hit">

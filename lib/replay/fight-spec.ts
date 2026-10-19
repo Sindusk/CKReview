@@ -150,4 +150,7 @@ export type FightReplay = {
   shapes?: (data: ReplayData) => AoeShape[];
   wowAuraShapes?: Record<number, WowAuraShape>;
   hiddenHits?: number[];
+  // Standing limits shown top right for the whole pull: a mechanic the log
+  // can't place, said outright so it doesn't look missing.
+  notes?: string[];
 };
