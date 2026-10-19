@@ -456,10 +456,10 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
         </svg>
 
         {showAoes && (raidwide.length > 0 || fightNotes.length > 0) && (
-          <div style={{ position: "absolute", top: 14, right: 14, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, pointerEvents: "none", maxWidth: "45%" }}>
+          <div style={{ position: "absolute", top: 14, right: 14, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, pointerEvents: "none" }}>
             {/* The fight's standing limits (FightReplay.notes): what the log can't place. */}
             {fightNotes.map((n) => (
-              <div key={n} style={{ background: "rgba(10,10,14,0.82)", border: "1px dashed #8a8f9a", borderRadius: 4, padding: "3px 8px", fontSize: 11, color: "#c4c8d0", fontStyle: "italic" }}
+              <div key={n} style={{ background: "rgba(10,10,14,0.82)", border: "1px dashed #8a8f9a", borderRadius: 4, padding: "3px 8px", fontSize: 11, color: "#c4c8d0", fontStyle: "italic", whiteSpace: "nowrap" }}
                 title="A limit of the log, not something missing from this replay">
                 ⓘ {n}
               </div>
