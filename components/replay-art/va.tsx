@@ -538,7 +538,6 @@ export const VA_ART: FightArt = {
     "va-lost-explorers-aftershock": pool("#6b4a2a", "#c99a5e"),
     "va-nekzali-cultist": pool("#3a1f5e", "#9b6bff"),
     "va-nymrissa-frost": pool("#7fc8f0", "#e8f8ff"),
-    "va-sszorak-residue": pool("#4a6b12", "#a8d43a"),
     "va-twin-fangs-gore": pool("#5e0d16", "#b0283a"),
   },
   colors: {

@@ -14,7 +14,7 @@ import type { AoeShape } from "@/lib/replay/action-shapes";
 import type { CasterEffect, FightReplay } from "@/lib/replay/fight-spec";
 import { poseAt, sampleNear, type ReplayData } from "@/lib/replay/ffxiv-replay";
 import { facingToCompassBearing } from "@/lib/mechanics/geometry";
-import { actorMap, wowAuraSpans, wowCasts, wowLastAuraNear, wowShape } from "@/lib/replay/wow-helpers";
+import { actorMap, wowAuraSpans, wowCasts, wowShape } from "@/lib/replay/wow-helpers";
 
 const MUTILATE_BEGIN = 1277027, MUTILATE = 1277031, MUTILATE_HIT = 1285999;
 const MUTILATE_RANGE = 2500;        // the tank cones' length (tankCones)
@@ -29,7 +29,7 @@ const CROSSWINDS_A = [1297096, 1297111];   // pairs that clear each other's Gust
 const CROSSWINDS_B = [1285425, 1285453];
 const TEMPEST = 1287083;            // direct hit: debuff on the player
 const TEMPEST_CAST = 1287072;       // the 3.5s channel
-const CLAWS = 1305998, RESIDUE = 1296667;
+const CLAWS = 1305998;              // Caustic Claws' impact (not drawn: CLAWS_NOTE)
 
 /** A cast whose begincast and resolve carry different ids: its begin, resolve and target. */
 function pairedCasts(data: ReplayData, beginId: number, resolveId: number) {
@@ -237,26 +237,25 @@ function tornadoes(data: ReplayData): CasterEffect[] {
   });
 }
 
-/** Caustic Claws' impact, then its Caustic Residue pool until the last player stepped in it. */
-function residue(data: ReplayData): AoeShape[] {
-  const actors = actorMap(data);
-  return (data.enemyHits ?? []).filter((h) => h[1] === CLAWS).flatMap((h) => {
-    const a = actors.get(h[3]);
-    const p = h[6] !== null && h[7] !== null ? { x: h[6], y: h[7] } : a && poseAt(a, h[0]);
-    if (!p) return [];
-    const last = wowLastAuraNear(data, [RESIDUE], p, h[0], 6, 90000);
-    return [wowShape({ kind: "circle", x: p.x, y: p.y, range: 600, name: "Caustic Residue", start: h[0],
-      resolve: Math.max(h[0] + 5000, (last ?? 0) + 1000), style: "va-sszorak-residue", noFlash: true })];
-  });
-}
+// Caustic Claws' bombs and their Caustic Residue puddles are NOT drawn (user,
+// 2026-10-19): the log has no cast, target or marker for them (a raw query
+// of every non-player event 0:28-0:40 of dqKJB9rgXpRPyVTj fight 7 shows only
+// Sszorak's Venomous Surge buff, 0:29.0-0:33.0, and one Claws hit). The
+// puddles aren't where players stood when the indicators showed (112 spots
+// in two kills: median 6y from the nearest player at +1s/+4s, the same as
+// at random times) nor in a pattern around the boss, so only puddles someone
+// touched could be placed (3 of ~16 in the first volley pair). The panel
+// says so instead (notes).
+const CLAWS_NOTE = "Cannot determine bomb puddle drop locations";
 
 export const SSZORAK_REPLAY: FightReplay = {
   key: "va-sszorak",
   game: "wow",
   name: "Sszorak",
   signature: [MUTILATE_BEGIN, SURGE, FURY_MARK],
-  hiddenHits: [MUTILATE_HIT],
-  shapes: (data) => [...fury(data), ...crosswinds(data), ...residue(data)],
+  hiddenHits: [MUTILATE_HIT, CLAWS],
+  notes: [CLAWS_NOTE],
+  shapes: (data) => [...fury(data), ...crosswinds(data)],
   effects: (data) => [...tankCones(data), ...furyMarks(data), ...cystEffects(data), ...carriers(data), ...virulence(data), ...virulenceFails(data),
     ...tornadoes(data), ...tempestHits(data), ...crosswindArrows(data)],
 };
