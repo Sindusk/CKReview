@@ -43,7 +43,8 @@ import { ffMapImageUrl, fitReplayView, mapImageBounds, poseAt, type ReplayActor,
 import { aoesAt, buildAoeShapes, buildHeadMarkers, buildTethers, tetherEndAt, type AoeShape } from "@/lib/replay/action-shapes";
 import { getFFAbilityIconUrl } from "@/lib/ability-icons";
 import { buildCasterEffects, JAIL_STATUSES, SLIDE_STATUSES } from "@/lib/replay/ffxiv-effects";
-import { ElementTether, JailCage } from "@/components/ReplayEffects";
+import { ElementTether, JailCage, rand } from "@/components/ReplayEffects";
+import type { CasterEffect } from "@/lib/replay/fight-spec";
 import { EFFECT_ART, EXTRA_COLORS, SHAPE_ART, TETHER_ART } from "@/components/replay-art";
 import { BOSS_ICON, type AoeColors } from "@/components/replay-art/types";
 import { sampleNear } from "@/lib/replay/ffxiv-replay";
@@ -239,6 +240,11 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   }, [pull]);
   const actorByKey = useMemo(() => new Map((data?.actors ?? []).map((a) => [a.key, a])), [data]);
   const casterEffects = useMemo(() => (data ? buildCasterEffects(data) : []), [data]);
+  const shakesByActor = useMemo(() => {
+    const m = new Map<string, CasterEffect[]>();
+    for (const e of casterEffects) if (e.shake && e.actor) (m.get(e.actor) ?? m.set(e.actor, []).get(e.actor)!).push(e);
+    return m;
+  }, [casterEffects]);
   const headMarkers = useMemo(() => (data && data.game !== "wow" ? buildHeadMarkers(data, HEAD_MARKER_PLAIN_MS) : []), [data]);
   const aurasByKey = useMemo(() => {
     const m = new Map<string, NonNullable<ReplayData["playerAuras"]>>();
@@ -411,8 +417,13 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             const jail = !dead ? (aurasByKey.get(a.key) ?? []).find((s) => JAIL_STATUSES.has(s[3]) && s[0] <= t && t < s[1]) : undefined;
             const lift = jail ? Math.min(1, (t - jail[0]) / 400) * 12 * iconScale : 0;
             const iy = y - lift;
+            // Struck (CasterEffect.shake): the icon jolts for the effect's span, settling out.
+            const jolt = (shakesByActor.get(a.key) ?? []).find((e) => t >= e.start && t <= e.end);
+            const amp = jolt ? 5 * iconScale * (1 - (t - jolt.start) / Math.max(1, jolt.end - jolt.start)) : 0;
+            const step = Math.floor(t / 40);
+            const shake = amp ? `translate(${(rand(step * 1.7 + 0.3) - 0.5) * 2 * amp} ${(rand(step * 2.9 + 0.7) - 0.5) * 2 * amp})` : undefined;
             return (
-              <g key={a.key} style={{ cursor: "pointer" }} opacity={dead ? 0.5 : p.stale ? 0.75 : 1}
+              <g key={a.key} style={{ cursor: "pointer" }} opacity={dead ? 0.5 : p.stale ? 0.75 : 1} transform={shake}
                 onMouseEnter={() => setHoverKey(a.key)} onMouseLeave={() => setHoverKey((k) => (k === a.key ? null : k))}
                 onClick={(e) => { e.stopPropagation(); setSelectedKey(a.key); }}>
                 {selectedKey === a.key && <TargetRing x={x} y={y} r={Math.max(r + 10, (a.hitbox ?? 50) * scale)} deg={deg} />}
