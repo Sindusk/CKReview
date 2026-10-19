@@ -338,6 +338,19 @@ function virulenceCross(offset: number) {
   };
 }
 
+/** Serpent's Fury's mark: a red-orange fang badge above its holder's icon. */
+function FuryMark({ e, x, y, t }: EffectArtProps) {
+  const opacity = Math.max(0, Math.min(1, (t - e.start) / FADE_MS, (e.end - t) / 150));
+  if (opacity <= 0) return null;
+  const by = y - 34;
+  return (
+    <g opacity={opacity} pointerEvents="none">
+      <circle cx={x} cy={by} r={11} fill="#b8260f" stroke="#ffb04a" strokeWidth={2} filter="url(#replay-glow)" />
+      <path d={`M${x - 5} ${by - 5} L${x - 2} ${by + 6} L${x} ${by - 2} L${x + 2} ${by + 6} L${x + 5} ${by - 5} Z`} fill="#fff4e0" />
+    </g>
+  );
+}
+
 /** A player a Virulence burst hit: a green X flashing over their icon for 2s. */
 function VirulenceFail({ e, x, y, t }: EffectArtProps) {
   const age = t - e.start;
@@ -439,6 +452,7 @@ export const VA_ART: FightArt = {
     "va-sszorak-virulence-plus": virulenceCross(0),
     "va-sszorak-virulence-x": virulenceCross(45),
     "va-sszorak-virulence-fail": VirulenceFail,
+    "va-sszorak-fury": FuryMark,
     "va-sszorak-whirl": Whirl,
     // Tank cones (sszorak-replay.ts tankCones): Ravage white, Mutilate green.
     "va-sszorak-ravage": tankCone(50, "#f4f8ff", "#ffffff"),

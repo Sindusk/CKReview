@@ -54,10 +54,24 @@ function tankCones(data: ReplayData): CasterEffect[] {
   return [...cone(RAVAGE_BEGIN, RAVAGE, "va-sszorak-ravage", "Ravage"), ...cone(MUTILATE_BEGIN, MUTILATE, "va-sszorak-mutilate", "Mutilate")];
 }
 
-/** Serpent's Fury: the 8y stack circle on the mark until the charge. */
+/**
+ * Serpent's Fury: a mark icon on its holder for the whole debuff, and the
+ * 8y stack circle only for the last FURY_STACK_MS before the charge. The
+ * mark sits on one player 40-70s at a time and goes back on ~6s after each
+ * charge (kill dqKJB9rgXpRPyVTj fight 7: the same player all fight), so a
+ * circle for the whole span covered them all fight (user, 2026-10-19).
+ */
+const FURY_STACK_MS = 8000;
 function fury(data: ReplayData): AoeShape[] {
   return wowAuraSpans(data, [FURY_MARK]).map((s) =>
-    wowShape({ kind: "circle", x: 0, y: 0, range: 800, name: "Serpent's Fury", start: s.start, resolve: s.end, follow: s.target, style: "stack" }));
+    wowShape({ kind: "circle", x: 0, y: 0, range: 800, name: "Serpent's Fury", start: Math.max(s.start, s.end - FURY_STACK_MS), resolve: s.end,
+      follow: s.target, style: "stack" }));
+}
+
+function furyMarks(data: ReplayData): CasterEffect[] {
+  return wowAuraSpans(data, [FURY_MARK]).map((s) => ({
+    kind: "va-sszorak-fury", label: "Serpent's Fury", actor: s.target, x: 0, y: 0, start: s.start, end: s.end,
+  }));
 }
 
 // Each Crosswinds aura throws its holder one fixed way (map bearing, 0 =
@@ -225,6 +239,6 @@ export const SSZORAK_REPLAY: FightReplay = {
   signature: [MUTILATE_BEGIN, SURGE, FURY_MARK],
   hiddenHits: [MUTILATE_HIT],
   shapes: (data) => [...fury(data), ...crosswinds(data), ...residue(data)],
-  effects: (data) => [...tankCones(data), ...cystEffects(data), ...carriers(data), ...virulence(data), ...virulenceFails(data),
+  effects: (data) => [...tankCones(data), ...furyMarks(data), ...cystEffects(data), ...carriers(data), ...virulence(data), ...virulenceFails(data),
     ...tornadoes(data), ...tempestHits(data), ...crosswindArrows(data)],
 };
