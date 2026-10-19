@@ -313,8 +313,11 @@ function tankCone(angle: number, fill: string, rim: string) {
 
 /**
  * Virulence on its carrier: four venom lines `e.radius` long through them,
- * a + or an X fixed to the map as in game (user's VOD, 0:27), with a bright
- * flash as it bursts at the aura's end (the spec ends the effect 0.4s after).
+ * a + or an X fixed to the map as in game (user's VOD, 0:27). Each arm is
+ * a solid venom spike, wide at the player and pointed at its 15y tip with
+ * a dark outline, its fill stepping between dark and light green (never
+ * faint: any paused frame reads, user 2026-10-19), white-hot as it bursts
+ * at the aura's end (the spec ends the effect 0.4s after).
  */
 function virulenceCross(offset: number) {
   return function VirulenceCross({ e, x, y, t, scale }: EffectArtProps) {
@@ -323,16 +326,23 @@ function virulenceCross(offset: number) {
     if (opacity <= 0) return null;
     const len = (e.radius ?? 1500) * scale;
     const burst = t >= burstAt;
-    const pulse = 0.55 + 0.25 * Math.sin(t / 140);
+    const light = Math.floor((t - e.start) / 350) % 2 === 1;
+    const fill = burst ? "#f4ffc8" : light ? "#b8ff4a" : "#2f9e1a";
+    const core = burst ? "#ffffff" : light ? "#efffc0" : "#8fe03a";
+    const w = burst ? 9 : 6;   // half-width at the player, SVG units
+    // One arm pointing up from the player: a tapered spike with a diamond tip.
+    const arm = `M${x - w} ${y - 10} L${x - 1.5} ${y - len + 8} L${x} ${y - len - 4} L${x + 1.5} ${y - len + 8} L${x + w} ${y - 10} Z`;
     return (
       <g opacity={opacity} pointerEvents="none" transform={`rotate(${offset} ${x} ${y})`}>
-        {[0, 90].map((a) => (
+        {[0, 90, 180, 270].map((a) => (
           <g key={a} transform={`rotate(${a} ${x} ${y})`}>
-            <line x1={x} y1={y - len} x2={x} y2={y + len} stroke="#c8ff2a" strokeWidth={burst ? 16 : 9} strokeOpacity={burst ? 0.5 : 0.18} filter="url(#replay-glow)" />
-            <line x1={x} y1={y - len} x2={x} y2={y + len} stroke={burst ? "#f4ffb0" : "#b8f02a"} strokeWidth={burst ? 4 : 2} strokeOpacity={burst ? 1 : pulse} strokeDasharray={burst ? undefined : "10 6"} />
+            {burst && <path d={arm} fill="#c8ff2a" opacity={0.6} filter="url(#replay-glow)" />}
+            <path d={arm} fill={fill} stroke="#0b2406" strokeWidth={2} strokeLinejoin="round" />
+            <line x1={x} y1={y - 12} x2={x} y2={y - len + 6} stroke={core} strokeWidth={1.2} />
           </g>
         ))}
-        <circle cx={x} cy={y} r={7} fill="#c8ff2a" fillOpacity={0.8} />
+        <circle cx={x} cy={y} r={9} fill="none" stroke="#0b2406" strokeWidth={4} />
+        <circle cx={x} cy={y} r={9} fill="none" stroke={fill} strokeWidth={2} />
       </g>
     );
   };
@@ -370,18 +380,16 @@ function VirulenceFail({ e, x, y, t }: EffectArtProps) {
 
 /**
  * A Tempest tornado on its modelled path (sszorak-replay.ts tornadoes): a
- * green funnel, solid while it forms around Sszorak and launches, fading to
- * faint once it has been out ~6s, since its later path is a model.
+ * green funnel at one strength for its whole life (user, 2026-10-19: a
+ * fade made the late ones too hard to see), fading only as it ends.
  */
 function Whirl({ e, x, y, t, scale }: EffectArtProps) {
-  const launch = e.path?.[0].t ?? e.start;
   const opacity = Math.max(0, Math.min(1, (t - e.start) / 400, (e.end - t) / 1500));
   if (opacity <= 0) return null;
-  const faint = t < launch + 6000 ? 1 : Math.max(0.35, 1 - (t - launch - 6000) / 6000);
   const r = Math.max(9, 250 * scale);
   const a = (t / 2.5) % 360;
   return (
-    <g opacity={opacity * faint} pointerEvents="none">
+    <g opacity={opacity} pointerEvents="none">
       <circle cx={x} cy={y} r={r} fill="#5fd13a" fillOpacity={0.18} stroke="#9fe86a" strokeWidth={1.5} strokeOpacity={0.6} />
       <g transform={`rotate(${a} ${x} ${y})`}>
         {[0.9, 0.62, 0.34].map((f, i) => (
