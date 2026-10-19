@@ -182,14 +182,16 @@ function tempestHits(data: ReplayData): CasterEffect[] {
  * VOD) they form around Sszorak during the 3.5s channel, hold still, and at
  * the cast's end go straight out from him, bouncing off the arena's edge
  * for most of the phase. Here: TORNADOES on a 10y ring (the first hits at
- * +0.6-1.0s were 8-12y from him), the first at his facing, 2y/s (hits 20-35y
- * out 8-14s later), reflecting off a 50y circle (players' farthest samples
+ * +0.6-1.0s were 8-12y from him), the first at his facing, 7y/s (user's
+ * VOD stills at 0:23.6 / 0:26 / 0:29 after the 0:20.5 launch: the farthest
+ * ~36y out at +3.1s and ~50y at +5.5s, scaled by Virulence's 15y lines;
+ * 2y/s was too slow, user 2026-10-19), reflecting off a 50y circle (players' farthest samples
  * per 15° sector: 40-62y, most 48-56), for 40s (the latest hits came at
  * +36s). A fit of count, speed and angle to the 65 first hits in both kills
  * found nothing clearly better than chance, so the paths after launch are
  * a picture of the mechanic, not where each tornado was.
  */
-const TORNADOES = 8, TORNADO_RING = 1000, TORNADO_SPEED = 200 /* centi-yards a second */, TORNADO_LIFE_MS = 40000;
+const TORNADOES = 8, TORNADO_RING = 1000, TORNADO_SPEED = 700 /* centi-yards a second */, TORNADO_LIFE_MS = 40000;
 const ARENA = { x: -40650, y: -38680, r: 5000 };
 function tornadoes(data: ReplayData): CasterEffect[] {
   const actors = actorMap(data);
