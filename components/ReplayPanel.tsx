@@ -351,7 +351,10 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
               const follow = e.actor ? actorByKey.get(e.actor) : undefined;
               const p = follow && poseAt(follow, t);
               const at = p && !p.stale ? p : e;
-              return <Art key={`${e.kind}-${e.start}-${e.x}-${e.y}-${e.actor ?? ""}`} e={e} x={toX(at.x)} y={toY(at.y)} t={t} scale={scale} cx={toX(cx)} cy={toY(cy)} actor={follow} />;
+              const aimActor = e.aimAt ? actorByKey.get(e.aimAt) : undefined;
+              const ap = aimActor && poseAt(aimActor, t);
+              return <Art key={`${e.kind}-${e.start}-${e.x}-${e.y}-${e.actor ?? ""}`} e={e} x={toX(at.x)} y={toY(at.y)} t={t} scale={scale} cx={toX(cx)} cy={toY(cy)} actor={follow}
+                aim={ap ? { x: toX(ap.x), y: toY(ap.y) } : undefined} />;
             })}
           </g>
           <text x={S / 2} y={24} textAnchor="middle" fill="#fff" fontSize={20} fontWeight={700} {...LABEL}>N</text>

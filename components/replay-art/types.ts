@@ -22,8 +22,14 @@ import type { ReplayActor } from "@/lib/replay/ffxiv-replay";
 
 export type AoeColors = { fill: string; flash: string; rim: string; glow: string };
 
-/** `x, y`: where the effect is now (its actor while tracked, else its spot); `cx, cy`: the arena centre. */
-export type EffectArtProps = { e: CasterEffect; x: number; y: number; t: number; scale: number; cx: number; cy: number; actor?: ReplayActor };
+/**
+ * `x, y`: where the effect is now (its actor while tracked, else its spot); `cx, cy`: the arena centre;
+ * `aim`: where its `aimAt` actor is now, when tracked.
+ */
+export type EffectArtProps = {
+  e: CasterEffect; x: number; y: number; t: number; scale: number; cx: number; cy: number; actor?: ReplayActor;
+  aim?: { x: number; y: number };
+};
 
 /** `x, y` origin and `r` range in SVG units; `marked`: a line stack's marked player or group. */
 export type ShapeArtProps = {

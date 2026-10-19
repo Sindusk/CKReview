@@ -112,6 +112,9 @@ export type CasterEffect = {
   radius?: number;              // centi-yalms, for art that has a size (halos, floors)
   label:   string;              // what it means, under the boss
   actor?:  string;              // follows this actor while it has samples
+  // Points at this actor: the art gets its position as `aim` (a cone from
+  // the boss that tracks its tank through the cast bar, WoW Ravage).
+  aimAt?:  string;
   x: number; y: number;         // else stays here (centi-yalms)
   start: number; end: number;   // ms from pull start
 };
