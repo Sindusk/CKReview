@@ -402,6 +402,49 @@ function virulenceCross(offset: number) {
   };
 }
 
+/**
+ * A player struck by a tank hit (the spec also jolts their icon): Ravage
+ * rakes three white claw slashes across them, Mutilate bursts a green
+ * splash ring with droplets. Both flash in and fade over the effect.
+ */
+function struckArt(kind: "claw" | "splash") {
+  return function Struck({ e, x, y, t }: EffectArtProps) {
+    const f = (t - e.start) / Math.max(1, e.end - e.start);
+    if (f < 0 || f > 1) return null;
+    const o = 1 - f * f;
+    if (kind === "claw") {
+      const draw = Math.min(1, f * 4);   // the slashes rake across in the first quarter
+      return (
+        <g opacity={o} pointerEvents="none">
+          <circle cx={x} cy={y} r={26 + 14 * f} fill="#ffffff" fillOpacity={0.3 * (1 - f)} stroke="#ffffff" strokeWidth={2} strokeOpacity={1 - f} />
+          {/* Longer than the icon (34 units), which is drawn over them. */}
+          {[-13, 0, 13].map((dx, i) => {
+            const x0 = x + dx - 22, y0 = y - 30, x1 = x + dx + 22, y1 = y + 30;
+            return (
+              <g key={i}>
+                <line x1={x0} y1={y0} x2={x0 + (x1 - x0) * draw} y2={y0 + (y1 - y0) * draw} stroke="#3a0a0a" strokeWidth={6} strokeLinecap="round" />
+                <line x1={x0} y1={y0} x2={x0 + (x1 - x0) * draw} y2={y0 + (y1 - y0) * draw} stroke="#ffd0d0" strokeWidth={8} strokeOpacity={0.4} strokeLinecap="round" filter="url(#replay-glow)" />
+                <line x1={x0} y1={y0} x2={x0 + (x1 - x0) * draw} y2={y0 + (y1 - y0) * draw} stroke="#ffffff" strokeWidth={3} strokeLinecap="round" />
+              </g>
+            );
+          })}
+        </g>
+      );
+    }
+    const r = 20 + 20 * Math.sqrt(f);
+    return (
+      <g opacity={o} pointerEvents="none">
+        <circle cx={x} cy={y} r={r} fill="#6fe03a" fillOpacity={0.22 * (1 - f)} stroke="#c8ff8a" strokeWidth={3 * (1 - f) + 1} filter="url(#replay-glow)" />
+        {Array.from({ length: 6 }, (_, k) => {
+          const a = (k / 6) * Math.PI * 2 + rand(e.start + k) * 0.6;
+          const d = 10 + 22 * f;
+          return <circle key={k} cx={x + Math.sin(a) * d} cy={y - Math.cos(a) * d} r={3.2 * (1 - f) + 1} fill="#9cff3a" stroke="#1f4a0a" strokeWidth={1} />;
+        })}
+      </g>
+    );
+  };
+}
+
 /** Serpent's Fury's mark: a red-orange fang badge above its holder's icon. */
 function FuryMark({ e, x, y, t }: EffectArtProps) {
   const opacity = Math.max(0, Math.min(1, (t - e.start) / FADE_MS, (e.end - t) / 150));
@@ -516,6 +559,8 @@ export const VA_ART: FightArt = {
     "va-sszorak-virulence-x": virulenceCross(45),
     "va-sszorak-virulence-fail": VirulenceFail,
     "va-sszorak-fury": FuryMark,
+    "va-sszorak-ravage-hit": struckArt("claw"),
+    "va-sszorak-mutilate-hit": struckArt("splash"),
     "va-sszorak-whirl": Whirl,
     // Tank cones (sszorak-replay.ts tankCones): Ravage white, Mutilate green.
     "va-sszorak-ravage": tankCone(50, "#f4f8ff", "#ffffff"),

@@ -55,6 +55,18 @@ function tankCones(data: ReplayData): CasterEffect[] {
 }
 
 /**
+ * Each player Ravage (1277101) or Mutilate (1285999) hit: a burst on them
+ * and a jolt of their icon for 450ms, so the hit lands (user, 2026-10-19).
+ */
+const STRUCK_MS = 450;
+function struck(data: ReplayData): CasterEffect[] {
+  return (data.enemyHits ?? []).filter((h) => h[1] === RAVAGE || h[1] === MUTILATE_HIT).map((h) => ({
+    kind: h[1] === RAVAGE ? "va-sszorak-ravage-hit" : "va-sszorak-mutilate-hit", label: h[1] === RAVAGE ? "Ravage" : "Mutilate",
+    actor: h[3], x: h[6] ?? 0, y: h[7] ?? 0, start: h[0], end: h[0] + STRUCK_MS, shake: true,
+  }));
+}
+
+/**
  * Serpent's Fury: a mark icon on its holder for the whole debuff, and the
  * 8y stack circle only for the last FURY_STACK_MS before the charge. The
  * mark sits on one player 40-70s at a time and goes back on ~6s after each
@@ -256,6 +268,6 @@ export const SSZORAK_REPLAY: FightReplay = {
   hiddenHits: [MUTILATE_HIT, CLAWS],
   notes: [CLAWS_NOTE],
   shapes: (data) => [...fury(data), ...crosswinds(data)],
-  effects: (data) => [...tankCones(data), ...furyMarks(data), ...cystEffects(data), ...carriers(data), ...virulence(data), ...virulenceFails(data),
+  effects: (data) => [...tankCones(data), ...struck(data), ...furyMarks(data), ...cystEffects(data), ...carriers(data), ...virulence(data), ...virulenceFails(data),
     ...tornadoes(data), ...tempestHits(data), ...crosswindArrows(data)],
 };
