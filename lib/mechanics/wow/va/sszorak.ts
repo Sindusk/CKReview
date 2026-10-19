@@ -31,6 +31,14 @@
 // 4-16 players within 8yd of the mark (samples are 1-2s stale), so this is
 // a player-less Raid error.
 //
+// Virulence's burst is four 15y lines through the carrier, a + for 1297707
+// and an X for 1299899, fixed to the map (user's VOD of dqKJB9rgXpRPyVTj
+// fight 7 at 0:27; the angles and length measured from where players
+// spread, 2026-10-19). In game, Ravage shows a white cone and Mutilate a
+// green one from the boss tracking the tank for the cast bar; Tempest's
+// tornadoes form around the boss during the 3.5s channel, then go straight
+// out and bounce off the arena's edge (same VOD).
+//
 // Virulence (5s): expiry OR death bursts on players within ~10yd who no
 // longer hold that same Virulence ID, re-infecting them (1300089, 350-700k)
 // ~10-60ms after the spreader's removal. 78 reinfections in 36 pulls,

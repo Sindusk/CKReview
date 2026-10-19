@@ -13,19 +13,22 @@
 import type { AoeShape } from "@/lib/replay/action-shapes";
 import type { CasterEffect, FightReplay } from "@/lib/replay/fight-spec";
 import { poseAt, sampleNear, type ReplayData } from "@/lib/replay/ffxiv-replay";
+import { facingToCompassBearing } from "@/lib/mechanics/geometry";
 import { actorMap, wowAuraSpans, wowCasts, wowLastAuraNear, wowShape } from "@/lib/replay/wow-helpers";
 
 const MUTILATE_BEGIN = 1277027, MUTILATE = 1277031, MUTILATE_HIT = 1285999;
-const MUTILATE_ANGLE = 70;          // kill: all 96 soaker hits within 36° of the boss->tank line, 5-25y out
-const MUTILATE_RANGE = 2500;
+const MUTILATE_RANGE = 2500;        // the tank cones' length (tankCones)
 const RAVAGE_BEGIN = 1277002, RAVAGE = 1277101;
 const FURY_MARK = 1305621;          // Serpent's Fury: stack 14 within 8y of the mark
 const VIRULENCE = [1297707, 1299899];
+const VIRULENCE_BURST = 1300089;    // a burst's hit on another player (re-infects them)
+const VIRULENCE_LINE = 1500;        // each burst line's length, centi-yards
 const SURGE = 1305963;              // 10s; a Viscous Cyst where it ends
 const CYST_POP = 1287205;           // a pop puts this on every living player at once
 const CROSSWINDS_A = [1297096, 1297111];   // pairs that clear each other's Gusts (header)
 const CROSSWINDS_B = [1285425, 1285453];
 const TEMPEST = 1287083;            // direct hit: debuff on the player
+const TEMPEST_CAST = 1287072;       // the 3.5s channel
 const CLAWS = 1305998, RESIDUE = 1296667;
 
 /** A cast whose begincast and resolve carry different ids: its begin, resolve and target. */
@@ -34,24 +37,21 @@ function pairedCasts(data: ReplayData, beginId: number, resolveId: number) {
   return wowCasts(data, [resolveId]).map((c) => ({ ...c, begin: begins.find((b) => Math.abs(b.t - c.t) < 300)?.begin }));
 }
 
-/** Mutilate: the soak cone from Sszorak to the tank for its 3s cast. */
-function mutilate(data: ReplayData): AoeShape[] {
-  const actors = actorMap(data);
-  return pairedCasts(data, MUTILATE_BEGIN, MUTILATE).flatMap((c) => {
-    const boss = actors.get(c.caster), tank = actors.get(c.target);
-    const b = boss && sampleNear(boss, c.t, 2000), p = tank && poseAt(tank, c.t);
-    if (!b || !p) return [];
-    const bearing = ((Math.atan2(p.x - b.x, -(p.y - b.y)) * 180) / Math.PI + 360) % 360;
-    return [wowShape({ kind: "cone", x: b.x, y: b.y, bearing, angle: MUTILATE_ANGLE, range: MUTILATE_RANGE,
-      name: "Mutilate", start: c.begin ?? c.t - 3000, resolve: c.t, style: "stack" })];
-  });
-}
-
-/** Ravage: a tankbuster ring on its tank for the 3s cast. */
-function ravage(data: ReplayData): AoeShape[] {
-  return pairedCasts(data, RAVAGE_BEGIN, RAVAGE).filter((c) => c.target).map((c) =>
-    wowShape({ kind: "circle", x: 0, y: 0, range: 300, name: "Ravage", start: c.begin ?? c.t - 3000, resolve: c.t,
-      follow: c.target, style: "tankbuster", estimated: false }));
+/**
+ * Ravage (white) and Mutilate (green, shared by the soak group): a cone from
+ * Sszorak that tracks the tank through the 3s cast bar and is gone with the
+ * hit, as in game (user's VOD of dqKJB9rgXpRPyVTj fight 7, 2026-10-19).
+ * The tank is the resolve's target. Mutilate 70°, 25y: in the kill
+ * nHavrDhPVtBYkMXA fight 43 all 96 soaker hits stood within 36° of the
+ * boss->tank line, 5-25y out. Ravage hits only its tank; its 50° and 25y
+ * are read off the VOD stills (art in va.tsx).
+ */
+function tankCones(data: ReplayData): CasterEffect[] {
+  const cone = (begin: number, id: number, kind: string, label: string) =>
+    pairedCasts(data, begin, id).filter((c) => c.target && c.target !== c.caster).map((c) => ({
+      kind, label, actor: c.caster, aimAt: c.target, x: 0, y: 0, radius: MUTILATE_RANGE, start: c.begin ?? c.t - 3000, end: c.t,
+    }));
+  return [...cone(RAVAGE_BEGIN, RAVAGE, "va-sszorak-ravage", "Ravage"), ...cone(MUTILATE_BEGIN, MUTILATE, "va-sszorak-mutilate", "Mutilate")];
 }
 
 /** Serpent's Fury: the 8y stack circle on the mark until the charge. */
@@ -122,21 +122,86 @@ function cystEffects(data: ReplayData): CasterEffect[] {
   return cysts(data).map((c) => ({ kind: "va-sszorak-cyst", label: "Viscous Cyst", x: c.x, y: c.y, start: c.start, end: c.end }));
 }
 
-/** Venomous Surge and Virulence on their carriers. */
+/** Venomous Surge on its carriers. */
 function carriers(data: ReplayData): CasterEffect[] {
-  return wowAuraSpans(data, [SURGE, ...VIRULENCE]).map((s) => ({
-    kind: s.id === SURGE ? "va-sszorak-surge" : "va-sszorak-virulence",
-    label: s.id === SURGE ? "Venomous Surge" : "Virulence", actor: s.target, x: 0, y: 0, start: s.start, end: s.end,
+  return wowAuraSpans(data, [SURGE]).map((s) => ({
+    kind: "va-sszorak-surge", label: "Venomous Surge", actor: s.target, x: 0, y: 0, start: s.start, end: s.end,
+  }));
+}
+
+/**
+ * Virulence: the game shows each carrier's burst as four lines, a + for one
+ * id and an X for the other (user's VOD, 0:27). Lines fixed to the map, 15y.
+ * Measured on dqKJB9rgXpRPyVTj fight 7 and nHavrDhPVtBYkMXA fight 43 from
+ * where players spread: at each expiry, players within 15y of a 1297707
+ * carrier avoided bearings 0/90/180/270 (±7°) and those near a 1299899
+ * carrier avoided 45/135/225/315; within 6° of a line sat 0-6% of neighbours
+ * inside 15y against 10-17% beyond (13% by chance).
+ */
+const VIRULENCE_PLUS = 1297707;
+function virulence(data: ReplayData): CasterEffect[] {
+  return wowAuraSpans(data, VIRULENCE).map((s) => ({
+    kind: s.id === VIRULENCE_PLUS ? "va-sszorak-virulence-plus" : "va-sszorak-virulence-x",
+    label: "Virulence", actor: s.target, x: 0, y: 0, radius: VIRULENCE_LINE, start: s.start, end: s.end + 400,
+  }));
+}
+
+/** A flashing green X on a player a Virulence burst hit (re-infected: the spread failed). */
+function virulenceFails(data: ReplayData): CasterEffect[] {
+  return (data.enemyHits ?? []).filter((h) => h[1] === VIRULENCE_BURST).map((h) => ({
+    kind: "va-sszorak-virulence-fail", label: "Virulence hit", actor: h[3], x: h[6] ?? 0, y: h[7] ?? 0, start: h[0], end: h[0] + 2000,
   }));
 }
 
 /** A tornado's swirl where Tempest struck a player. */
-function tempest(data: ReplayData): CasterEffect[] {
+function tempestHits(data: ReplayData): CasterEffect[] {
   const actors = actorMap(data);
   return wowAuraSpans(data, [TEMPEST]).flatMap((s) => {
     const a = actors.get(s.target);
     const p = a && poseAt(a, s.start);
     return p ? [{ kind: "va-sszorak-tornado", label: "Tempest", x: p.x, y: p.y, start: s.start - 500, end: s.start + 1200 }] : [];
+  });
+}
+
+/**
+ * Tempest's tornadoes, MODELLED (no actors in the log). In game (user's
+ * VOD) they form around Sszorak during the 3.5s channel, hold still, and at
+ * the cast's end go straight out from him, bouncing off the arena's edge
+ * for most of the phase. Here: TORNADOES on a 10y ring (the first hits at
+ * +0.6-1.0s were 8-12y from him), the first at his facing, 2y/s (hits 20-35y
+ * out 8-14s later), reflecting off a 50y circle (players' farthest samples
+ * per 15° sector: 40-62y, most 48-56), for 40s (the latest hits came at
+ * +36s). A fit of count, speed and angle to the 65 first hits in both kills
+ * found nothing clearly better than chance, so the paths after launch are
+ * a picture of the mechanic, not where each tornado was.
+ */
+const TORNADOES = 8, TORNADO_RING = 1000, TORNADO_SPEED = 200 /* centi-yards a second */, TORNADO_LIFE_MS = 40000;
+const ARENA = { x: -40650, y: -38680, r: 5000 };
+function tornadoes(data: ReplayData): CasterEffect[] {
+  const actors = actorMap(data);
+  return wowCasts(data, [TEMPEST_CAST]).flatMap((c) => {
+    const boss = actors.get(c.caster);
+    const b = boss && sampleNear(boss, c.t, 2000);
+    if (!b) return [];
+    const face = facingToCompassBearing(b.facing);
+    return Array.from({ length: TORNADOES }, (_, k) => {
+      const a = ((face + (k * 360) / TORNADOES) * Math.PI) / 180;
+      let x = b.x + Math.sin(a) * TORNADO_RING, y = b.y - Math.cos(a) * TORNADO_RING;
+      let vx = Math.sin(a) * TORNADO_SPEED, vy = -Math.cos(a) * TORNADO_SPEED;
+      const path = [{ t: c.t, x, y }];
+      const STEP = 250;
+      for (let t = STEP; t <= TORNADO_LIFE_MS; t += STEP) {
+        x += (vx * STEP) / 1000; y += (vy * STEP) / 1000;
+        const rx = x - ARENA.x, ry = y - ARENA.y, r = Math.hypot(rx, ry);
+        if (r > ARENA.r) {
+          const nx = rx / r, ny = ry / r, dot = vx * nx + vy * ny;
+          if (dot > 0) { vx -= 2 * dot * nx; vy -= 2 * dot * ny; }
+        }
+        path.push({ t: c.t + t, x, y });
+      }
+      return { kind: "va-sszorak-whirl", label: "Tempest", x: path[0].x, y: path[0].y, path,
+        start: c.begin ?? c.t - 3500, end: c.t + TORNADO_LIFE_MS };
+    });
   });
 }
 
@@ -159,6 +224,7 @@ export const SSZORAK_REPLAY: FightReplay = {
   name: "Sszorak",
   signature: [MUTILATE_BEGIN, SURGE, FURY_MARK],
   hiddenHits: [MUTILATE_HIT],
-  shapes: (data) => [...mutilate(data), ...ravage(data), ...fury(data), ...crosswinds(data), ...residue(data)],
-  effects: (data) => [...cystEffects(data), ...carriers(data), ...tempest(data), ...crosswindArrows(data)],
+  shapes: (data) => [...fury(data), ...crosswinds(data), ...residue(data)],
+  effects: (data) => [...tankCones(data), ...cystEffects(data), ...carriers(data), ...virulence(data), ...virulenceFails(data),
+    ...tornadoes(data), ...tempestHits(data), ...crosswindArrows(data)],
 };

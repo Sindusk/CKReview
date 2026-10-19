@@ -285,7 +285,99 @@ function windArrow(bearing: number, color: string, glow: string) {
 }
 
 const SSZ_SURGE = ring({ color: "#9cff5a", glow: "#3f9e1a", motes: 4, spinMs: 2000 });
-const SSZ_VIRULENCE = ring({ color: "#d6ff3a", glow: "#7a9e00", motes: 6, spinMs: 900 });
+
+/**
+ * Ravage (white) / Mutilate (venom green): a cone from Sszorak toward the
+ * tank (`aim`) that tracks them through the cast bar, `e.radius` long,
+ * brightening toward the hit.
+ */
+function tankCone(angle: number, fill: string, rim: string) {
+  return function TankCone({ e, x, y, t, scale, aim }: EffectArtProps) {
+    if (!aim) return null;
+    const opacity = Math.max(0, Math.min(1, (t - e.start) / FADE_MS, (e.end - t) / 120));
+    if (opacity <= 0) return null;
+    const r = (e.radius ?? 2500) * scale;
+    const b = Math.atan2(aim.x - x, -(aim.y - y));
+    const h = (angle / 2) * (Math.PI / 180);
+    const pt = (a: number) => `${x + Math.sin(a) * r} ${y - Math.cos(a) * r}`;
+    const d = `M${x} ${y} L${pt(b - h)} A${r} ${r} 0 0 1 ${pt(b + h)} Z`;
+    const grow = Math.max(0, Math.min(1, (t - e.start) / Math.max(1, e.end - e.start)));
+    return (
+      <g opacity={opacity} pointerEvents="none">
+        <path d={d} fill={fill} fillOpacity={0.12 + 0.16 * grow} stroke={rim} strokeWidth={2.5} strokeOpacity={0.85} />
+        <path d={d} fill="none" stroke={fill} strokeWidth={8} strokeOpacity={0.3} filter="url(#replay-glow)" />
+      </g>
+    );
+  };
+}
+
+/**
+ * Virulence on its carrier: four venom lines `e.radius` long through them,
+ * a + or an X fixed to the map as in game (user's VOD, 0:27), with a bright
+ * flash as it bursts at the aura's end (the spec ends the effect 0.4s after).
+ */
+function virulenceCross(offset: number) {
+  return function VirulenceCross({ e, x, y, t, scale }: EffectArtProps) {
+    const burstAt = e.end - 400;
+    const opacity = Math.max(0, Math.min(1, (t - e.start) / FADE_MS, (e.end - t) / 400));
+    if (opacity <= 0) return null;
+    const len = (e.radius ?? 1500) * scale;
+    const burst = t >= burstAt;
+    const pulse = 0.55 + 0.25 * Math.sin(t / 140);
+    return (
+      <g opacity={opacity} pointerEvents="none" transform={`rotate(${offset} ${x} ${y})`}>
+        {[0, 90].map((a) => (
+          <g key={a} transform={`rotate(${a} ${x} ${y})`}>
+            <line x1={x} y1={y - len} x2={x} y2={y + len} stroke="#c8ff2a" strokeWidth={burst ? 16 : 9} strokeOpacity={burst ? 0.5 : 0.18} filter="url(#replay-glow)" />
+            <line x1={x} y1={y - len} x2={x} y2={y + len} stroke={burst ? "#f4ffb0" : "#b8f02a"} strokeWidth={burst ? 4 : 2} strokeOpacity={burst ? 1 : pulse} strokeDasharray={burst ? undefined : "10 6"} />
+          </g>
+        ))}
+        <circle cx={x} cy={y} r={7} fill="#c8ff2a" fillOpacity={0.8} />
+      </g>
+    );
+  };
+}
+
+/** A player a Virulence burst hit: a green X flashing over their icon for 2s. */
+function VirulenceFail({ e, x, y, t }: EffectArtProps) {
+  const age = t - e.start;
+  if (age < 0 || t > e.end) return null;
+  const on = Math.floor(age / 200) % 2 === 0;
+  // Wider than the player icon (34 units), which is drawn over it.
+  const s = 30 + 10 * Math.max(0, 1 - age / 400);
+  const opacity = Math.min(1, (e.end - t) / 300);
+  return (
+    <g opacity={opacity} pointerEvents="none">
+      <path d={`M${x - s} ${y - s} L${x + s} ${y + s} M${x + s} ${y - s} L${x - s} ${y + s}`} stroke="#0d1a0a" strokeWidth={12} strokeLinecap="round" />
+      <path d={`M${x - s} ${y - s} L${x + s} ${y + s} M${x + s} ${y - s} L${x - s} ${y + s}`} stroke={on ? "#7dff3a" : "#2fae1a"} strokeWidth={7} strokeLinecap="round"
+        filter={on ? "url(#replay-glow)" : undefined} />
+    </g>
+  );
+}
+
+/**
+ * A Tempest tornado on its modelled path (sszorak-replay.ts tornadoes): a
+ * green funnel, solid while it forms around Sszorak and launches, fading to
+ * faint once it has been out ~6s, since its later path is a model.
+ */
+function Whirl({ e, x, y, t, scale }: EffectArtProps) {
+  const launch = e.path?.[0].t ?? e.start;
+  const opacity = Math.max(0, Math.min(1, (t - e.start) / 400, (e.end - t) / 1500));
+  if (opacity <= 0) return null;
+  const faint = t < launch + 6000 ? 1 : Math.max(0.35, 1 - (t - launch - 6000) / 6000);
+  const r = Math.max(9, 250 * scale);
+  const a = (t / 2.5) % 360;
+  return (
+    <g opacity={opacity * faint} pointerEvents="none">
+      <circle cx={x} cy={y} r={r} fill="#5fd13a" fillOpacity={0.18} stroke="#9fe86a" strokeWidth={1.5} strokeOpacity={0.6} />
+      <g transform={`rotate(${a} ${x} ${y})`}>
+        {[0.9, 0.62, 0.34].map((f, i) => (
+          <path key={i} d={`M${x - r * f} ${y} A${r * f} ${r * f} 0 1 1 ${x} ${y + r * f}`} fill="none" stroke={i === 1 ? "#7fe04a" : "#cfeec0"} strokeWidth={2.2 - i * 0.4} />
+        ))}
+      </g>
+    </g>
+  );
+}
 
 // ── The Twin Fangs ──
 
@@ -344,7 +436,13 @@ export const VA_ART: FightArt = {
     "va-sszorak-cyst": Cyst,
     "va-sszorak-tornado": Tornado,
     "va-sszorak-surge": SSZ_SURGE,
-    "va-sszorak-virulence": SSZ_VIRULENCE,
+    "va-sszorak-virulence-plus": virulenceCross(0),
+    "va-sszorak-virulence-x": virulenceCross(45),
+    "va-sszorak-virulence-fail": VirulenceFail,
+    "va-sszorak-whirl": Whirl,
+    // Tank cones (sszorak-replay.ts tankCones): Ravage white, Mutilate green.
+    "va-sszorak-ravage": tankCone(50, "#f4f8ff", "#ffffff"),
+    "va-sszorak-mutilate": tankCone(70, "#5fe03a", "#c8ffa8"),
     // Crosswinds arrows (sszorak-replay.ts CROSSWINDS_BEARING): N/S teal, E/W white.
     "va-sszorak-arrow-15": windArrow(15, "#7fe0d0", "#2fa597"),
     "va-sszorak-arrow-195": windArrow(195, "#7fe0d0", "#2fa597"),

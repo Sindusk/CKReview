@@ -333,6 +333,24 @@ Open questions:
   off the hit player. Cyst pop matching is clean: every one of the 11 pops
   had a player 1.7-5.4y from the matched cyst and the next cyst 17y+ away.
 
+#### After the user's first VOD pass (2026-10-19)
+
+- **Ravage**: a white 50° cone from Sszorak tracking the tank for the 3s
+  cast bar, gone with the hit (was a tankbuster ring).
+- **Mutilate**: the same, green and 70° (was a fixed orange cone).
+- **Virulence**: four 15y lines through each carrier, + for 1297707 and X
+  for 1299899, fixed to the map, flashing as they burst (was a ring).
+  Measured from the spread: within 15y of a carrier, 0-6% of players sat
+  within 6° of a line, against 13% by chance and 10-17% beyond 15y.
+- **Virulence failure**: a flashing green X over a player a burst hit
+  (one in this kill, 0:30.0).
+- **Tempest tornadoes** (modelled): eight on a 10y ring around Sszorak for
+  the channel, then straight out at 2y/s, bouncing off a 50y circle for
+  40s, fading after 6s. Only the ring and launch follow the VOD; a fit of
+  count, speed and launch angle to the 65 first hits in both kills found
+  nothing clearly better than chance, so later paths are a picture, not
+  positions. The hit swirls still mark where tornadoes really struck.
+
 VOD checks, Pull 7 (dqKJB9rgXpRPyVTj):
 1. Pull 7, 0:40-0:48: eight Crosswinds arrows (two each pointing roughly
    N, E, S, W). Check that the in-game arrow over each player points the
