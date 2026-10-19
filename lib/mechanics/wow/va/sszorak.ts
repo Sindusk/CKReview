@@ -58,7 +58,9 @@
 // lose Gusts at the same moment when they collide. A non-holder was
 // caught in a blast 15 times in 79 sets. Ability-less deaths 4.6-5.6s
 // after the blast at healthy HP are falls off the platform (holders or
-// blasted players: pulls 1/4/9/14/19/22/25/27).
+// blasted players: pulls 1/4/9/14/19/22/25/27). Each aura throws one fixed
+// way (2026-10-19, kill dqKJB9rgXpRPyVTj fight 7, all 47 blasts): 1285425
+// map bearing 15°, 1285453 195°, 1297096 105°, 1297111 285°.
 //
 // Venomous Surge (debuff 1305963, 10s; two players per cast, 2s apart):
 // expiry detonates on the whole raid (1306120, ~150k flat) and leaves a

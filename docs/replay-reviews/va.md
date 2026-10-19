@@ -316,14 +316,37 @@ Drawn:
   player stepped in it.
 
 Not drawn: tornadoes between hits, the Maelstrom's gale order (no
-events), which way each Crosswinds aura throws its holder: the holders'
-movement after the blast doesn't settle it, since partners collide
-midair.
+events).
 
 Open questions:
-- Which Crosswinds aura points which way? If the arrows are fixed per id,
-  the replay could draw them.
 - Mutilate's real cone angle.
+
+### Refinement on the kill dqKJB9rgXpRPyVTj fight 7 (6:18, user's VOD)
+
+- **Crosswinds arrows**: each aura id throws its holder one fixed way. In
+  the first 0.6s after all 47 blasts the holder moved on the same map
+  bearing per id: 1285425 15°, 1285453 195° (teal pair), 1297096 105°,
+  1297111 285° (white pair); the arena sits 15° off map north. Each holder
+  now gets an arrow on the rim of their blast circle for the 8s.
+- Fit check: Mutilate 8 of 12 exact, the other 4 one soaker short
+  (sampling); the one Caustic Claws circle is drawn but the log places it
+  off the hit player. Cyst pop matching is clean: every one of the 11 pops
+  had a player 1.7-5.4y from the matched cyst and the next cyst 17y+ away.
+
+VOD checks, Pull 7 (dqKJB9rgXpRPyVTj):
+1. Pull 7, 0:40-0:48: eight Crosswinds arrows (two each pointing roughly
+   N, E, S, W). Check that the in-game arrow over each player points the
+   way the replay's does, and that they fly that way at 0:47.7.
+2. Pull 7, 0:00-0:26: the Serpent's Fury stack circle on the mark; the
+   charge at 0:26. Check the circle sits on the marked player.
+3. Pull 7, 0:42 and 0:44: the first two cysts drop where the two Surge
+   carriers stood. Check the in-game cyst spots.
+4. Pull 7, 1:40-2:07: Maelstrom pops at 1:43.7, 1:51.9, 2:00.9, 2:06.7,
+   each removing the cyst the raid was blown into. Check the order, and
+   tell me how the gale itself looks in game (which tunnel lights up, how
+   long before it hits) so it can be drawn.
+5. Pull 7, 0:11-0:15: Mutilate's 70° soak cone. Check its width against
+   where the soak group stood.
 
 VOD checks, Pull 1 (nHavrDhPVtBYkMXA fight 43):
 1. Pull 1, 0:05-0:08: Mutilate's soak cone toward the tank. Check its

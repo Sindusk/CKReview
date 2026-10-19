@@ -260,6 +260,30 @@ function Tornado({ e, x, y, t }: EffectArtProps) {
   );
 }
 
+/**
+ * Raging Crosswinds' arrow on its holder: a chevron on the rim of their 6y
+ * blast circle pointing where the blast throws them (map bearing, clockwise
+ * from north), white or teal by pair like the circles, dark-edged so it
+ * reads over them. A thin shaft runs to it from the player.
+ */
+function windArrow(bearing: number, color: string, glow: string) {
+  return function WindArrow({ e, x, y, t, scale }: EffectArtProps) {
+    const opacity = Math.max(0, Math.min(1, (t - e.start) / FADE_MS, (e.end - t) / 150));
+    if (opacity <= 0) return null;
+    const d = Math.max(RING + 6, 600 * scale - 4);
+    return (
+      <g opacity={opacity} pointerEvents="none" transform={`rotate(${bearing} ${x} ${y})`}>
+        <line x1={x} y1={y - RING} x2={x} y2={y - d} stroke="#0d1a24" strokeWidth={5} strokeOpacity={0.7} />
+        <line x1={x} y1={y - RING} x2={x} y2={y - d} stroke={color} strokeWidth={2.5} />
+        <path d={`M${x} ${y - d - 18} L${x + 13} ${y - d + 2} L${x} ${y - d - 4} L${x - 13} ${y - d + 2} Z`}
+          fill={color} stroke="#0d1a24" strokeWidth={2} />
+        <path d={`M${x} ${y - d - 18} L${x + 13} ${y - d + 2} L${x} ${y - d - 4} L${x - 13} ${y - d + 2} Z`}
+          fill="none" stroke={glow} strokeWidth={4} strokeOpacity={0.35} filter="url(#replay-glow)" />
+      </g>
+    );
+  };
+}
+
 const SSZ_SURGE = ring({ color: "#9cff5a", glow: "#3f9e1a", motes: 4, spinMs: 2000 });
 const SSZ_VIRULENCE = ring({ color: "#d6ff3a", glow: "#7a9e00", motes: 6, spinMs: 900 });
 
@@ -321,6 +345,11 @@ export const VA_ART: FightArt = {
     "va-sszorak-tornado": Tornado,
     "va-sszorak-surge": SSZ_SURGE,
     "va-sszorak-virulence": SSZ_VIRULENCE,
+    // Crosswinds arrows (sszorak-replay.ts CROSSWINDS_BEARING): N/S teal, E/W white.
+    "va-sszorak-arrow-15": windArrow(15, "#7fe0d0", "#2fa597"),
+    "va-sszorak-arrow-195": windArrow(195, "#7fe0d0", "#2fa597"),
+    "va-sszorak-arrow-105": windArrow(105, "#ffffff", "#9fb4c8"),
+    "va-sszorak-arrow-285": windArrow(285, "#ffffff", "#9fb4c8"),
     "va-twin-fangs-globule": Globule,
     "va-twin-fangs-ichor": TF_ICHOR,
     "va-ulatek-egg": ULA_EGG,

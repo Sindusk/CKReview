@@ -2,14 +2,13 @@
 //
 // Sszorak's replay spec (lib/replay/fight-spec.ts). Art in
 // components/replay-art/va.tsx ("va-sszorak-..."). Built from the kill
-// nHavrDhPVtBYkMXA fight 43 (4:55); review in docs/replay-reviews/va.md.
+// nHavrDhPVtBYkMXA fight 43 (4:55), refined on the kill dqKJB9rgXpRPyVTj
+// fight 7 (6:18, the user has its VOD); review in docs/replay-reviews/va.md.
 // Nothing here is VOD-checked yet.
 //
 // Not drawn: Tempest's tornadoes between hits (no actors; a swirl marks
 // where each one struck a player), the Maelstrom's gale order and the wind
-// tunnels' motes (no events), Crosswinds' arrow directions (the four auras
-// are drawn by pair: in the kill the holders' movement after the blast
-// didn't settle which aura points which way, as partners collide midair).
+// tunnels' motes (no events).
 
 import type { AoeShape } from "@/lib/replay/action-shapes";
 import type { CasterEffect, FightReplay } from "@/lib/replay/fight-spec";
@@ -59,6 +58,20 @@ function ravage(data: ReplayData): AoeShape[] {
 function fury(data: ReplayData): AoeShape[] {
   return wowAuraSpans(data, [FURY_MARK]).map((s) =>
     wowShape({ kind: "circle", x: 0, y: 0, range: 800, name: "Serpent's Fury", start: s.start, resolve: s.end, follow: s.target, style: "stack" }));
+}
+
+// Each Crosswinds aura throws its holder one fixed way (map bearing, 0 =
+// north, clockwise), 15° off the cardinals with the arena. Kill
+// dqKJB9rgXpRPyVTj fight 7: in the first 0.6s after every one of the 47
+// logged blasts (0:47.7 ... 5:48.8), the holder moved 4-23y on exactly this
+// bearing (±1°, one Druid at 259° for 285°); partners are opposites.
+const CROSSWINDS_BEARING: Record<number, number> = { 1285425: 15, 1285453: 195, 1297096: 105, 1297111: 285 };
+
+/** Crosswinds' arrow on each holder for its 8s, pointing where the blast will throw them. */
+function crosswindArrows(data: ReplayData): CasterEffect[] {
+  return wowAuraSpans(data, Object.keys(CROSSWINDS_BEARING).map(Number)).map((s) => ({
+    kind: `va-sszorak-arrow-${CROSSWINDS_BEARING[s.id]}`, label: "Raging Crosswinds", actor: s.target, x: 0, y: 0, start: s.start, end: s.end,
+  }));
 }
 
 /** Crosswinds: the ~6y blast circle on each holder for its 8s, coloured by the pair that clears each other. */
@@ -147,5 +160,5 @@ export const SSZORAK_REPLAY: FightReplay = {
   signature: [MUTILATE_BEGIN, SURGE, FURY_MARK],
   hiddenHits: [MUTILATE_HIT],
   shapes: (data) => [...mutilate(data), ...ravage(data), ...fury(data), ...crosswinds(data), ...residue(data)],
-  effects: (data) => [...cystEffects(data), ...carriers(data), ...tempest(data)],
+  effects: (data) => [...cystEffects(data), ...carriers(data), ...tempest(data), ...crosswindArrows(data)],
 };
