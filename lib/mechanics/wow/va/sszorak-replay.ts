@@ -132,14 +132,30 @@ function cysts(data: ReplayData): Cyst[] {
   return out;
 }
 
+/**
+ * A cyst at its trigger size, 5y: at each of the kill's 11 pops the nearest
+ * player stood 1.7-5.4y from it (samples up to ~1s old). Each drop also
+ * flashes Surge's blast where it lands.
+ */
+const CYST_RADIUS = 500;
 function cystEffects(data: ReplayData): CasterEffect[] {
-  return cysts(data).map((c) => ({ kind: "va-sszorak-cyst", label: "Viscous Cyst", x: c.x, y: c.y, start: c.start, end: c.end }));
+  return cysts(data).flatMap((c) => [
+    { kind: "va-sszorak-cyst", label: "Viscous Cyst", x: c.x, y: c.y, radius: CYST_RADIUS, start: c.start, end: c.end },
+    { kind: "va-sszorak-surge-blast", label: "Venomous Surge", x: c.x, y: c.y, radius: SURGE_RADIUS, start: c.start, end: c.start + 900 },
+  ]);
 }
 
-/** Venomous Surge on its carriers. */
+/**
+ * Venomous Surge on its carriers: a shimmering green aura (user's VOD),
+ * SURGE_RADIUS across, the size its blast is drawn at too. The log can't
+ * size it: the blast hits the whole raid (one pull with amounts: the holder
+ * 360-395k, 1.5y away 172k, 24-72y away 50-170k with no clear falloff) and
+ * nobody stood 2-23y from a holder. 8y is a guess for the VOD to settle.
+ */
+const SURGE_RADIUS = 800;
 function carriers(data: ReplayData): CasterEffect[] {
   return wowAuraSpans(data, [SURGE]).map((s) => ({
-    kind: "va-sszorak-surge", label: "Venomous Surge", actor: s.target, x: 0, y: 0, start: s.start, end: s.end,
+    kind: "va-sszorak-surge", label: "Venomous Surge", actor: s.target, x: 0, y: 0, radius: SURGE_RADIUS, start: s.start, end: s.end,
   }));
 }
 

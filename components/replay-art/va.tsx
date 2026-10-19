@@ -231,17 +231,72 @@ const NYM_CHILL = ring({ color: "#cfefff", glow: "#4aa8e0", motes: 3, spinMs: 24
 // ── Sszorak ──
 
 /** A Viscous Cyst: a lumpy green sac on the floor, the Maelstrom's bumper. */
+/**
+ * A Viscous Cyst as in game (user's VOD): a swirling green ring on the floor
+ * at its trigger size (`e.radius`), a glossy venom orb bobbing above its
+ * shadow in the middle.
+ */
 function Cyst({ e, x, y, t, scale }: EffectArtProps) {
   const opacity = Math.max(0, Math.min(1, (t - e.start) / FADE_MS, (e.end - t) / 150));
   if (opacity <= 0) return null;
-  const r = Math.max(8, 150 * scale);
-  const w = 1 + 0.05 * Math.sin(t / 300 + x);
+  const R = (e.radius ?? 500) * scale;
+  const orb = Math.max(7, R * 0.28);
+  const bob = Math.sin(t / 420 + x) * orb * 0.25;
+  const spin = (t / 30 + x) % 360;
+  const arc = (r: number, from: number, to: number) => {
+    const a0 = (from * Math.PI) / 180, a1 = (to * Math.PI) / 180;
+    return `M${x + Math.sin(a0) * r} ${y - Math.cos(a0) * r} A${r} ${r} 0 0 1 ${x + Math.sin(a1) * r} ${y - Math.cos(a1) * r}`;
+  };
   return (
     <g opacity={opacity} pointerEvents="none">
-      <circle cx={x} cy={y} r={r * 1.6} fill="#9cff5a" fillOpacity={0.18} filter="url(#replay-glow)" />
-      <ellipse cx={x} cy={y} rx={r * w} ry={r * 0.85 / w} fill="#5f9e2a" stroke="#d4ff9a" strokeWidth={1.5} />
-      <circle cx={x - r * 0.35} cy={y - r * 0.2} r={r * 0.25} fill="#b8ff7a" fillOpacity={0.8} />
-      <circle cx={x + r * 0.3} cy={y + r * 0.25} r={r * 0.18} fill="#b8ff7a" fillOpacity={0.6} />
+      <circle cx={x} cy={y} r={R} fill="#4fbf2a" fillOpacity={0.14} stroke="#0f2a08" strokeWidth={4} strokeOpacity={0.6} />
+      <circle cx={x} cy={y} r={R} fill="none" stroke="#7fe04a" strokeWidth={2} />
+      <g transform={`rotate(${spin} ${x} ${y})`}>
+        {[0, 120, 240].map((a) => (
+          <path key={a} d={arc(R * 0.86, a, a + 75)} fill="none" stroke="#c8ff8a" strokeWidth={2.5} strokeLinecap="round" />
+        ))}
+      </g>
+      <ellipse cx={x} cy={y + orb * 0.55} rx={orb * 0.9} ry={orb * 0.35} fill="#0f2a08" fillOpacity={0.55} />
+      <circle cx={x} cy={y - orb * 0.6 + bob} r={orb} fill="#9cff3a" stroke="#2f6b12" strokeWidth={1.5} filter="url(#replay-glow)" />
+      <circle cx={x - orb * 0.35} cy={y - orb * 0.95 + bob} r={orb * 0.32} fill="#f4ffd0" fillOpacity={0.85} />
+    </g>
+  );
+}
+
+/**
+ * Venomous Surge's aura on its carrier: a shimmering green field `e.radius`
+ * across (user's VOD), sparkles drifting in it, a solid rim.
+ */
+function SurgeAura({ e, x, y, t, scale }: EffectArtProps) {
+  const opacity = Math.max(0, Math.min(1, (t - e.start) / FADE_MS, (e.end - t) / 150));
+  if (opacity <= 0) return null;
+  const R = (e.radius ?? 800) * scale;
+  const tick = Math.floor(t / 160);
+  const pulse = 1 + 0.03 * Math.sin(t / 200);
+  return (
+    <g opacity={opacity} pointerEvents="none">
+      <circle cx={x} cy={y} r={R * pulse} fill="#6fe03a" fillOpacity={0.16} />
+      <circle cx={x} cy={y} r={R * 0.6} fill="#9cff5a" fillOpacity={0.1} />
+      <circle cx={x} cy={y} r={R * pulse} fill="none" stroke="#b8ff6a" strokeWidth={2} strokeOpacity={0.9} filter="url(#replay-glow)" />
+      {Array.from({ length: 10 }, (_, k) => {
+        const a = rand(k * 7.1 + tick * 0.37) * Math.PI * 2, d = Math.sqrt(rand(k * 3.3 + tick * 0.91)) * R * 0.92;
+        return <circle key={k} cx={x + Math.sin(a) * d} cy={y - Math.cos(a) * d} r={1.6 + 1.8 * rand(k + tick)} fill="#eaffc0" fillOpacity={0.9} />;
+      })}
+    </g>
+  );
+}
+
+/** Venomous Surge's blast as the cyst drops: a green shockwave out to `e.radius` with a bright core. */
+function SurgeBlast({ e, x, y, t, scale }: EffectArtProps) {
+  const f = (t - e.start) / Math.max(1, e.end - e.start);
+  if (f < 0 || f > 1) return null;
+  const R = (e.radius ?? 800) * scale;
+  const r = R * (0.35 + 0.65 * Math.sqrt(f));
+  return (
+    <g pointerEvents="none" opacity={1 - f * f}>
+      <circle cx={x} cy={y} r={r} fill="#c8ff6a" fillOpacity={0.35 * (1 - f)} />
+      <circle cx={x} cy={y} r={r} fill="none" stroke="#f4ffd0" strokeWidth={5 * (1 - f) + 1.5} filter="url(#replay-glow)" />
+      <circle cx={x} cy={y} r={R * 0.25 * (1 - f)} fill="#ffffff" fillOpacity={0.8} />
     </g>
   );
 }
@@ -284,7 +339,6 @@ function windArrow(bearing: number, color: string, glow: string) {
   };
 }
 
-const SSZ_SURGE = ring({ color: "#9cff5a", glow: "#3f9e1a", motes: 4, spinMs: 2000 });
 
 /**
  * Ravage (white) / Mutilate (venom green): a cone from Sszorak toward the
@@ -456,7 +510,8 @@ export const VA_ART: FightArt = {
     "va-nymrissa-chill": NYM_CHILL,
     "va-sszorak-cyst": Cyst,
     "va-sszorak-tornado": Tornado,
-    "va-sszorak-surge": SSZ_SURGE,
+    "va-sszorak-surge": SurgeAura,
+    "va-sszorak-surge-blast": SurgeBlast,
     "va-sszorak-virulence-plus": virulenceCross(0),
     "va-sszorak-virulence-x": virulenceCross(45),
     "va-sszorak-virulence-fail": VirulenceFail,
