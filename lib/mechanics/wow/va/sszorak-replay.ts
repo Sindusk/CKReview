@@ -304,7 +304,9 @@ export const SSZORAK_REPLAY: FightReplay = {
   name: "Sszorak",
   signature: [MUTILATE_BEGIN, SURGE, FURY_MARK],
   hiddenHits: [MUTILATE_HIT, CLAWS],
-  notes: [CLAWS_NOTE],
+  // The tornadoes are modelled (tornadoes): close early, drifting late in
+  // their life (user's VOD, 2026-10-19).
+  notes: [CLAWS_NOTE, "Tornado paths are estimated and drift late in their life"],
   // 7y: on the kill dqKJB9rgXpRPyVTj fight 7, melee stood a median 8.4-10.3y
   // from his centre while he stood still (WoW melee reach ~ hitbox + 3y),
   // and the user's VOD still shows his selection ring about the size of the
