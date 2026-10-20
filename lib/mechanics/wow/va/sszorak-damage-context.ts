@@ -11,39 +11,42 @@
 //   untargetable. Dig In is a burn window: he takes +30% damage.
 // - Raging Crosswinds (1285425 / 1285453 / 1297096 / 1297111, ~7.9s, 8
 //   players per set, header lines 54–61): melee holders idle 38% vs 7%;
-//   ranged 10% vs 6%. Movement (user, 2026-10-19, replacing the forced
-//   window for melee): every holder from the aura's application (its circle
-//   appears) +4s to get into position, and the 2s after the blast while
-//   they're thrown into the air.
-// - Venomous Surge (1305963, 10s, always ranged or healers, lines 63–68):
-//   holders idle 18.5% vs 3.8%. Movement, not forced (user, 2026-10-19):
-//   the 10s plus 3s after the drop, which can leave the holder across the
-//   arena from the boss.
+//   ranged 10% vs 6%.
+// - Re-measured 2026-10-19 on the kill dqKJB9rgXpRPyVTj fight 7 plus
+//   1bM6VzcZpkqxYtAK pull 1 (DPS; idle = in a 2.5s+ cast gap), per 0.5s
+//   from each event, affected players against every other DPS at that
+//   moment. The user asked for the windows to follow the data, for every
+//   player, as movement (not forced):
+//   - Crosswinds, from the aura's application: melee holders idle 32-41%
+//     vs 18-23% from +1.5s to +9.5s, level by +10s (the blast is at ~+7.9,
+//     so ~2s after it, in the air and walking back). Ranged holders only
+//     +2-6 points early and after the blast. Window: application to the
+//     blast + CROSSWINDS_AFTER_MS, for every holder.
+//   - Venomous Surge, from the drop: holders 46-62% vs 16-36% from -8s
+//     (2s after the debuff) to +1.5s, below the rest from +2s. Window: the
+//     debuff to the drop + SURGE_AFTER_MS.
+//   - Virulence: nearly every DPS holds it at once, so against the moment
+//     before: ranged idle climbs from ~15% to 45% at +3.5-4s and is back by
+//     +5.5-6s, the debuff's 5s to its burst; melee move little (their charge
+//     window below covers them). Window: the debuff's span, for everyone
+//     who gets it (the charge's and any re-infection).
 // - Charge / Virulence (Serpent's Fury 1305621 removal; Virulence 1297707 /
 //   1299899 0.8s later, 5s, lines 23–37): every melee idles 17–25% from +1s
 //   to +7s after the removal (baseline 2–4%). Forced for melee, removal
-//   +1s to +7s. Also movement (user, 2026-10-19): everyone a Virulence goes
-//   on (the charge's and any re-infection), the 3s after it, to spread.
+//   +1s to +7s.
 // - Not forced (measured): the Serpent's Fury mark itself, Mutilate soaks,
 //   Tempest, Turbulent Gusts, the Maelstrom gales.
 // - Enrage unobserved (longest pull 288.8s).
 
 import type { DamageContext, ForcedWindow } from "../../../damage/types";
-import type { Pull } from "@/types/Pull";
 import { debuffWindows, isMelee } from "../../../damage/wow/context-helpers";
 
 const RAGING_CROSSWINDS = [1285425, 1285453, 1297096, 1297111];
 const VENOMOUS_SURGE = 1305963;
 const SERPENTS_FURY = 1305621;
 const VIRULENCE = [1297707, 1299899];
-const CROSSWINDS_SETUP_MS = 4_000, CROSSWINDS_AIR_MS = 2_000, SURGE_DROP_MS = 3_000, VIRULENCE_SPREAD_MS = 3_000;
-
-/** Each Crosswinds holder's 2s in the air after their blast (the aura's removal). */
-function crosswindsAirborne(pull: Pull): ForcedWindow[] {
-  return pull.players.flatMap((p) => p.debuffs
-    .filter((e) => RAGING_CROSSWINDS.includes(e.abilityId) && e.debuffStatus === "removed")
-    .map((e) => ({ startMs: e.timestamp, endMs: e.timestamp + CROSSWINDS_AIR_MS, cause: "thrown into the air by Raging Crosswinds", players: [p.name] })));
-}
+// Measured tails after each mechanic ends (header).
+const CROSSWINDS_AFTER_MS = 2_000, SURGE_AFTER_MS = 1_500;
 
 export const SSZORAK_DAMAGE_CONTEXT: DamageContext = {
   encounter: "Sszorak",
@@ -66,9 +69,8 @@ export const SSZORAK_DAMAGE_CONTEXT: DamageContext = {
     return out;
   },
   movementWindows: (pull) => [
-    ...debuffWindows(pull, RAGING_CROSSWINDS, "lining up Raging Crosswinds", { maxMs: CROSSWINDS_SETUP_MS }),
-    ...crosswindsAirborne(pull),
-    ...debuffWindows(pull, [VENOMOUS_SURGE], "carrying Venomous Surge", { maxMs: 11_000, tailMs: SURGE_DROP_MS }),
-    ...debuffWindows(pull, VIRULENCE, "spreading Virulence", { maxMs: VIRULENCE_SPREAD_MS }),
+    ...debuffWindows(pull, RAGING_CROSSWINDS, "Raging Crosswinds", { maxMs: 9_000, tailMs: CROSSWINDS_AFTER_MS }),
+    ...debuffWindows(pull, [VENOMOUS_SURGE], "carrying Venomous Surge", { maxMs: 11_000, tailMs: SURGE_AFTER_MS }),
+    ...debuffWindows(pull, VIRULENCE, "spreading Virulence", { maxMs: 6_000 }),
   ],
 };
