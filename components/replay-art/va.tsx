@@ -369,10 +369,16 @@ function tankCone(angle: number, fill: string, rim: string) {
  * Virulence on its carrier: four venom lines `e.radius` long through them,
  * a + or an X fixed to the map as in game (user's VOD, 0:27). Each arm is
  * a solid venom spike, wide at the player and pointed at its 15y tip with
- * a dark outline, its fill stepping between dark and light green (never
- * faint: any paused frame reads, user 2026-10-19), white-hot as it bursts
+ * a dark outline, its fill pulsing gently between two greens over 1.4s
+ * (never faint: any paused frame reads, user 2026-10-19), white-hot as it bursts
  * at the aura's end (the spec ends the effect 0.4s after).
  */
+/** `a` to `b` (#rrggbb) by `k` in 0..1. */
+function mix(a: string, b: string, k: number): string {
+  const c = (s: string, i: number) => parseInt(s.slice(1 + i * 2, 3 + i * 2), 16);
+  return "#" + [0, 1, 2].map((i) => Math.round(c(a, i) + (c(b, i) - c(a, i)) * k).toString(16).padStart(2, "0")).join("");
+}
+
 function virulenceCross(offset: number) {
   return function VirulenceCross({ e, x, y, t, scale }: EffectArtProps) {
     const burstAt = e.end - 400;
@@ -380,9 +386,11 @@ function virulenceCross(offset: number) {
     if (opacity <= 0) return null;
     const len = (e.radius ?? 1500) * scale;
     const burst = t >= burstAt;
-    const light = Math.floor((t - e.start) / 350) % 2 === 1;
-    const fill = burst ? "#f4ffc8" : light ? "#b8ff4a" : "#2f9e1a";
-    const core = burst ? "#ffffff" : light ? "#efffc0" : "#8fe03a";
+    // A slow, gentle pulse between two close greens (user, 2026-10-19: a hard
+    // dark/light flash was too noisy).
+    const k = 0.5 - 0.5 * Math.cos(((t - e.start) / 1400) * Math.PI * 2);
+    const fill = burst ? "#f4ffc8" : mix("#5fc82a", "#9ce83f", k);
+    const core = burst ? "#ffffff" : mix("#b8f07a", "#e4ffb0", k);
     const w = burst ? 9 : 6;   // half-width at the player, SVG units
     // One arm pointing up from the player: a tapered spike with a diamond tip.
     const arm = `M${x - w} ${y - 10} L${x - 1.5} ${y - len + 8} L${x} ${y - len - 4} L${x + 1.5} ${y - len + 8} L${x + w} ${y - 10} Z`;
