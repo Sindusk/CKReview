@@ -27,6 +27,11 @@
 //         (Aquaveil, Exaltation, Intersection, ...) as green "X ← healer"
 //         rows (user, 2026-10-15: tanks plan around them; never moved),
 //         short cooldowns as dots. Job colour is only on the tank's name.
+//       - Aggro rows under the axis (user, 2026-10-19), one per enemy
+//         with autos (at most AGGRO_MAX_ROWS): the holder's job colour,
+//         faded where no autos confirm it, outlined amber when #2 came
+//         within ENMITY_CLOSE_LEAD, and a tick at each swap coloured by
+//         cause (lib/mitigation/enmity.ts).
 //       - Busters: a triangle on the axis coloured by margin; only those
 //         under TANK_MARGIN_OVER get a name, staggered when close.
 //       - Proposed changes: a dashed box in the cooldown's row.
@@ -61,6 +66,7 @@ import {
   type AggregatedBuster, type Buster, type BusterKind, type PullTanking, type TankCast, type TankVerdict, type UnusedSummary,
 } from "@/lib/mitigation/tanking";
 import type { TankChange, TankPlanGroup, TankingPlan } from "@/lib/mitigation/tanking-plan";
+import { ENMITY_CLOSE_LEAD, type EnmityChange } from "@/lib/mitigation/enmity";
 import { getClassColor } from "@/lib/player-display";
 import { VERDICT_STYLE, fmtTime } from "./MitigationTimeline";
 import { SkillTip } from "./ui/MitigationGlyphs";
@@ -78,6 +84,10 @@ const HEALER_COLOR = "#7fd1a8";
 const MOVE_COLOR = "#2bb38a";
 const NOW_COLOR = "#8b8f98";
 const INVULN_COLOR = "#53a9ff";
+// Aggro rows under the axis (lib/mitigation/enmity.ts), one per enemy.
+const AGGRO_ROW_H = 11;
+const AGGRO_MAX_ROWS = 3;
+const AGGRO_CLOSE_COLOR = "#e0a030";
 const BUSTER_LABEL: Record<BusterKind, string> = { single: "single", shared: "shared", dual: "dual", both: "both tanks", solo: "taken alone" };
 
 const INFO = [
@@ -85,6 +95,7 @@ const INFO = [
   "A buster's margin is the tank's HP left, starting from full, after the buster and everything they take in the next 10s, with no healing. Under 15%: under; 15-30%: good; over 30%: over.",
   "All pulls: the clock shows the window pull that got furthest; the chips and the changes cover the whole window, at each anchor's typical time.",
   "The bars are damage TAKEN, not HP left: each bar is what the tank took in its few seconds, as a share of max HP. A full-height bar is 100% of max HP taken in that span; a white cap marks one clipped above that.",
+  "Aggro rows: who held each enemy. The boss's single-target autos show who is #1; between them a simple enmity table (damage, x10 in tank stance; heals; Provoke; Shirk) fills in, faded. An outline means #2 came within 5%: a coin flip from the log. Bosses with dual autos only show their top two, so #1 there is always the table's guess.",
   `Make a card's changes together, at most ${PLAN_MAX_CHANGES} at a time. Short cooldowns (Holy Sheltron, Heart of Corundum, The Blackest Night, Bloodwhetting) are expected on cooldown and never moved.`,
 ].join("\n\n");
 
@@ -259,7 +270,9 @@ function Clock({ pull, tanking, lanes, changes, hover }: {
   const upperRowsY = PHASE_H + 6;
   const upperBase = upperRowsY + upperRows.length * ROW_H + 6 + (upper ? BAR_H : 0);
   const axis = upperBase + (upper ? 10 : 30);
-  const lowerBase = axis + 10;
+  const aggro = tanking.enmity.enemies.slice(0, AGGRO_MAX_ROWS);
+  const aggroY = axis + 9;
+  const lowerBase = axis + 10 + (aggro.length ? aggro.length * AGGRO_ROW_H + 4 : 0);
   const lowerRowsY = lowerBase + (lower ? BAR_H + 6 : 0);
   const height = lowerRowsY + lowerRows.length * ROW_H + 6;
   const text = { fontSize: 10, fill: "var(--ck-text-3)" };
@@ -405,6 +418,37 @@ function Clock({ pull, tanking, lanes, changes, hover }: {
           {i % labelEvery === 0 && <text x={x(s)} y={axis + 3.5} textAnchor="middle" style={{ ...text, ...halo, strokeWidth: 4 }}>{fmtTime(s)}</text>}
         </g>
       ))}
+      {aggro.map((o, i) => {
+        const y = aggroY + i * AGGRO_ROW_H;
+        const name = o.enemy.length > 18 ? `${o.enemy.slice(0, 17)}…` : o.enemy;
+        return (
+          <g key={`aggro${o.enemy}`}>
+            <text x={LEFT - 6} y={y + 7} textAnchor="end" style={{ ...text, fontSize: 9.5 }}
+              {...tipProps(`Who held ${o.enemy}'s enmity (aggro)` + (o.dualAutos ? "\nDual autos: each swing hits the top two, so #1 is the table's guess" : ""))}>
+              Aggro · {name}{o.dualAutos ? " (dual)" : ""}
+            </text>
+            {o.spans.filter((s) => visible(s.startMs, s.endMs)).map((s, k) => {
+              const job = pull.players.find((p) => p.name === s.player)?.className ?? "";
+              const close = s.minLead !== undefined && s.minLead < ENMITY_CLOSE_LEAD;
+              return (
+                <rect key={k} x={x(s.startMs)} y={y} width={Math.max(1.5, x(s.endMs) - x(s.startMs))} height={7} rx={1}
+                  fill={getClassColor("ffxiv", job)} opacity={s.observed ? 0.85 : 0.35}
+                  stroke={close ? AGGRO_CLOSE_COLOR : "none"} strokeWidth={close ? 1.2 : 0}
+                  {...tipProps(`${firstName(s.player)} holds ${o.enemy}, ${fmtTime(s.startMs)}–${fmtTime(s.endMs)}\n` +
+                    (s.observed ? `${s.autos} auto${s.autos === 1 ? "" : "s"} confirm it`
+                      : o.dualAutos ? "Dual autos: the table's guess of #1" : "No autos here: the table's guess") +
+                    (s.minLead !== undefined && s.second
+                      ? `\nClosest: ${firstName(s.second)} ${s.minLead < 0 ? "ahead in the table" : `within ${pct(s.minLead)}`} at ${fmtTime(s.minLeadAtMs ?? s.startMs)}` : ""))} />
+              );
+            })}
+            {o.changes.filter((c) => c.cause !== "pull" && visible(c.atMs)).map((c, k) => (
+              <line key={`c${k}`} x1={x(c.atMs)} x2={x(c.atMs)} y1={y - 1.5} y2={y + 8.5} strokeWidth={1.6}
+                stroke={c.cause === "death" ? VERDICT_STYLE.fail.color : c.cause === "overtake" ? AGGRO_CLOSE_COLOR : "var(--ck-text-2)"}
+                {...tipProps(`${fmtTime(c.atMs)} ${o.enemy}: ${c.from ? firstName(c.from) : "?"} → ${firstName(c.to)}\n${changeText(c)}`)} />
+            ))}
+          </g>
+        );
+      })}
       {shownBusters.filter((b) => visible(b.timestampMs)).map((b) => {
         const mortal = b.tanks.filter((t) => !t.invuln && lanes.some((l) => l.player === t.player));
         const worst = mortal.length ? Math.min(...mortal.map((t) => t.margin)) : undefined;
@@ -440,6 +484,19 @@ function Clock({ pull, tanking, lanes, changes, hover }: {
   );
 }
 
+/** Why the aggro moved, in words. */
+function changeText(c: EnmityChange): string {
+  const st = (p?: string) => (p && c.stance[p] !== undefined ? `${firstName(p)}'s stance ${c.stance[p] ? "on" : "off"}` : "");
+  const stances = [st(c.from), st(c.to)].filter(Boolean).join(", ");
+  const how = c.predicted ? "" : "\nOnly the autos showed it (the table didn't have it yet)";
+  switch (c.cause) {
+    case "provoke": return `${firstName(c.to)}'s Provoke${how}`;
+    case "shirk": return `${c.from ? firstName(c.from) : "?"}'s Shirk${how}`;
+    case "death": return `${c.from ? firstName(c.from) : "?"} died${how}`;
+    default: return `Overtaken with no Provoke, Shirk or death${stances ? ` (${stances})` : ""}${how}`;
+  }
+}
+
 function Legend() {
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", fontSize: 11, ...dim }}>
@@ -452,6 +509,8 @@ function Legend() {
       <span><Swatch color={INVULN_COLOR} />invulns</span>
       <span style={{ color: MOVE_COLOR }}>┅ proposed</span>
       <span>▲ buster, coloured by margin</span>
+      <span>Aggro: holder&apos;s colour, faded where no autos confirm it, <span style={{ color: AGGRO_CLOSE_COLOR }}>outlined</span> when #2 came within {pct(ENMITY_CLOSE_LEAD)};
+        swaps marked <span style={{ color: AGGRO_CLOSE_COLOR }}>| overtake</span> <span style={{ color: VERDICT_STYLE.fail.color }}>| death</span> | Provoke / Shirk</span>
     </div>
   );
 }

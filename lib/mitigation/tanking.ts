@@ -18,7 +18,8 @@
 // ── Who is tanking ─────────────────────────────────────────────────────
 // Whoever receives an enemy's auto-attacks. Spans run per source enemy, so a
 // tank swap needs no configuration and a two-boss fight gives one holder
-// per boss.
+// per boss. The fuller picture (holder between autos, lead over #2, why
+// each swap happened) is enmity.ts, drawn as the clock's Aggro rows.
 //
 // ── Busters ────────────────────────────────────────────────────────────
 // A buster is a tank-only hit (MitigationHit.tankOnly: raw damage at least
@@ -90,6 +91,7 @@ import type { HitVerdict, MitigationGame, MitigationHit } from "./types";
 import { firstActivityAfter, rawOf, trailingInvulnAt } from "./analyze";
 import { busterLabel } from "./buster-kinds";
 import { RARE_SHARE } from "./aggregate";
+import { analyzePullEnmity, type PullEnmity } from "./enmity";
 
 export const FOLLOW_UP_MS = 10_000;  // user
 // Tunables: chosen by the builder, not yet confirmed (the "Not yet confirmed" list above).
@@ -172,6 +174,7 @@ export type PullTanking = {
   tanking: TankingSpan[];
   busters: Buster[];
   unused:  UnusedCooldown[];
+  enmity:  PullEnmity;   // who held each enemy and why it moved (enmity.ts)
 };
 
 // A short tank cooldown meant to be pressed on cooldown, per tank and pull.
@@ -201,6 +204,7 @@ export function analyzePullTanking(pull: Pull, hits: MitigationHit[], game: Miti
   return {
     tanks: streams,
     tanking: tankingSpans(tanks, playerNames, game),
+    enmity: analyzePullEnmity(pull, game),
     busters: busterHits.map((h) => buildBuster(pull, h, streams)),
     unused: tanks.flatMap((p) => unusedShortCooldowns(pull, p, streams, game)),
   };

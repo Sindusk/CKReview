@@ -32,6 +32,7 @@ sampling it.
 | Damage, Mitigation or Statics analysis | Module headers in `lib/damage/`, `lib/mitigation/`, `lib/static-analysis.ts` |
 | Mitigation optimizer and findings view | Headers of `lib/mitigation/plan.ts`, `findings.ts`, `optimize.ts`, `debuff-reach.ts`, `ffxiv-deployment.ts`; tests `node scripts/check-optimizer-example.js`, `node scripts/check-deployment-shields.js` |
 | Tanking panel | Headers of `lib/mitigation/tanking.ts`, `tanking-plan.ts`, `buster-kinds.ts`, `components/MitigationTanking.tsx`; test `node scripts/check-tanking-example.js` |
+| Who holds aggro (FFXIV enmity), tank swaps | Header of `lib/mitigation/enmity.ts`; accuracy `node scripts/check-enmity.js <code> [--list]` |
 | Per-player exposure, assigned duties, the Adjusted / pull headline | Headers of `lib/mechanics/rule-meta.ts`, `occurrences.ts`, `assignments.ts`, `lib/static-analysis.ts` |
 | WoW replay: what's left | [docs/wow-replay-plan.md](docs/wow-replay-plan.md) |
 | What's unfinished or waiting on a user decision | [docs/open-items.md](docs/open-items.md) |
