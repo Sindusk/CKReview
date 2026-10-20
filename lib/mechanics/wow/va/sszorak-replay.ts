@@ -76,8 +76,9 @@ function struck(data: ReplayData): CasterEffect[] {
 const FURY_STACK_MS = 8000;
 function fury(data: ReplayData): AoeShape[] {
   return wowAuraSpans(data, [FURY_MARK]).map((s) =>
+    // A red ring with no fill, as in game (user's VOD, 2026-10-19).
     wowShape({ kind: "circle", x: 0, y: 0, range: 800, name: "Serpent's Fury", start: Math.max(s.start, s.end - FURY_STACK_MS), resolve: s.end,
-      follow: s.target, style: "stack" }));
+      follow: s.target, style: "va-sszorak-mark" }));
 }
 
 function furyMarks(data: ReplayData): CasterEffect[] {
@@ -146,29 +147,33 @@ function cysts(data: ReplayData): Cyst[] {
 
 /**
  * Howling Maelstrom's gales: a wind across the whole arena blowing the raid
- * into a cyst (user's VOD: a light white wind over the screen). The log has
- * no gale event; each Maelstrom pop (within DIG_IN_SPAN_MS of Dig In) is the
- * end of one, blowing from where the raid stood GALE_MS before toward the
- * cyst. Kill dqKJB9rgXpRPyVTj fight 7, Maelstrom 1:40: the raid's median
- * velocity rose to 10-18y/s toward each cyst 1.9-2.2s before its pop
- * (1:41.5 -> 1:43.7 at ~327°, 1:50.0 -> 1:51.9 at ~21°, 1:58.7 -> 2:00.9 at
- * ~115°), then 20-29y/s the other way from the pop's knockback. The fourth
- * gale (pop 2:06.7) blurs with the walk back to the middle, so all get
- * GALE_MS.
+ * into a cyst (user's VOD: a light white wind over the screen). Three gales
+ * per Maelstrom; the fourth cyst the raid walks into itself (user). The log
+ * has no gale event, so they run at GALE_SPANS from Dig In, from the user's
+ * VOD of dqKJB9rgXpRPyVTj fight 7 (Dig In 1:40): ~1:41-1:49, ~1:51-1:56,
+ * ~1:58-2:05. The Maelstrom is on a fixed clock: that kill's pops fell at
+ * Dig In +3.5-3.7 / +11.9-12.2 / +20.7-20.9 in all three Maelstroms. Each
+ * blows from where the raid stood as it began toward the cyst that gale
+ * pops (the raid's median velocity rose to 10-18y/s that way ~2s before).
  */
-const DIG_IN = 1286033, DIG_IN_SPAN_MS = 34000, GALE_MS = 2500;
+const DIG_IN = 1286033;
+const GALE_SPANS: [number, number][] = [[1000, 9000], [11000, 16000], [18000, 25000]];
 function gales(data: ReplayData, all: Cyst[]): CasterEffect[] {
   // Dig In: a cast in the replay data (its buff on Sszorak may be missing).
-  const digs = [...wowCasts(data, [DIG_IN]).map((c) => c.t), ...(data.enemyAuras ?? []).filter((a) => a[1] === DIG_IN && a[3]).map((a) => a[0])];
+  const digs = [...new Set([...wowCasts(data, [DIG_IN]).map((c) => c.t), ...(data.enemyAuras ?? []).filter((a) => a[1] === DIG_IN && a[3]).map((a) => a[0])])];
   const players = data.actors.filter((a) => a.kind === "player");
-  return all.filter((c) => c.popped && digs.some((d) => c.end >= d && c.end <= d + DIG_IN_SPAN_MS)).flatMap((c) => {
-    const from = c.end - GALE_MS;
-    const ps = players.map((p) => poseAt(p, from)).filter((p): p is NonNullable<typeof p> => !!p && p.hp !== 0);
+  const popped = all.filter((c) => c.popped).sort((a, b) => a.end - b.end);
+  return digs.flatMap((dig) => GALE_SPANS.flatMap(([s, e]) => {
+    const start = dig + s, end = dig + e;
+    // The cyst this gale pops: the first pop after it starts.
+    const c = popped.find((x) => x.end >= start && x.end <= end);
+    if (!c || start >= data.durationMs) return [];
+    const ps = players.map((p) => poseAt(p, start)).filter((p): p is NonNullable<typeof p> => !!p && p.hp !== 0);
     if (!ps.length) return [];
-    const mx = ps.reduce((s, p) => s + p.x, 0) / ps.length, my = ps.reduce((s, p) => s + p.y, 0) / ps.length;
+    const mx = ps.reduce((sum, p) => sum + p.x, 0) / ps.length, my = ps.reduce((sum, p) => sum + p.y, 0) / ps.length;
     const bearing = ((Math.atan2(c.x - mx, -(c.y - my)) * 180) / Math.PI + 360) % 360;
-    return [{ kind: "va-sszorak-gale", label: "Howling Maelstrom", layer: "floor" as const, x: mx, y: my, bearing, start: from, end: c.end + 300 }];
-  });
+    return [{ kind: "va-sszorak-gale", label: "Howling Maelstrom", layer: "floor" as const, x: mx, y: my, bearing, start, end: Math.min(end, data.durationMs) }];
+  }));
 }
 
 /**
@@ -300,6 +305,11 @@ export const SSZORAK_REPLAY: FightReplay = {
   signature: [MUTILATE_BEGIN, SURGE, FURY_MARK],
   hiddenHits: [MUTILATE_HIT, CLAWS],
   notes: [CLAWS_NOTE],
+  // 7y: on the kill dqKJB9rgXpRPyVTj fight 7, melee stood a median 8.4-10.3y
+  // from his centre while he stood still (WoW melee reach ~ hitbox + 3y),
+  // and the user's VOD still shows his selection ring about the size of the
+  // 8y Serpent's Fury ring.
+  hitboxes: { Sszorak: 700 },
   shapes: (data) => [...fury(data), ...crosswinds(data)],
   effects: (data) => [...tankCones(data), ...struck(data), ...furyMarks(data), ...cystEffects(data), ...carriers(data), ...virulence(data), ...virulenceFails(data),
     ...tornadoes(data), ...tempestHits(data), ...crosswindArrows(data)],

@@ -521,6 +521,17 @@ function struckArt(kind: "claw" | "splash") {
   };
 }
 
+/** Serpent's Fury's stack ring: red, no fill, as in game (user's VOD). */
+function MarkRing({ x, y, r, t, opacity }: ShapeArtProps) {
+  const pulse = 1 + 0.02 * Math.sin(t / 220);
+  return (
+    <g opacity={opacity} pointerEvents="none">
+      <circle cx={x} cy={y} r={r * pulse} fill="none" stroke="#ff2a2a" strokeWidth={8} strokeOpacity={0.35} filter="url(#replay-glow)" />
+      <circle cx={x} cy={y} r={r * pulse} fill="none" stroke="#ff3b30" strokeWidth={3} />
+    </g>
+  );
+}
+
 /** Serpent's Fury's mark: a red-orange fang badge above its holder's icon. */
 function FuryMark({ e, x, y, t }: EffectArtProps) {
   const opacity = Math.max(0, Math.min(1, (t - e.start) / FADE_MS, (e.end - t) / 150));
@@ -662,6 +673,7 @@ export const VA_ART: FightArt = {
     "va-nekzali-cultist": pool("#3a1f5e", "#9b6bff"),
     "va-nymrissa-frost": pool("#7fc8f0", "#e8f8ff"),
     "va-twin-fangs-gore": pool("#5e0d16", "#b0283a"),
+    "va-sszorak-mark": MarkRing,
   },
   colors: {
     "va-vashnik-bile": VASHNIK_BILE,
