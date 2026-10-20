@@ -107,7 +107,7 @@ function crosswinds(data: ReplayData): AoeShape[] {
       style: CROSSWINDS_A.includes(s.id) ? "va-sszorak-wind-a" : "va-sszorak-wind-b" }));
 }
 
-type Cyst = { x: number; y: number; start: number; end: number };
+type Cyst = { x: number; y: number; start: number; end: number; popped?: boolean };
 
 /**
  * Viscous Cysts: dropped where each Venomous Surge ends, until a pop (the
@@ -139,22 +139,54 @@ function cysts(data: ReplayData): Cyst[] {
         if (!best || d < best.d) best = { c, d };
       }
     }
-    if (best) best.c.end = t;
+    if (best) { best.c.end = t; best.c.popped = true; }
   }
   return out;
 }
 
 /**
+ * Howling Maelstrom's gales: a wind across the whole arena blowing the raid
+ * into a cyst (user's VOD: a light white wind over the screen). The log has
+ * no gale event; each Maelstrom pop (within DIG_IN_SPAN_MS of Dig In) is the
+ * end of one, blowing from where the raid stood GALE_MS before toward the
+ * cyst. Kill dqKJB9rgXpRPyVTj fight 7, Maelstrom 1:40: the raid's median
+ * velocity rose to 10-18y/s toward each cyst 1.9-2.2s before its pop
+ * (1:41.5 -> 1:43.7 at ~327°, 1:50.0 -> 1:51.9 at ~21°, 1:58.7 -> 2:00.9 at
+ * ~115°), then 20-29y/s the other way from the pop's knockback. The fourth
+ * gale (pop 2:06.7) blurs with the walk back to the middle, so all get
+ * GALE_MS.
+ */
+const DIG_IN = 1286033, DIG_IN_SPAN_MS = 34000, GALE_MS = 2500;
+function gales(data: ReplayData, all: Cyst[]): CasterEffect[] {
+  // Dig In: a cast in the replay data (its buff on Sszorak may be missing).
+  const digs = [...wowCasts(data, [DIG_IN]).map((c) => c.t), ...(data.enemyAuras ?? []).filter((a) => a[1] === DIG_IN && a[3]).map((a) => a[0])];
+  const players = data.actors.filter((a) => a.kind === "player");
+  return all.filter((c) => c.popped && digs.some((d) => c.end >= d && c.end <= d + DIG_IN_SPAN_MS)).flatMap((c) => {
+    const from = c.end - GALE_MS;
+    const ps = players.map((p) => poseAt(p, from)).filter((p): p is NonNullable<typeof p> => !!p && p.hp !== 0);
+    if (!ps.length) return [];
+    const mx = ps.reduce((s, p) => s + p.x, 0) / ps.length, my = ps.reduce((s, p) => s + p.y, 0) / ps.length;
+    const bearing = ((Math.atan2(c.x - mx, -(c.y - my)) * 180) / Math.PI + 360) % 360;
+    return [{ kind: "va-sszorak-gale", label: "Howling Maelstrom", layer: "floor" as const, x: mx, y: my, bearing, start: from, end: c.end + 300 }];
+  });
+}
+
+/**
  * A cyst at its trigger size, 5y: at each of the kill's 11 pops the nearest
  * player stood 1.7-5.4y from it (samples up to ~1s old). Each drop also
- * flashes Surge's blast where it lands.
+ * flashes Surge's blast where it lands, and each pop its knockback: rings
+ * of green rolling out from it for POP_MS with arrows pushing away (user's
+ * VOD: a multi-layer green ring that clears the cyst, ~0.5-1s), plus the
+ * Maelstrom's gales (gales).
  */
-const CYST_RADIUS = 500;
+const CYST_RADIUS = 500, POP_MS = 900, POP_RADIUS = 1200;
 function cystEffects(data: ReplayData): CasterEffect[] {
-  return cysts(data).flatMap((c) => [
+  const all = cysts(data);
+  return [...all.flatMap((c) => [
     { kind: "va-sszorak-cyst", label: "Viscous Cyst", x: c.x, y: c.y, radius: CYST_RADIUS, start: c.start, end: c.end },
     { kind: "va-sszorak-surge-blast", label: "Venomous Surge", x: c.x, y: c.y, radius: SURGE_RADIUS, start: c.start, end: c.start + 900 },
-  ]);
+    ...(c.popped ? [{ kind: "va-sszorak-cyst-pop", label: "Viscous Cyst", x: c.x, y: c.y, radius: POP_RADIUS, start: c.end, end: c.end + POP_MS }] : []),
+  ]), ...gales(data, all)];
 }
 
 /**

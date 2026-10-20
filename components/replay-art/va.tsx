@@ -264,6 +264,74 @@ function Cyst({ e, x, y, t, scale }: EffectArtProps) {
 }
 
 /**
+ * A cyst popping (its knockback): three green rings rolling out one after
+ * another to `e.radius`, fading to nothing, and eight arrows pushing away
+ * from it.
+ */
+function CystPop({ e, x, y, t, scale }: EffectArtProps) {
+  const span = Math.max(1, e.end - e.start);
+  const f = (t - e.start) / span;
+  if (f < 0 || f > 1) return null;
+  const R = (e.radius ?? 1200) * scale, r0 = 500 * scale;
+  return (
+    <g pointerEvents="none">
+      {[0, 0.15, 0.3].map((delay, i) => {
+        const g = (f - delay) / (1 - delay);
+        if (g <= 0) return null;
+        const r = r0 + (R - r0) * Math.sqrt(g);
+        return (
+          <g key={i} opacity={(1 - g) * (1 - i * 0.2)}>
+            <circle cx={x} cy={y} r={r} fill="none" stroke="#3faa1a" strokeWidth={9 - i * 2} strokeOpacity={0.5} filter="url(#replay-glow)" />
+            <circle cx={x} cy={y} r={r} fill="none" stroke={i === 0 ? "#e4ffb0" : "#9ce83f"} strokeWidth={3 - i * 0.6} />
+          </g>
+        );
+      })}
+      {f < 0.15 && <circle cx={x} cy={y} r={r0} fill="#c8ff6a" fillOpacity={0.5 * (1 - f / 0.15)} />}
+      <g opacity={1 - f}>
+        {Array.from({ length: 8 }, (_, k) => {
+          const d = r0 + (R - r0) * (0.25 + 0.75 * f);
+          return (
+            <g key={k} transform={`rotate(${k * 45} ${x} ${y})`}>
+              <path d={`M${x} ${y - d - 14} L${x + 9} ${y - d} L${x} ${y - d - 4} L${x - 9} ${y - d} Z`} fill="#d8ffa0" stroke="#1f4a0a" strokeWidth={1.5} />
+            </g>
+          );
+        })}
+      </g>
+    </g>
+  );
+}
+
+/**
+ * A Maelstrom gale over the whole arena, blowing toward `e.bearing`: light
+ * white streaks racing across and big faint chevrons drifting the same way
+ * (user's VOD: a light white wind across the screen). Drawn on the floor
+ * layer, under everything else.
+ */
+function Gale({ e, t, cx, cy }: EffectArtProps) {
+  const opacity = Math.max(0, Math.min(1, (t - e.start) / 300, (e.end - t) / 300));
+  if (opacity <= 0) return null;
+  const H = 800;   // half the square the wind fills, SVG units (the arena view is 1000)
+  const age = t - e.start;
+  const wrap = (v: number) => ((((v + H) % (2 * H)) + 2 * H) % (2 * H)) - H;
+  return (
+    <g opacity={opacity} pointerEvents="none" transform={`rotate(${e.bearing ?? 0} ${cx} ${cy})`}>
+      <rect x={cx - H} y={cy - H} width={2 * H} height={2 * H} fill="#e8f0ff" fillOpacity={0.05} />
+      {Array.from({ length: 46 }, (_, k) => {
+        const lx = cx - H + rand(k * 1.37) * 2 * H;
+        const len = 50 + rand(k * 2.11) * 90;
+        const ly = cy + wrap(rand(k * 3.7) * 2 * H - age * (1.1 + rand(k * 0.53) * 0.6));
+        return <line key={k} x1={lx} y1={ly} x2={lx} y2={ly + len} stroke="#f4f8ff" strokeWidth={1.2 + rand(k) * 1.4} strokeOpacity={0.16 + rand(k * 5.3) * 0.16} strokeLinecap="round" />;
+      })}
+      {Array.from({ length: 6 }, (_, i) => Array.from({ length: 6 }, (_, j) => {
+        const ax = cx - H + (i + 0.5) * (2 * H / 6) + (j % 2 ? 60 : -60);
+        const ay = cy + wrap(-H + (j + 0.5) * (2 * H / 6) - age * 0.25);
+        return <path key={`${i}-${j}`} d={`M${ax - 26} ${ay + 14} L${ax} ${ay - 14} L${ax + 26} ${ay + 14}`} fill="none" stroke="#ffffff" strokeWidth={5} strokeOpacity={0.12} strokeLinecap="round" strokeLinejoin="round" />;
+      }))}
+    </g>
+  );
+}
+
+/**
  * Venomous Surge's aura on its carrier: a shimmering green field `e.radius`
  * across (user's VOD), sparkles drifting in it, a solid rim.
  */
@@ -563,6 +631,8 @@ export const VA_ART: FightArt = {
     "va-sszorak-tornado": Tornado,
     "va-sszorak-surge": SurgeAura,
     "va-sszorak-surge-blast": SurgeBlast,
+    "va-sszorak-cyst-pop": CystPop,
+    "va-sszorak-gale": Gale,
     "va-sszorak-virulence-plus": virulenceCross(0),
     "va-sszorak-virulence-x": virulenceCross(45),
     "va-sszorak-virulence-fail": VirulenceFail,
