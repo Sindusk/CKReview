@@ -123,6 +123,7 @@ export type CasterEffect = {
   // Jolts the `actor`'s icon for the effect's span, settling out: a player
   // struck by a hit (WoW Ravage / Mutilate).
   shake?:  boolean;
+  bearing?: number;             // compass degrees, for art that points (a wind's direction)
   x: number; y: number;         // else stays here (centi-yalms)
   start: number; end: number;   // ms from pull start
 };
