@@ -65,7 +65,10 @@ describe", fetch-only-what-you-need).
      the production server can't reach wago.tools, the arena stays blank.
 4. **Hitboxes.** Creature id → display → model bounds in db2, or measured
    from melee players' median distance (as FFXIV's were checked). Until
-   then the target ring is a fixed size.
+   then the target ring is a fixed size, unless the fight's spec sets
+   `hitboxes` by enemy name (2026-10-19: Sszorak 7y, from melee distances
+   8.4-10.3y and the VOD; the icon grows with it). Other bosses: measure
+   the same way.
 5. **Fetch size.** Every hit on the boss carries its position (~300 events
    a second); the builder thins them, but they're still downloaded. A
    server-side filter that drops most player→boss damage while keeping

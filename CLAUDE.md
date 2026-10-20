@@ -106,6 +106,10 @@ Standing preferences, each learned from a real correction.
   render a mockup from real data and let the user pick. For a data
   checkpoint, tie each question to a pull and MM:SS and say what the log
   shows there.
+- **Measure; don't adopt placeholder numbers** (user, 2026-10-19). When
+  the user gives a window length, size or timing, check it against the
+  logs and use the measured value, saying where it differs and why. Their
+  numbers are a starting guess, not a spec.
 - **Sanity-check generated advice** the way a raid lead would. The
   optimizer once moved a 60s Reprisal four minutes later when it was free
   three times over in between (user, 2026-10-11).

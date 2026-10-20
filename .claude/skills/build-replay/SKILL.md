@@ -117,11 +117,24 @@ WebSearch); don't download files. Record what you learn and where in the
 spec's comments. When sources disagree or say nothing, pick the plainest
 rendering and list it as a VOD check.
 
+The log often holds more than its events: players' movement shows forced
+motion (a gale is the raid's median velocity jumping toward one spot; a
+knockback's direction is each holder's first 0.6s of travel), and where
+players stand shows unseen geometry (lines they all avoid, a ring they
+stand at the edge of; melee distance gives a WoW hitbox). For speeds and
+sizes the log can't give, measure the user's VOD stills against something
+of known size on screen (Sszorak's tornadoes, scaled by Virulence's 15y
+lines). Lessons from Sszorak, 2026-10-19.
+
 ## 5. Decide what to draw
 
 One line per mechanic, before writing code: game data is right / an
 override / a new cue (effect) / a new look (style or shape art) / skip
-(and why). Draw what a player reads to resolve the mechanic: where the AoE
+(and why). A mechanic the log can't place (no cast, target, marker or
+position) is skipped and said outright with the spec's `notes` (shown top
+right), not drawn as a guess (user, 2026-10-19); a modelled one that's
+only roughly right (paths with no actors) gets a note too. Draw what a
+player reads to resolve the mechanic: where the AoE
 is going to be, who carries what, what the boss is telling them. Reuse
 built-in looks first (styles: aoe, stack, tower, tankbuster, knockback,
 lightning, light, ice, drop, puddle; star crosses, line stacks, cages,

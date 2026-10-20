@@ -295,31 +295,29 @@ VOD checks, Pull 2 (Kag91qVZ2YJ7MQAb fight 22):
 
 ## Sszorak
 
-Pull: Sszorak kill, Pull 1 (nHavrDhPVtBYkMXA fight 43, 4:55).
+Pulls: the kill nHavrDhPVtBYkMXA fight 43 (4:55, first build); the
+user's kill dqKJB9rgXpRPyVTj fight 7 (6:18, "Pull 7"), reviewed on VOD
+2026-10-19. Current state (the spec's comments hold each entry's evidence):
 
-Drawn:
-- **Serpent's Fury**: an orange 8y stack circle on the mark until the
-  charge.
-- **Mutilate**: an orange soak cone from Sszorak toward the tank for the 3s
-  cast, 70° and 25y: every soaker hit in the kill (96) stood within 36° of
-  the boss-to-tank line, 5-25y out.
-- **Ravage**: a tankbuster ring on its tank for the 3s cast.
-- **Raging Crosswinds**: a 6y blast circle on each of the 8 holders for
-  8s, white for one pair of directions (1297096 / 1297111) and teal for the
-  other (1285425 / 1285453), so partners can be read off.
-- **Venomous Surge** (green ring) and **Virulence** (yellow-green ring) on
-  their carriers.
-- **Viscous Cysts**: a green sac where each Surge ended, until a pop is
-  matched to it (the live cyst with a player nearest it at the pop).
-- **Tempest**: a swirl where a tornado struck a player.
-- **Caustic Residue**: a pool where Caustic Claws landed, until the last
-  player stepped in it.
+| Mechanic | Drawn | Source |
+|---|---|---|
+| Ravage | white 50° cone from the boss tracking the tank for the cast bar; claw slashes + icon jolt on the hit | VOD look; angle by eye |
+| Mutilate | green 70° cone the same way; splash + jolt on each soaker | VOD look; angle from 96 soaker hits |
+| Serpent's Fury | fang badge on the mark the whole time; red unfilled 8y ring for the last 8s before the charge | VOD look |
+| Raging Crosswinds | 6y circle per holder by pair colour, plus an arrow the way the blast throws them | arrows measured (47 blasts) |
+| Virulence | four 15y spikes through each carrier, + (1297707) or X (1299899), gentle pulse, white at the burst; green X over anyone a burst hits | VOD look; angles/length from the spread |
+| Venomous Surge | shimmering 8y aura on the carrier; shockwave at the drop | VOD look; 8y a guess (log can't size it) |
+| Viscous Cyst | 5y ring with a floating orb; three rolling rings + knockback arrows at the pop | VOD look; 5y from 11 pops |
+| Howling Maelstrom | white wind over the arena toward each gale's cyst: 3 gales at Dig In +1-9s, +11-16s, +18-25s; no 4th (the raid walks in) | VOD timings |
+| Tempest | 8 tornadoes on a 10y ring during the channel, out at 7y/s, bouncing off a 50y circle for 55s; hit swirls where they struck | VOD speed/lifetime; paths modelled |
+| Caustic Claws | not drawn; panel note says so | log has no position |
+| Sszorak | 7y hitbox (target ring and icon) | melee distances + VOD |
 
-Not drawn: tornadoes between hits, the Maelstrom's gale order (no
-events).
+Panel notes (top right): bomb puddles can't be placed; tornado paths are
+estimated and drift late in their life.
 
-Open questions:
-- Mutilate's real cone angle.
+Still open: Ravage's angle, the tornado count and launch angle, the Surge
+aura size, whether every tornado set lasts 55s.
 
 ### Refinement on the kill dqKJB9rgXpRPyVTj fight 7 (6:18, user's VOD)
 
@@ -345,38 +343,34 @@ Open questions:
 - **Virulence failure**: a flashing green X over a player a burst hit
   (one in this kill, 0:30.0).
 - **Tempest tornadoes** (modelled): eight on a 10y ring around Sszorak for
-  the channel, then straight out at 2y/s, bouncing off a 50y circle for
-  40s, fading after 6s. Only the ring and launch follow the VOD; a fit of
-  count, speed and launch angle to the 65 first hits in both kills found
-  nothing clearly better than chance, so later paths are a picture, not
-  positions. The hit swirls still mark where tornadoes really struck.
+  the channel, then straight out, bouncing off a 50y circle. A fit of
+  count, speed (to 16y/s) and launch angle to the 65 first hits in both
+  kills found nothing clearly better than chance (the hits are mostly DoT
+  ticks near the boss), so speed came from three VOD stills scaled by
+  Virulence's 15y lines (7y/s) and lifetime from the VOD (55s).
 
-VOD checks, Pull 7 (dqKJB9rgXpRPyVTj):
-1. Pull 7, 0:40-0:48: eight Crosswinds arrows (two each pointing roughly
-   N, E, S, W). Check that the in-game arrow over each player points the
-   way the replay's does, and that they fly that way at 0:47.7.
-2. Pull 7, 0:00-0:26: the Serpent's Fury stack circle on the mark; the
-   charge at 0:26. Check the circle sits on the marked player.
-3. Pull 7, 0:42 and 0:44: the first two cysts drop where the two Surge
-   carriers stood. Check the in-game cyst spots.
-4. Pull 7, 1:40-2:07: Maelstrom pops at 1:43.7, 1:51.9, 2:00.9, 2:06.7,
-   each removing the cyst the raid was blown into. Check the order, and
-   tell me how the gale itself looks in game (which tunnel lights up, how
-   long before it hits) so it can be drawn.
-5. Pull 7, 0:11-0:15: Mutilate's 70° soak cone. Check its width against
-   where the soak group stood.
+#### Later VOD passes (2026-10-19)
 
-VOD checks, Pull 1 (nHavrDhPVtBYkMXA fight 43):
-1. Pull 1, 0:05-0:08: Mutilate's soak cone toward the tank. Check its
-   width against where the soak group stood.
-2. Pull 1, 0:00-0:26: Serpent's Fury's circle on the mark; the charge at
-   0:26. Check the stack formed on that player.
-3. Pull 1, 0:40-0:48: Crosswinds circles on eight players in two colours.
-   Check that same-colour players were the ones meant to meet midair.
-4. Pull 1, 0:29-0:42: Venomous Surge rings, then cysts where they ended.
-   Check the cyst spots against the in-game drops.
-5. Pull 1, 1:40-2:08: the Maelstrom; cysts vanish one by one as they pop.
-   Check each pop's cyst and order.
+Mark ring red and unfilled; tank-hit bursts; cysts, Surge aura and pop
+rings; three gales at the VOD's timings; 7y hitbox; Caustic Claws dropped
+for a note. Findings that settled them:
+- Caustic Claws has no cast, target or marker (raw query of every
+  non-player event 0:28-0:40); puddles are neither where players stood at
+  the indicators (112 spots: median 6y, same as random times) nor in a
+  pattern around the boss. Only touched puddles could be placed.
+- Gales: the raid's median velocity rises to 10-18y/s toward a cyst ~2s
+  before each pop and 20-29y/s the other way at the pop. Pops fall at Dig
+  In +3.5 / +12 / +20.8 in all three Maelstroms, so fixed offsets hold.
+- Surge's blast hits the whole raid with no clear falloff, and nobody
+  stood 2-23y from a carrier, so the log can't size its "inside".
+
+VOD checks still open, Pull 7 (dqKJB9rgXpRPyVTj):
+1. Pull 7, 0:05-0:08: Ravage's 50° white cone. Check its width.
+2. Pull 7, 0:17-0:21: the tornado ring. Check the count (8 drawn) and
+   whether one sits straight in front of the boss.
+3. Pull 7, 0:32-0:42: the Venomous Surge aura (8y). Check its size.
+4. Pull 7, 3:14-4:10: the 3:14.5 tornado set ends at ~4:09.5 (55s). Check
+   it really lasts that long.
 
 ## The Twin Fangs
 

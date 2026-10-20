@@ -13,11 +13,18 @@
 //   markerAoes    markers that put a circle on their player until it drops
 //   tethers       tether ids with a meaning: their element and payoff hits
 //   effects       boss cues the log names only through a cast (CasterEffect),
-//                 drawn by the fight's art file under `kind`
+//                 drawn by the fight's art file under `kind`. An effect can
+//                 follow an `actor`, point at another (`aimAt`: a cone from
+//                 the boss tracking its tank), move along a modelled `path`
+//                 (objects the log never tracks), carry a `bearing` (a
+//                 wind), or `shake` its actor's icon (a player struck)
 //   floorStatuses statuses that change the whole floor while the party has them
 //   slideStatuses / jailStatuses  player decorations (slide trail, cage)
 //   shapes        extra AoeShapes the overrides can't express
 //   wowAuraShapes / hiddenHits    WoW: debuff circles, hits drawn some other way
+//   notes         standing limits shown top right: a mechanic the log can't
+//                 place, said outright instead of drawn as a guess
+//   hitboxes      WoW: enemy hitbox radii by name (WCL gives none)
 //
 // A spec applies to a pull when any of its `signature` ability ids, or any
 // ability id it overrides or names, shows up in the pull's casts, hits or

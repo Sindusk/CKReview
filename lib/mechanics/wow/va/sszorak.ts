@@ -37,7 +37,16 @@
 // spread, 2026-10-19). In game, Ravage shows a white cone and Mutilate a
 // green one from the boss tracking the tank for the cast bar; Tempest's
 // tornadoes form around the boss during the 3.5s channel, then go straight
-// out and bounce off the arena's edge (same VOD).
+// out and bounce off the arena's edge (same VOD) at ~7y/s, a set lasting
+// ~55s (the 0:20.5 set until ~1:15). Howling Maelstrom has THREE gales
+// (~Dig In +1-9s, +11-16s, +18-25s on that VOD); the raid walks into the
+// fourth cyst itself. A cyst's pop is a multi-layer green ring knocking
+// players away (~0.5-1s). Serpent's Fury's stack ring is red and unfilled
+// in game. Sszorak's hitbox is ~7y (melee stood a median 8.4-10.3y from
+// his centre on that kill). Caustic Claws' bombs ("Bombs" timer, Venomous
+// Surge buff on the boss 1305959) can't be placed from the log: no cast,
+// target or marker, and the puddles aren't where players stood at the
+// indicators (sszorak-replay.ts CLAWS_NOTE).
 //
 // Virulence (5s): expiry OR death bursts on players within ~10yd who no
 // longer hold that same Virulence ID, re-infecting them (1300089, 350-700k)
