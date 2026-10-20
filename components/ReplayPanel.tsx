@@ -231,6 +231,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   const aoes = useMemo(() => (!data ? [] : data.game === "wow" ? buildWowAoeShapes(data) : buildAoeShapes(data)), [data]);
   const raidwide = useMemo(() => (data?.game === "wow" ? buildWowRaidwide(data) : []), [data]);
   const fightNotes = useMemo(() => (data ? fightReplaysFor(data).flatMap((f) => f.notes ?? []) : []), [data]);
+  const fightHitboxes = useMemo(() => new Map<string, number>(data ? fightReplaysFor(data).flatMap((f) => Object.entries(f.hitboxes ?? {})) : []), [data]);
   const tethers = useMemo(() => (data && data.game !== "wow" ? buildTethers(data) : []), [data]);
   const players = useMemo(() => new Map((pull?.players ?? []).map((p) => [p.name, p])), [pull]);
   const slotByName = useMemo(() => {
@@ -383,8 +384,10 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
           {live.filter((l) => l.a.kind === "enemy").map(({ a, p }) => {
             const x = toX(p.x), y = toY(p.y);
             const deg = facingToCompassBearing(p.facing);
-            const ring = Math.max(BOSS_ICON / 2 + 8, (a.hitbox ?? 0) * scale);
-            const size = a.targetable ? BOSS_ICON : 18;
+            const hitbox = a.hitbox ?? fightHitboxes.get(a.name) ?? 0;
+            const ring = Math.max(BOSS_ICON / 2 + 8, hitbox * scale);
+            // A spec-given hitbox (FightReplay.hitboxes) grows the icon with it.
+            const size = !a.targetable ? 18 : a.hitbox === undefined && hitbox ? Math.max(BOSS_ICON, Math.round(ring * 1.1)) : BOSS_ICON;
             return (
               <g key={a.key} style={{ cursor: "pointer" }} opacity={a.targetable ? 1 : 0.55}
                 onMouseEnter={() => setHoverKey(a.key)} onMouseLeave={() => setHoverKey((k) => (k === a.key ? null : k))}

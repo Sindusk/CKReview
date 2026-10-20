@@ -157,4 +157,7 @@ export type FightReplay = {
   // Standing limits shown top right for the whole pull: a mechanic the log
   // can't place, said outright so it doesn't look missing.
   notes?: string[];
+  // WoW: enemy hitbox radii (centi-yards) by name, which WCL doesn't give:
+  // the target ring's size, and the boss icon grows to fit it.
+  hitboxes?: Record<string, number>;
 };
