@@ -100,10 +100,15 @@
 //   cones then killed six.
 // - Pull 64 (0:15, all eight dead by 0:05, no killing blow) was a reset to
 //   get a cooldown back (user): not a pull, left without a cutoff.
-// VOD review 2026-10-23 (user): report B Pulls 1, 3, 7, 12, 44, 51, 56
-// (and P2's 66, 72 in omega-mf.ts); rulings in expectations/rulings.json.
-// Pull 14 1:18.9 (many on the wrong side, the group's first talk about
-// it) and Pull 44's DRK in the round 1 tower stay unruled.
+// VOD review 2026-10-23 (user): report B Pulls 1, 3, 7, 12, 44, 51, 56,
+// then 2, 4, 6, 13, 22, 23, 25, 30 (and P2's 66, 68, 71, 72 in
+// omega-mf.ts); rulings in expectations/rulings.json. Pull 14 1:18.9
+// (many on the wrong side, the group's first talk about it) stays
+// unruled. Pull 15 0:56.2 (the MNK took the SGE's tether and held it all
+// round; the SGE "isn't necessarily wrong") is unruled: the hits can't
+// say who held which tether, so the holder priority still names the SGE.
+// Last-moment tether steals need the tether events (89), which only the
+// replay fetches today.
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-top1-avoidable (Major on Damage Down or death, else Minor): Flame
@@ -125,7 +130,10 @@
 //   didn't take it (and the holder, unless they held it the round before);
 //   an In Line player no Blaster hit took no tether, and the previous
 //   round's holders still holding one aren't named for what it hits
-//   (user, B7, B12).
+//   (user, B7, B12); not when a tower owner of the round stood in a
+//   Blaster instead (they took it: user, B4).
+// ffxiv-top1-tower "Tower Out of Turn" skips a player with no duty that
+//   round who covered for a tower owner stuck in a Blaster (user, B44).
 // ffxiv-top1-missile (Major on death, else Minor): a missile hitting
 //   others (the carrier; with one other, both), or the carrier in a line.
 // ffxiv-top1-line, groups broken: a group holding both players of an In
@@ -588,7 +596,14 @@ function detectProgramLoop(
     const failed = rd.casts.filter((c) => c.abilityId === OBLITERATION);
 
     // A Looper holder of another number soaking now spends their Looper early.
-    for (const p of players.filter((x) => soaked.has(x) && looped(x) && num.get(x) !== rd.r && life.alive(x, rd.t - 500))) {
+    // Not a player with no duty this round covering for an owner stuck in a
+    // Blaster (user, 2026-10-23, Pull 44 0:28.9: the DRK covered for the
+    // GNB, whose tether nobody took). A tether holder taking a tower instead
+    // still counts (Pull 30 0:37.7, Pull 18 0:38.1).
+    const h = ((rd.r + 1) % 4) + 1;
+    const blasted = new Set(rd.casts.filter((c) => c.abilityId === BLASTER).flatMap((c) => instanceHits(players, life, c).map((x) => x.p)));
+    const ownerStuck = owners.some((p) => looped(p) && !soaked.has(p) && blasted.has(p));
+    for (const p of players.filter((x) => soaked.has(x) && looped(x) && num.get(x) !== rd.r && life.alive(x, rd.t - 500) && !(ownerStuck && num.get(x) !== h))) {
       errors.push(playerError(p, {
         ruleId: TOP1_TOWER_RULE_ID, severity: "Major", name: "Tower Out of Turn",
         description: `Soaked a round ${rd.r} tower as In Line ${num.get(p)}: that spent their Looper early, so their own round ${num.get(p)} tower has one soaker short. ${TOWER_WHY}`,
@@ -689,7 +704,18 @@ function blasterClips(
   // An In Line h player no Blaster hit took no tether, wherever the cast
   // targets went (Pull 12 0:38.2: the SAM; both Blasters lost their
   // targets). The previous round's holders it hit still had theirs.
-  const untaken = rd.r === 1 ? [] : players.filter((p) => num.get(p) === h && !blasts.some((b) => b.hit.includes(p)));
+  // Not when a tower owner of this round stood in a Blaster instead of a
+  // tower: they took the tether (user, 2026-10-23, Pull 4 0:38.1: the DRK
+  // crossed through the boss and took the RDM's at the last second).
+  // A tether taken from its rightful holder by another In Line h player
+  // (Pull 6 0:47.0, the MNK from the SGE) or by a player of another number
+  // (Pull 15 0:56.2, the MNK from the SGE) doesn't show in the hits: each
+  // Blaster's centre (the hit player whose 15y covers every hit and no
+  // miss) fit two or three players in those rounds. The tether events (89)
+  // would show it; detection doesn't fetch them yet.
+  const towerTakers = players.filter((p) => num.get(p) === rd.r && holdsAt(p, LOOPER, rd.t - 300) && !soaked.has(p) && blasts.some((b) => b.hit.includes(p)));
+  const missing = rd.r === 1 ? [] : players.filter((p) => num.get(p) === h && !blasts.some((b) => b.hit.includes(p)));
+  const untaken = towerTakers.length ? [] : missing;
   for (const p of untaken) {
     errors.push(playerError(p, {
       ruleId: TOP1_BLASTER_RULE_ID, severity: roundDoomed ? "Major" : "Minor", name: "Tether Not Taken",
@@ -697,7 +723,7 @@ function blasterClips(
       timestamp: rd.t, abilityId: BLASTER, abilityName: "Blaster",
     }));
   }
-  const stuck = new Set(untaken.length ? players.filter((p) => num.get(p) === hPrev) : []);
+  const stuck = new Set(missing.length ? players.filter((p) => num.get(p) === hPrev) : []);
   const bearingOf = (b: (typeof blasts)[number], p: PlayerInfo) => {
     const e = b.hits.find((x) => x.p === p)?.e;
     return e?.x === undefined || e.y === undefined ? undefined : compassOf(e.x, e.y);
