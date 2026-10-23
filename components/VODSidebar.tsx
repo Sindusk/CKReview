@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { isLocalVod, type Vod } from "../types/Vod";
+import { isLocalVod, isTwitchVod, type Vod } from "../types/Vod";
 import PullList from "../components/PullList";
 import { Panel, PanelHeader } from "./ui/Panel";
 import type { Pull } from "../types/Pull";
@@ -144,8 +144,13 @@ function VodCard({
   onOpenTranscript: (id: number) => void;
 }) {
   const local = isLocalVod(vod);
-  const youTubeTitle = useYouTubeTitle(local ? null : vod.videoId);
-  const title = local ? vod.localFile?.name ?? null : youTubeTitle;
+  const twitch = isTwitchVod(vod);
+  const youTubeTitle = useYouTubeTitle(local || twitch ? null : vod.videoId);
+  // Twitch has no keyless title lookup (its API needs a registered app), so
+  // the card shows the VOD's ID instead.
+  const title = local ? vod.localFile?.name ?? null
+    : twitch ? `twitch.tv/videos/${vod.videoId}`
+    : youTubeTitle;
 
   return (
     <div
@@ -177,9 +182,9 @@ function VodCard({
         <div style={{ fontWeight: 700, fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center", flex: 1, color: isSelected ? "#e1f0ff" : "var(--ck-text)" }}>
           {vod.player}
         </div>
-        {/* Transcripts come from YouTube, so local files have none. The
-            spacer keeps the player name centred either way. */}
-        {local ? (
+        {/* Transcripts come from YouTube, so local files and Twitch VODs
+            have none. The spacer keeps the player name centred either way. */}
+        {local || twitch ? (
           <div style={{ width: "18px", flexShrink: 0 }} />
         ) : (
           <button
@@ -201,6 +206,15 @@ function VodCard({
           >
             Local
           </span>
+        ) : twitch ? (
+          // Twitch icon: a purple speech-bubble screen.
+          <svg viewBox="0 0 24 26" width="16" height="17" aria-label="Twitch">
+            <title>Twitch VOD: past broadcasts expire after 7–60 days</title>
+            <path d="M2 0 L0 5 V23 H6 V26 H9 L12 23 H17 L24 16 V0 Z" fill="#a78bfa" opacity="0.9" />
+            <path d="M4 2 H22 V15 L18 19 H12 L9 22 V19 H4 Z" fill="#1a1a1a" />
+            <rect x="10" y="6" width="2" height="6" fill="#a78bfa" />
+            <rect x="16" y="6" width="2" height="6" fill="#a78bfa" />
+          </svg>
         ) : (
           // YouTube icon — marks the source at a glance instead of
           // spelling out the URL as plain text.
@@ -221,7 +235,8 @@ function VodCard({
         )}
       </div>
 
-      {/* YouTube title from the oEmbed endpoint, or the local file's name. */}
+      {/* YouTube title from the oEmbed endpoint, the local file's name, or
+          the Twitch VOD's path. */}
       <div
         title={title ?? undefined}
         style={{

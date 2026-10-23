@@ -1,9 +1,11 @@
 // Where a VOD's video comes from. "local" is a file picked from the user's
 // own disk and played through an object URL: it lives only in the current
 // tab and never reaches the server (see docs/archive/local-vod-plan.md and the
-// filter in app/page.tsx's persistSession). Absent means "youtube", so
-// sessions saved before local VODs existed restore unchanged.
-export type VodSource = "youtube" | "local";
+// filter in app/page.tsx's persistSession). "twitch" is a Twitch VOD
+// (twitch.tv/videos/ID); sessions save only its URL, and restore tells it
+// from YouTube by parsing that. Absent means "youtube", so sessions saved
+// before other sources existed restore unchanged.
+export type VodSource = "youtube" | "local" | "twitch";
 
 // In-memory handle on a local file. `name`/`size`/`lastModified` identify
 // the file without reading it.
@@ -43,10 +45,10 @@ export type Vod = {
   class: string;
   role: "Tank" | "Healer" | "DPS";
 
-  // YouTube only — empty for local VODs.
+  // YouTube and Twitch — empty for local VODs.
   url: string;
-  videoId: string;   // YouTube Video ID
-  embedUrl: string;
+  videoId: string;   // YouTube video ID, or the numeric Twitch VOD ID
+  embedUrl: string;  // YouTube only: Twitch's embed needs the page's host, known at play time
 
   raid: string;
   boss: string;
@@ -59,4 +61,8 @@ export type Vod = {
 
 export function isLocalVod(vod: Vod): boolean {
   return vod.source === "local";
+}
+
+export function isTwitchVod(vod: Vod): boolean {
+  return vod.source === "twitch";
 }

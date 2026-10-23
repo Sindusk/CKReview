@@ -1,7 +1,7 @@
 // lib/url-parsers.ts
 //
 // All "pull an ID out of a pasted URL" helpers in one place — WCL/FFLogs
-// report URLs and YouTube video URLs. Formerly lib/log-url.ts and
+// report URLs and YouTube/Twitch video URLs. Formerly lib/log-url.ts and
 // lib/youtube.ts; both boiled down to the same kind of task, so they now
 // live together instead of one tiny file per URL format.
 
@@ -104,4 +104,47 @@ export function parseYouTubeUrl(url: string): YouTubeVideoInfo | null {
   } catch {
     return null;
   }
+}
+
+// ─── Twitch URLs ────────────────────────────────────────────────────────────
+
+/**
+ * Extracts a Twitch VOD's numeric ID. Only past broadcasts, highlights and
+ * uploads (/videos/ID): clips use a different embed and aren't VODs.
+ * Supports:
+ * - https://www.twitch.tv/videos/ID (also m.twitch.tv, with or without ?t=)
+ * - https://player.twitch.tv/?video=ID (or v<ID>)
+ */
+export function parseTwitchUrl(url: string): { videoId: string } | null {
+  try {
+    const parsed = new URL(url.trim());
+    const host = parsed.hostname.toLowerCase();
+    if (host !== "twitch.tv" && !host.endsWith(".twitch.tv")) return null;
+
+    const pathMatch = parsed.pathname.match(/^\/videos\/(\d+)/);
+    if (pathMatch) return { videoId: pathMatch[1] };
+
+    const param = parsed.searchParams.get("video")?.match(/^v?(\d+)$/);
+    if (param) return { videoId: param[1] };
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Any VOD URL ────────────────────────────────────────────────────────────
+
+export type ParsedVodUrl =
+  | { source: "youtube"; videoId: string; embedUrl: string }
+  | { source: "twitch";  videoId: string; embedUrl: "" };
+
+// A pasted (or saved) VOD link as YouTube or Twitch. Twitch is tried first
+// because the YouTube parser accepts any host with a /watch or /live/ path.
+export function parseVodUrl(url: string): ParsedVodUrl | null {
+  const twitch = parseTwitchUrl(url);
+  if (twitch) return { source: "twitch", videoId: twitch.videoId, embedUrl: "" };
+  const yt = parseYouTubeUrl(url);
+  if (yt) return { source: "youtube", ...yt };
+  return null;
 }

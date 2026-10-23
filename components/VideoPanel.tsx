@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { isLocalVod, type Vod } from "@/types/Vod";
+import { isLocalVod, isTwitchVod, type Vod } from "@/types/Vod";
 import type { SeekRequest } from "@/hooks/useTimelineController";
 import { PanelHeader } from "./ui/Panel";
 
@@ -9,6 +9,7 @@ declare global {
   interface Window {
     onYouTubeIframeAPIReady?: () => void;
     YT: any;
+    Twitch: any;
   }
 }
 
@@ -27,12 +28,27 @@ type YTPlayerEvent = {
   target: YTPlayer;
 };
 
+// Twitch's embed player (player.twitch.tv/js/embed/v1.js). It has no
+// destroy(): clearing its container removes the iframe.
+type TwitchPlayer = {
+  play(): void;
+  pause(): void;
+  seek(seconds: number): void;
+  setVideo(videoId: string, timestamp: number): void;
+  getVideo(): string;   // the numeric ID, without the "v"
+  getCurrentTime(): number;
+  getDuration(): number;
+  isPaused(): boolean;
+  getEnded(): boolean;
+  addEventListener(event: string, callback: () => void): void;
+};
+
 /**
  * What the rest of the panel needs from whichever player is active: seek,
- * play and read the time. Two implementations — the YouTube iframe player
- * and an HTML5 <video> playing a local file. Switching videos stays
- * source-specific (loadVideoById vs. changing the <video> src) and lives in
- * the create/swap effect below.
+ * play and read the time. Three implementations — the YouTube iframe
+ * player, Twitch's embed player and an HTML5 <video> playing a local file.
+ * Switching videos stays source-specific (loadVideoById, setVideo, or
+ * changing the <video> src) and lives in the create/swap effect below.
  */
 type PlayerAdapter = {
   seekTo(seconds: number): void;
@@ -52,6 +68,20 @@ function youTubeAdapter(player: YTPlayer): PlayerAdapter {
     getCurrentTime: () => player.getCurrentTime(),
     getDuration:    () => player.getDuration(),
     isPlaying:      () => { const s = player.getPlayerState(); return s === 1 || s === 3; },
+  };
+}
+
+// `swapPending` is true from setVideo() until the new video reports its own
+// length: until then the player still answers with the previous video's
+// duration, which the playback loop would record for the new VOD.
+function twitchAdapter(player: TwitchPlayer, swapPending: () => boolean): PlayerAdapter {
+  return {
+    seekTo:         (t) => player.seek(t),
+    play:           () => player.play(),
+    pause:          () => player.pause(),
+    getCurrentTime: () => player.getCurrentTime(),
+    getDuration:    () => (swapPending() ? 0 : player.getDuration()),
+    isPlaying:      () => !player.isPaused() && !player.getEnded(),
   };
 }
 
@@ -165,6 +195,31 @@ function loadYouTubeAPI(): Promise<void> {
   });
 }
 
+// Twitch's `time` option: 3725.4 → "1h2m5s".
+function twitchTimestamp(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(s / 3600)}h${Math.floor((s % 3600) / 60)}m${s % 60}s`;
+}
+
+const TWITCH_EMBED_SRC ="https://player.twitch.tv/js/embed/v1.js";
+
+function loadTwitchAPI(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (window.Twitch?.Player) {
+      resolve();
+      return;
+    }
+    let tag = document.querySelector<HTMLScriptElement>(`script[src="${TWITCH_EMBED_SRC}"]`);
+    if (!tag) {
+      tag = document.createElement("script");
+      tag.src = TWITCH_EMBED_SRC;
+      document.body.appendChild(tag);
+    }
+    tag.addEventListener("load", () => resolve());
+    tag.addEventListener("error", () => reject(new Error("Twitch player script failed to load")));
+  });
+}
+
 export default function VideoPanel({
   vod,
   seekRequest,
@@ -194,7 +249,12 @@ export default function VideoPanel({
   // The raw YouTube player, kept for loadVideoById/destroy. Non-null only
   // while a YouTube VOD is showing.
   const ytPlayerRef = useRef<YTPlayer | null>(null);
-  // Whichever player is active, YouTube or local.
+  // The raw Twitch player, kept for setVideo. Non-null only while a Twitch
+  // VOD is showing; YouTube and Twitch never share the container.
+  const twitchPlayerRef = useRef<TwitchPlayer | null>(null);
+  // See twitchAdapter: set by setVideo() until the new video's length shows.
+  const twitchSwapPendingRef = useRef(false);
+  // Whichever player is active: YouTube, Twitch or local.
   const playerRef = useRef<PlayerAdapter | null>(null);
   const playerReadyRef = useRef(false);
 
@@ -230,12 +290,111 @@ export default function VideoPanel({
 
   const isLocal = !!vod && isLocalVod(vod);
 
-  function destroyYouTubePlayer() {
+  // Tears down whichever embed (YouTube or Twitch) owns the container.
+  function destroyEmbeds() {
     if (ytPlayerRef.current) {
       ytPlayerRef.current.destroy();
       ytPlayerRef.current = null;
     }
+    twitchPlayerRef.current = null;
+    twitchSwapPendingRef.current = false;
     if (containerRef.current) containerRef.current.innerHTML = "";
+  }
+
+  /**
+   * Twitch counterpart of seekOnceReady. After setVideo(), getVideo()
+   * names the new ID within ~250ms but getDuration() keeps the previous
+   * video's length for another ~250ms (measured 2026-10-22), and
+   * setVideo's own timestamp is ignored. So wait for the length to change
+   * (or 3s, for two VODs of equal length), then seek.
+   */
+  function twitchSeekOnceReady(generation: number, videoId: string, prevDuration: number, startedAt: number) {
+    const player = twitchPlayerRef.current;
+    if (!player || swapGenerationRef.current !== generation) return;
+
+    const duration = player.getDuration();
+    if (player.getVideo() === videoId && duration > 0
+      && (duration !== prevDuration || Date.now() - startedAt > 3000)) {
+      twitchSwapPendingRef.current = false;
+      if (holdRef.current) {
+        player.pause();
+        return;
+      }
+      twitchSeekAndPlay(player, generation);
+      return;
+    }
+
+    setTimeout(() => twitchSeekOnceReady(generation, videoId, prevDuration, startedAt), 100);
+  }
+
+  /**
+   * Seeks to the pending target and plays, then checks the seek landed and
+   * repeats it a few times if not. The embed answers over postMessage, so
+   * a seek sent while the video is still loading can be lost. Stops once
+   * a newer swap or seek request replaces this one.
+   */
+  function twitchSeekAndPlay(player: TwitchPlayer, generation: number, tries = 0) {
+    const target = latestSeekRef.current?.time;
+    if (target !== undefined) player.seek(target);
+    player.play();
+    if (target === undefined || tries >= 4) return;
+
+    setTimeout(() => {
+      if (twitchPlayerRef.current !== player || swapGenerationRef.current !== generation) return;
+      if (holdRef.current || latestSeekRef.current?.time !== target) return;
+      if (Math.abs(player.getCurrentTime() - target) > 3) twitchSeekAndPlay(player, generation, tries + 1);
+    }, 600);
+  }
+
+  function createTwitchPlayer(vod: Vod, startTime: number | undefined) {
+    if (!containerRef.current) return;
+
+    playerReadyRef.current = false;
+    setPlayerReady(false);
+    twitchSwapPendingRef.current = false;
+    swapGenerationRef.current += 1;
+
+    // The embed takes an element ID; the VOD id keeps it unique per create.
+    const div = document.createElement("div");
+    div.id = `twitch-embed-${vod.id}`;
+    div.style.width = "100%";
+    div.style.height = "100%";
+    containerRef.current.innerHTML = "";
+    containerRef.current.appendChild(div);
+
+    const creatingForVodId = vod.id;
+
+    loadTwitchAPI().then(() => {
+      if (!containerRef.current || latestVodIdRef.current !== creatingForVodId) return;
+
+      const player: TwitchPlayer = new window.Twitch.Player(div.id, {
+        video:    `v${vod.videoId}`,
+        width:    "100%",
+        height:   "100%",
+        // Twitch refuses to play inside a page whose host isn't listed
+        // here (and needs HTTPS off localhost).
+        parent:   [window.location.hostname],
+        autoplay: !holdRef.current,
+        muted:    true,
+        ...(startTime !== undefined ? { time: twitchTimestamp(startTime) } : {}),
+      });
+      twitchPlayerRef.current = player;
+
+      player.addEventListener(window.Twitch.Player.READY, () => {
+        // Superseded by another source before the embed finished loading.
+        if (twitchPlayerRef.current !== player) return;
+        playerRef.current = twitchAdapter(player, () => twitchSwapPendingRef.current);
+        playerReadyRef.current = true;
+        setPlayerReady(true);
+
+        if (holdRef.current) {
+          player.pause();
+          return;
+        }
+        // `time` is whole seconds; nudge to the exact target.
+        twitchSeekAndPlay(player, swapGenerationRef.current);
+      });
+    }).catch(() => {});
   }
 
   /**
@@ -285,7 +444,7 @@ export default function VideoPanel({
       playerReadyRef.current = false;
       setPlayerReady(false);
       playerRef.current = null;
-      destroyYouTubePlayer();
+      destroyEmbeds();
       return;
     }
 
@@ -295,15 +454,35 @@ export default function VideoPanel({
       playerReadyRef.current = false;
       setPlayerReady(false);
       playerRef.current = null;
-      destroyYouTubePlayer();
+      destroyEmbeds();
       return;
     }
 
     const startTime = latestSeekRef.current?.time;
 
+    // Twitch: same reuse-or-create shape as YouTube below, via setVideo().
+    if (isTwitchVod(vod)) {
+      const twitchPlayer = twitchPlayerRef.current;
+      if (twitchPlayer && playerReadyRef.current) {
+        swapGenerationRef.current += 1;
+        const prevDuration = twitchPlayer.getDuration();
+        twitchSwapPendingRef.current = true;
+        twitchPlayer.setVideo(`v${vod.videoId}`, startTime ?? 0);
+        twitchSeekOnceReady(swapGenerationRef.current, vod.videoId, prevDuration, Date.now());
+        return;
+      }
+      if (ytPlayerRef.current) destroyEmbeds();
+      createTwitchPlayer(vod, startTime);
+      return;
+    }
+    if (twitchPlayerRef.current) {
+      playerRef.current = null;
+      destroyEmbeds();
+    }
+
     // Reuse the existing player: swap the video in place. ytPlayerRef is
-    // cleared whenever a local VOD takes over, so this only reuses a
-    // YouTube player that's still showing.
+    // cleared whenever a local or Twitch VOD takes over, so this only
+    // reuses a YouTube player that's still showing.
     if (ytPlayerRef.current && playerReadyRef.current) {
       swapGenerationRef.current += 1;
       ytPlayerRef.current.loadVideoById({ videoId: vod.videoId, startSeconds: startTime });
@@ -339,7 +518,7 @@ export default function VideoPanel({
         },
         events: {
           onReady: (event: YTPlayerEvent) => {
-            // Superseded by a local VOD before the iframe finished loading.
+            // Superseded by another source before the iframe finished loading.
             if (ytPlayerRef.current !== ytPlayer) return;
             playerRef.current = youTubeAdapter(ytPlayer);
             playerReadyRef.current = true;
@@ -372,6 +551,7 @@ export default function VideoPanel({
         ytPlayerRef.current.destroy();
         ytPlayerRef.current = null;
       }
+      twitchPlayerRef.current = null;
       playerRef.current = null;
     };
   }, []);
@@ -554,8 +734,8 @@ export default function VideoPanel({
               : "inset 0 0 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)",
           }}
         >
-          {/* The YouTube API owns this div's contents (it swaps in its
-              iframe), so React never renders children into it. */}
+          {/* The YouTube or Twitch API owns this div's contents (it swaps in
+              its iframe), so React never renders children into it. */}
           <div
             ref={containerRef}
             style={{ position: "absolute", inset: 0, display: isLocal ? "none" : "block" }}

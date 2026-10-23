@@ -12,7 +12,7 @@ import AddReviewToStaticDialog from "@/components/AddReviewToStaticDialog";
 import ManageStaticsDialog from "@/components/ManageStaticsDialog";
 import BatchImportDialog, { type BatchItem, type BatchOutcome } from "@/components/BatchImportDialog";
 import { buildStaticReviewPayload, staticEligiblePulls } from "@/lib/static-review-data";
-import { parseYouTubeUrl, parseLogUrl } from "@/lib/url-parsers";
+import { parseVodUrl, parseLogUrl } from "@/lib/url-parsers";
 import { isLocalVod, type Vod } from "../types/Vod";
 import { loadLocalVodSync, saveLocalVodSync, clearLocalVodSync } from "@/lib/local-vod-sync";
 import {
@@ -135,13 +135,14 @@ function serverSavableVods(vods: Vod[]): Vod[] {
 // A saved session's VOD back as a Vod, with its sync points (or one point
 // from the legacy offset) and recorded length.
 function restoreSessionVod(v: SavedSessionVod, index: number): Vod {
-  const parsedYt = parseYouTubeUrl(v.url);
+  const parsed = parseVodUrl(v.url);
   return withSyncPoints({
     id:          Date.now() + index,
+    ...(parsed?.source === "twitch" ? { source: "twitch" as const } : {}),
     player:      v.player,
     url:         v.url,
-    videoId:     parsedYt?.videoId ?? "",
-    embedUrl:    parsedYt?.embedUrl ?? "",
+    videoId:     parsed?.videoId ?? "",
+    embedUrl:    parsed?.embedUrl ?? "",
     class:       "Unknown",
     role:        "DPS",
     raid:        "Unknown Raid",
@@ -805,14 +806,15 @@ export default function Home() {
     }
 
     const { url } = source;
-    const parsed = parseYouTubeUrl(url);
+    const parsed = parseVodUrl(url);
     if (!parsed) {
-      alert("Invalid YouTube URL");
+      alert("Not a YouTube video or Twitch VOD link (twitch.tv/videos/…)");
       return;
     }
 
     const newVod: Vod = {
       id:         Date.now(),
+      ...(parsed.source === "twitch" ? { source: "twitch" as const } : {}),
       player,
       url,
       videoId:    parsed.videoId,

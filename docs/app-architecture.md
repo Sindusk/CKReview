@@ -192,9 +192,26 @@ file's header comment. Mechanic detection has its own guide:
 
 ## VOD playback (`components/VideoPanel.tsx`, `hooks/useTimelineController.ts`)
 
-- **Two sources behind one `PlayerAdapter`** (seek, play, current time,
-  duration): the YouTube iframe player, and an HTML5 `<video>` for local
-  files (`Vod.source === "local"`).
+- **Three sources behind one `PlayerAdapter`** (seek, play, current time,
+  duration): the YouTube iframe player, Twitch's embed player
+  (`Vod.source === "twitch"`), and an HTML5 `<video>` for local files
+  (`Vod.source === "local"`). The Add VOD dialog takes a YouTube or Twitch
+  link in one field; `parseVodUrl()` in `lib/url-parsers.ts` tells them
+  apart, and restoring a session does the same from the saved URL.
+- **Twitch specifics.**
+  - The embed only plays when the page's host is in its `parent` list
+    (passed as `window.location.hostname`), and it needs HTTPS outside
+    localhost.
+  - **Swap quirk:** after `setVideo()`, `getVideo()` switches at once but
+    `getDuration()` keeps the previous video's length for ~250ms, and
+    setVideo's timestamp is ignored. `twitchSeekOnceReady()` waits for the
+    length to change, `twitchSeekAndPlay()` re-checks that the seek
+    landed, and the adapter reports duration 0 while a swap is pending so
+    the wrong length isn't recorded.
+  - Card titles show `twitch.tv/videos/ID`, because Twitch has no keyless
+    title lookup. There are no transcripts.
+  - Past broadcasts expire after 7–60 days, and subscriber-only VODs don't
+    play in the embed. The dialog says so.
 - **Local VODs never reach the server.** The file plays from an object URL
   held only in the tab, and `serverSavableVods()` in `app/page.tsx` drops
   them from the session payload. Route any new code that sends VODs
@@ -203,7 +220,8 @@ file's header comment. Mechanic detection has its own guide:
   size, `lastModified` and report, so re-picking the file restores sync.
 - **One YouTube player while YouTube VODs are showing.** VOD switches reuse
   it via `loadVideoById()`; destroy-and-recreate was the multi-second
-  delay. Selecting a local VOD destroys it.
+  delay. Selecting a local or Twitch VOD destroys it. Twitch VODs likewise
+  share one Twitch player (`setVideo()`).
 - **YouTube API quirk:** a `seekTo()` right after `loadVideoById()` is
   silently dropped until metadata loads, and `onStateChange` fires too
   early to rely on. `seekOnceReady()` polls `getDuration() > 0` first.

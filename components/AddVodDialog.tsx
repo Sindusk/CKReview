@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { Dialog, Field } from "./ui/Dialog";
 
-// A YouTube link, or a video file from the user's disk. The file is only
+// A YouTube or Twitch link (the page tells them apart, lib/url-parsers.ts
+// parseVodUrl), or a video file from the user's disk. The file is only
 // handed back to the page, which plays it through an object URL; it is
 // never uploaded (see docs/archive/local-vod-plan.md).
 export type AddVodSource =
-  | { kind: "youtube"; url: string }
+  | { kind: "url"; url: string }
   | { kind: "local"; file: File };
 
 type AddVodDialogProps = {
@@ -18,7 +19,7 @@ type AddVodDialogProps = {
 
 export default function AddVodDialog({ open, onCancel, onAdd }: AddVodDialogProps) {
   const [player, setPlayer] = useState("");
-  const [kind, setKind] = useState<AddVodSource["kind"]>("youtube");
+  const [kind, setKind] = useState<AddVodSource["kind"]>("url");
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
 
@@ -29,9 +30,9 @@ export default function AddVodDialog({ open, onCancel, onAdd }: AddVodDialogProp
   function handleAdd() {
     if (!player.trim()) return;
 
-    if (kind === "youtube") {
+    if (kind === "url") {
       if (!url.trim()) return;
-      onAdd(player.trim(), { kind: "youtube", url: url.trim() });
+      onAdd(player.trim(), { kind: "url", url: url.trim() });
     } else {
       if (!file) return;
       onAdd(player.trim(), { kind: "local", file });
@@ -64,10 +65,10 @@ export default function AddVodDialog({ open, onCancel, onAdd }: AddVodDialogProp
 
       <div style={{ display: "flex", gap: "6px", marginBottom: "12px" }}>
         <button
-          className={`ck-tab ck-tab--sm${kind === "youtube" ? " ck-tab--active" : ""}`}
-          onClick={() => setKind("youtube")}
+          className={`ck-tab ck-tab--sm${kind === "url" ? " ck-tab--active" : ""}`}
+          onClick={() => setKind("url")}
         >
-          YouTube URL
+          YouTube / Twitch URL
         </button>
         <button
           className={`ck-tab ck-tab--sm${kind === "local" ? " ck-tab--active" : ""}`}
@@ -77,14 +78,18 @@ export default function AddVodDialog({ open, onCancel, onAdd }: AddVodDialogProp
         </button>
       </div>
 
-      {kind === "youtube" ? (
-        <Field label="YouTube URL" style={{ marginBottom: 0 }}>
+      {kind === "url" ? (
+        <Field label="YouTube or Twitch URL" style={{ marginBottom: 0 }}>
           <input
             className="ck-input"
             value={url}
             onChange={e => setUrl(e.target.value)}
-            placeholder="https://www.youtube.com/watch?v=..."
+            placeholder="https://www.youtube.com/watch?v=... or https://www.twitch.tv/videos/..."
           />
+          <div className="ck-help" style={{ marginTop: "8px", marginBottom: 0 }}>
+            Twitch deletes past broadcasts after 7–60 days; highlights and
+            uploads are kept. Subscriber-only VODs won&apos;t play here.
+          </div>
         </Field>
       ) : (
         <Field label="Video file" style={{ marginBottom: 0 }}>
