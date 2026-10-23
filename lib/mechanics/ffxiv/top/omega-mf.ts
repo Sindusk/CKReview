@@ -101,6 +101,16 @@
 // one sample, 45y out, at its laser; the partner tethers (222) form with
 // the symbols; Bladedance tethers (84) are taken from the clones by the
 // tanks. Built in replay.ts.
+// Report D = 2qgaAkxVypGWv9CN (the user's static, day 1; omega.ts's report
+// B): 4 P2 pulls, none past Party Synergy. D66, D68, D71: the clones
+// killed 4-5 within 1s (the raid out of the safe area together; user,
+// D66: "the conga was not formed ... kind of everyone"). D72 2:54.2: all
+// three Remote Glitch pairs out of range at the Fire; the user names the
+// DRK (top right instead of bottom right) and the GNB and SAM (swapped on
+// their side). With one Fire in the report synergy-order.ts learns no
+// order, so all six stay named; the RDM, MNK and SCH are unruled.
+// VOD review 2026-10-23 (user): report D Pulls 66, 72; rulings in
+// expectations/rulings.json.
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-top2-avoidable (Major on death, else Minor: no Damage Down in P2):
@@ -119,7 +129,9 @@
 //   (both; synergy-order.ts keeps the one outside their expected stack),
 //   both marks together (3+ in both stacks: the two marked players), else
 //   a player in both stacks or none.
-// ffxiv-top2-synergy (Raid): the Fire or Spotlight killed 3+.
+// ffxiv-top2-synergy (Raid): the Fire or Spotlight killed 3+; the clones
+//   killed 4+ in one resolution (player-less, in place of each victim's
+//   avoidable: user, D66).
 // ffxiv-top2-bladedance (targeted: both tanks): a tank in both cones held
 //   both tethers, so the other tank took none; a cone no tank took names
 //   the tank no cone reached; a tank's cone that hit 2+ non-tanks names
@@ -663,6 +675,36 @@ function detectAvoidable(players: PlayerInfo[], life: Life, from: number, end: n
   return errors;
 }
 
+const CLONE_IDS = [BLADEWORK, 31525, 31533, 31531, 31532];
+// The clones killing this many in one resolution is the raid out of its safe
+// spot together, not single misreads (2qgaAkxVypGWv9CN Pulls 66, 68, 71:
+// 4-5 dead within 1s; the other static's clone hits were one player each).
+const CLONE_COLLAPSE_DEAD = 4;
+
+/**
+ * The real clones killing CLONE_COLLAPSE_DEAD+ at once: one player-less Raid
+ * marker in place of each victim's avoidable (user, 2026-10-23, Pull 66
+ * 2:45.6: "The conga was not formed ... can't really tell who was wrong
+ * because it was kind of everyone").
+ */
+function cloneCollapse(players: PlayerInfo[], life: Life, avoidable: PullError[]): { errors: PullError[]; owned: Set<PullError> } {
+  const hits = avoidable.filter((e) => CLONE_IDS.includes(e.abilityId ?? 0)).sort((a, b) => a.timestamp - b.timestamp);
+  const owned = new Set<PullError>();
+  const errors: PullError[] = [];
+  for (const g of clusterByGap(hits, (e) => e.timestamp, 1500)) {
+    const died = uniq(g.filter((e) => {
+      const p = players.find((x) => x.name === e.player);
+      return p && life.diedFrom(p, e.timestamp);
+    }).map((e) => e.player!));
+    if (died.length < CLONE_COLLAPSE_DEAD) continue;
+    for (const e of g) owned.add(e);
+    errors.push(raidMarker(TOP2_SYNERGY_RULE_ID, "Party Synergy Failed",
+      `Party Synergy's clones killed ${died.length} at once (${joinNames(died)}): the raid wasn't in the one area both clones leave safe, so no one player's misread explains it. ${CLONE_WHY}`,
+      g[0].timestamp, g[0].abilityId ?? 0, g[0].abilityName ?? "Party Synergy"));
+  }
+  return { errors, owned };
+}
+
 // ── Solar Ray: one buster per tank ──────────────────────────────────────────
 
 const SOLAR_WHY = "Each tank holds their own Omega (M for the Omega-M group, F for the other) into Solar Ray; with both on one tank, that tank takes both busters.";
@@ -1012,8 +1054,10 @@ export function detectOmegaMFErrors(
   const blade = detectBladedance(players, life, enemyCasts, start, end, occurrences);
   const avoidable = detectAvoidable(players, life, start, end, blade.owned);
   const read = readSynergy(players, deathEvents, enemyCasts, headMarkers);
+  const clones = cloneCollapse(players, life, avoidable);
   const errors = [
-    ...avoidable,
+    ...avoidable.filter((e) => !clones.owned.has(e)),
+    ...clones.errors,
     ...detectSolarRay(players, life, enemyCasts, start, end, occurrences),
     ...detectSynergy(players, life, read, avoidable),
     ...blade.errors,

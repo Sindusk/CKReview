@@ -83,6 +83,27 @@
 // holders); Ballistic Impact's helpers log only the boss's spot; Diffuse
 // fits 120° aimed at the tanks it hit (10 of 10). Storage Violation 31492
 // returns at 11:07.5 in that pull. Built in replay.ts.
+// Report B = 2qgaAkxVypGWv9CN (the user's static, day 1 of prog, 73
+// pulls, no P1 clear; GNB DRK, SCH SGE, MNK SAM, DNC RDM; NAUR strats):
+// - Program Loop layout: each round's towers sit on two cardinals (+-14
+//   degrees) and the two holders take the other two, by priority: a
+//   clockwise scan from north, the earlier holder in the NAUR conga (SCH
+//   DNC MNK DRK GNB SAM RDM SGE) on the first free cardinal (170 of 175
+//   clean rounds; pantokrator-conga.ts). Clean holders stood 0-28 degrees
+//   off their cardinal; waiting players stand by the towers.
+// - The tower helpers' cast positions can repeat the previous round's
+//   spots (B12 +0:38.1: round 1's N/W for towers soaked at E/S); the
+//   soaker's own hit is the tower's place.
+// - Diffuse: the DRK takes all five volleys alone with Living Dead (cast
+//   1:43-1:47 every pull that got there); the GNB is clipped for 0 each
+//   volley. B51: no Living Dead, the DRK died to the first pair and the
+//   cones then killed six.
+// - Pull 64 (0:15, all eight dead by 0:05, no killing blow) was a reset to
+//   get a cooldown back (user): not a pull, left without a cutoff.
+// VOD review 2026-10-23 (user): report B Pulls 1, 3, 7, 12, 44, 51, 56
+// (and P2's 66, 72 in omega-mf.ts); rulings in expectations/rulings.json.
+// Pull 14 1:18.9 (many on the wrong side, the group's first talk about
+// it) and Pull 44's DRK in the round 1 tower stay unruled.
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-top1-avoidable (Major on Damage Down or death, else Minor): Flame
@@ -93,14 +114,24 @@
 //   whether or not a tower failed). Later rounds are fallout. Targeted:
 //   every round reports its two In Line players.
 // ffxiv-top1-blaster (Major on Doom or death, else Minor), all eight
-//   alive: a Blaster hitting both holders (both named); a round's tower
-//   player with Looper in a Blaster instead of a tower; a holder hitting a
-//   tower soaker or two+ others; else the holder and the one player hit; no
-//   holder in the hit (the non-soakers hit). Rounds 2-4, a tether on
-//   another number: the In Line player with no tether didn't take it (and
-//   the holder, unless they held it the round before).
+//   alive: a Blaster hitting both holders (both named; the cross-pull
+//   holder priority keeps the one off their assigned cardinal, "Wrong
+//   Tether Spot"); a round's tower player with Looper in a Blaster instead
+//   of a tower; a holder hitting a tower soaker or two+ others; else the
+//   one player hit when the holder stood on a free cardinal (user, B1
+//   0:29.2), the holder when they didn't and that player waited by a
+//   tower, else both; no holder in the hit (the non-soakers hit). Rounds
+//   2-4, a tether on another number: the In Line player with no tether
+//   didn't take it (and the holder, unless they held it the round before);
+//   an In Line player no Blaster hit took no tether, and the previous
+//   round's holders still holding one aren't named for what it hits
+//   (user, B7, B12).
 // ffxiv-top1-missile (Major on death, else Minor): a missile hitting
 //   others (the carrier; with one other, both), or the carrier in a line.
+// ffxiv-top1-line, groups broken: a group holding both players of an In
+//   Line number (Major, both named; the conga keeps the one who didn't
+//   flex) plus a Raid cutoff at the first set, and no line errors after
+//   (user, B3 1:21.4: "not resolvable").
 // ffxiv-top1-line (Major on death, else Minor), all eight alive: both
 //   line-marked players inside one line (both named, nobody else that
 //   set; the cross-pull conga then keeps only the one who belonged on the
@@ -108,7 +139,9 @@
 //   (groups read from the pull's lines), the aimed player taking the line
 //   to the other group, a player in both lines.
 // ffxiv-top1-diffuse (Major on death, else Minor), both tanks alive: the
-//   farthest non-tank a cone hit, and a tank no cone reached.
+//   farthest non-tank a cone hit, and a tank no cone reached. A tank the
+//   cones killed had no invuln ("Tank Cones Without Invuln", Major; Raid
+//   when the next cones killed 3+; user, B51).
 // ffxiv-top1-wave-cannon: a line hitting 2+ players, all six non-tanks
 //   alive (everyone it hit named: the log can't say who moved).
 // ffxiv-top1-wall (Major): a silent death no Doom, missile, reset or own
@@ -485,6 +518,22 @@ function detectAvoidable(players: PlayerInfo[], life: Life, end: number): PullEr
 
 type Round = { r: number; t: number; casts: EnemyEvent[] };
 
+/**
+ * The round's two tower cardinals and the two free ones the holders take.
+ * A tower's spot is read from its soaker's hit: the helpers' cast positions
+ * can repeat the previous round's (A12 +0:38.1 logged round 1's spots for
+ * towers soaked at E and S). An unsoaked tower falls back to its cast.
+ */
+function roundCardinals(players: PlayerInfo[], life: Life, rd: Round): { towers: number[]; free: number[] } | undefined {
+  const towers = uniq(rd.casts.filter((c) => c.abilityId === TOWER || c.abilityId === OBLITERATION).flatMap((c) => {
+    const e = instanceHits(players, life, c).find((x) => x.e.x !== undefined)?.e;
+    const x = e?.x ?? c.x, y = e?.y ?? c.y;
+    return x === undefined || y === undefined ? [] : [cardinalOf(compassOf(x, y))];
+  }));
+  if (towers.length !== 2) return undefined;
+  return { towers, free: [0, 1, 2, 3].filter((c) => !towers.includes(c)) };
+}
+
 /** The four Program Loop rounds: two towers and two Blasters each, ~9s apart. */
 function loopRounds(casts: EnemyEvent[], end: number): Round[] {
   return clusterByGap(castsOf(casts, [TOWER, OBLITERATION, BLASTER], end), (c) => c.timestamp, ROUND_GAP_MS)
@@ -492,7 +541,26 @@ function loopRounds(casts: EnemyEvent[], end: number): Round[] {
 }
 
 const TOWER_WHY = "Round n's towers belong to the two In Line n players (towers 1-2-3-4, tethers 3-4-1-2); each takes one tower of their own while they still hold Looper.";
-const BLASTER_WHY = "The tether holders (In Line 3, 4, 1, 2 in rounds 1-4) take Blaster to an empty cardinal, away from the towers, the other holder and the waiting players: it hits everyone near the holder, and a second hit before Twice-come Ruin wears off (11s) is Doom.";
+const BLASTER_WHY = "The tether holders (In Line 3, 4, 1, 2 in rounds 1-4) take Blaster to the two cardinals the towers leave empty, by priority, away from the towers, the other holder and the waiting players (who wait by the towers without taking them): it hits everyone near the holder, and a second hit before Twice-come Ruin wears off (11s) is Doom.";
+
+// TOP's arena is centred on (100, 100); positions are in hundredths of a yalm.
+const ARENA_X = 10000, ARENA_Y = 10000;
+/** Compass bearing from the arena centre (0 = north, clockwise; y grows south). */
+export function compassOf(x: number, y: number): number {
+  return (Math.atan2(x - ARENA_X, -(y - ARENA_Y)) * 180 / Math.PI + 360) % 360;
+}
+/** The nearest cardinal: 0 N, 1 E, 2 S, 3 W. */
+export const cardinalOf = (bearing: number) => Math.round(bearing / 90) % 4;
+/** Degrees between a bearing and a cardinal. */
+export const offCardinal = (bearing: number, c: number) => Math.abs(((bearing - c * 90) % 360 + 540) % 360 - 180);
+// A tether holder within this of a free cardinal stood on their spot. Clean
+// holders (2qgaAkxVypGWv9CN, 160 clean holds): 0-28 degrees; the holders
+// whose Blaster clipped one waiting player: 0-14, one 88 (A42 +0:46.6).
+const HOLDER_SPOT_DEG = 30;
+// A waiting player within this of a tower's cardinal stood by the tower.
+// Victims of a holder on their spot stood 21-135 off (A1 +0:29.2's SCH at
+// 21 was out of place: user, 2026-10-23).
+const WAITER_SPOT_DEG = 20;
 
 /**
  * Program Loop. Each round's two towers need the two In Line players for
@@ -575,7 +643,14 @@ function detectProgramLoop(
  * - a round's tower player with Looper who stood in the tether instead of a
  *   tower (unless the empty tower already names them);
  * - the holder, when they hit a tower soaker or two or more players;
- * - otherwise the holder and the one player hit (either could have moved).
+ * - otherwise the one player hit when the holder stood on a free cardinal
+ *   (user, 2026-10-23, 2qgaAkxVypGWv9CN Pull 1 0:29.2: the SCH waited away
+ *   from the towers), the holder when they didn't and the player hit
+ *   waited by a tower, else both.
+ * A tether nobody of the round's number took is theirs, not the previous
+ * holder's who still has it (user, 2026-10-23: "if a tether is not taken,
+ * it is the fault of the person who was supposed to take it"); that
+ * holder isn't named for what the stuck tether hits (Pull 12 0:38.2).
  * Major when someone it hit got Doom or died, else Minor.
  */
 function blasterClips(
@@ -586,10 +661,13 @@ function blasterClips(
   const hPrev = (rd.r % 4) + 1;   // the previous round's tether number
   const errors: PullError[] = [];
   const blasts = rd.casts.filter((x) => x.abilityId === BLASTER).map((c) => {
-    const hit = instanceHits(players, life, c).map((x) => x.p);
+    const hits = instanceHits(players, life, c);
+    const hit = hits.map((x) => x.p);
     const holders = hit.filter((p) => num.get(p) === h);
-    return { c, hit, holders, holder: hit.find((p) => p.name === c.target) ?? (holders.length === 1 ? holders[0] : undefined) };
+    return { c, hits, hit, holders, holder: hit.find((p) => p.name === c.target) ?? (holders.length === 1 ? holders[0] : undefined) };
   });
+  const cards = roundCardinals(players, life, rd);
+  const roundDoomed = uniq(blasts.flatMap((b) => b.hit)).some((p) => doomedAt(p, rd.t) || diedOf(p, life, deaths, rd.t));
   // A tether still on the wrong number: the In Line h player with no tether
   // this round didn't take it (A66 +47.1: the previous holder kept it and
   // got Doom). Not round 1, where the first holder is random.
@@ -608,7 +686,25 @@ function blasterClips(
       }));
     }
   }
-  for (const { c, hit, holders, holder } of blasts) {
+  // An In Line h player no Blaster hit took no tether, wherever the cast
+  // targets went (Pull 12 0:38.2: the SAM; both Blasters lost their
+  // targets). The previous round's holders it hit still had theirs.
+  const untaken = rd.r === 1 ? [] : players.filter((p) => num.get(p) === h && !blasts.some((b) => b.hit.includes(p)));
+  for (const p of untaken) {
+    errors.push(playerError(p, {
+      ruleId: TOP1_BLASTER_RULE_ID, severity: roundDoomed ? "Major" : "Minor", name: "Tether Not Taken",
+      description: `Round ${rd.r}: In Line ${h}, but no Blaster hit them: they took no tether, so one stayed on its previous holder.${roundDoomed ? " The round's Blasters gave Doom." : ""} ${BLASTER_WHY}`,
+      timestamp: rd.t, abilityId: BLASTER, abilityName: "Blaster",
+    }));
+  }
+  const stuck = new Set(untaken.length ? players.filter((p) => num.get(p) === hPrev) : []);
+  const bearingOf = (b: (typeof blasts)[number], p: PlayerInfo) => {
+    const e = b.hits.find((x) => x.p === p)?.e;
+    return e?.x === undefined || e.y === undefined ? undefined : compassOf(e.x, e.y);
+  };
+  for (const b of blasts) {
+    const { c, holders, holder } = b;
+    const hit = b.hit.filter((p) => !stuck.has(p) || p === holder);
     if (hit.length <= 1) continue;
     const doomed = hit.filter((p) => doomedAt(p, c.timestamp));
     const died = hit.filter((p) => diedOf(p, life, deaths, c.timestamp));
@@ -623,7 +719,7 @@ function blasterClips(
     }));
     if (!holder) {
       if (holders.length >= 2) {
-        for (const p of holders) push(p, "Tether Holders Together", `Round ${rd.r}: both Blaster holders (${namesOf(holders)}) stood within each other's Blaster${hit.length > holders.length ? `, which also hit ${namesOf(hit.filter((x) => !holders.includes(x)))}` : ""}.${tail}`);
+        for (const p of holders) push(p, HOLDERS_TOGETHER_NAME, `Round ${rd.r}: both Blaster holders (${namesOf(holders)}) stood within each other's Blaster${hit.length > holders.length ? `, which also hit ${namesOf(hit.filter((x) => !holders.includes(x)))}` : ""}.${tail}`);
       } else {
         // Nobody of the round's tether number: the soakers in their towers
         // are where they belong (A48 +47.1).
@@ -639,10 +735,21 @@ function blasterClips(
     }
     const rest = others.filter((p) => !wrongJob.includes(p));
     if (!rest.length) continue;
-    const blamed = rest.some((p) => soaked.has(p)) || rest.length >= 2 ? [holder] : [holder, rest[0]];
+    let blamed = rest.some((p) => soaked.has(p)) || rest.length >= 2 ? [holder] : [holder, rest[0]];
+    let why = blamed.length > 1 ? "; either the holder or the player hit was out of place" : "";
+    if (blamed.length === 2 && cards) {
+      const hb = bearingOf(b, holder), vb = bearingOf(b, rest[0]);
+      if (hb !== undefined && Math.min(...cards.free.map((f) => offCardinal(hb, f))) <= HOLDER_SPOT_DEG) {
+        blamed = [rest[0]];
+        why = `; ${holder.name} held it on a free cardinal, so ${rest[0].name} wasn't waiting by a tower`;
+      } else if (vb !== undefined && Math.min(...cards.towers.map((f) => offCardinal(vb, f))) <= WAITER_SPOT_DEG) {
+        blamed = [holder];
+        why = `; ${rest[0].name} was waiting by a tower and ${holder.name} wasn't on a free cardinal`;
+      }
+    }
     for (const p of blamed) {
       push(p, p === holder ? "Blaster Hit Others" : "Stood in a Blaster",
-        `Round ${rd.r}: ${holder.name}'s Blaster (In Line ${h}) also hit ${namesOf(rest)}${rest.some((x) => soaked.has(x)) ? ", in a tower" : ""}${blamed.length > 1 ? "; either the holder or the player hit was out of place" : ""}.${tail}`);
+        `Round ${rd.r}: ${holder.name}'s Blaster (In Line ${h}) also hit ${namesOf(rest)}${rest.some((x) => soaked.has(x)) ? ", in a tower" : ""}${why}.${tail}`);
     }
   }
   return firstPer(errors, (e) => `${e.player}`);
@@ -730,6 +837,38 @@ export function readPantokrator(players: PlayerInfo[], deathEvents: DeathEvent[]
   };
 }
 
+/** The error both Blaster holders of one round get (pantokrator-conga.ts narrows it to one). */
+export const HOLDERS_TOGETHER_NAME = "Tether Holders Together";
+
+/**
+ * The pull's Program Loop holds as names, for the cross-pull holder
+ * priority (pantokrator-conga.ts): per round, the free cardinals and where
+ * each of the round's In Line holders stood when their Blaster went off.
+ * `clean`: each Blaster hit only its own holder, all eight alive.
+ */
+export function readProgramLoop(players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[]): {
+  t: number; free: number[]; holders: { name: string; bearing: number }[]; clean: boolean;
+}[] | undefined {
+  const loop = castsOf(enemyCasts, PROGRAM_LOOP, Infinity)[0];
+  if (!loop) return undefined;
+  const p2 = phase1End(enemyCasts);
+  const life = buildLife(players, deathEvents.filter((d) => d.timestamp <= p2));
+  const num = numbersIn(players, loop.timestamp, loop.timestamp + 10_000);
+  return loopRounds(enemyCasts, p2).flatMap((rd) => {
+    const cards = roundCardinals(players, life, rd);
+    if (!cards) return [];
+    const h = ((rd.r + 1) % 4) + 1;
+    const blasts = rd.casts.filter((c) => c.abilityId === BLASTER).map((c) => instanceHits(players, life, c));
+    const holders = uniq(blasts.flat().filter((x) => num.get(x.p) === h && x.e.x !== undefined && x.e.y !== undefined).map((x) => x.p))
+      .map((p) => {
+        const e = blasts.flat().find((x) => x.p === p)!.e;
+        return { name: p.name, bearing: compassOf(e.x!, e.y!) };
+      });
+    const clean = allAlive(players, life, rd.t - 500) && blasts.length === 2 && blasts.every((b) => b.length === 1 && num.get(b[0].p) === h);
+    return [{ t: rd.t, free: cards.free, holders, clean }];
+  });
+}
+
 /** The error both players of a same-number pair get (pantokrator-conga.ts narrows it to one). */
 export const SAME_SIDE_NAME = "Same Number, Same Side";
 
@@ -738,6 +877,29 @@ function detectPantokrator(players: PlayerInfo[], life: Life, deaths: DeathEvent
   if (!read) return [];
   const { num, sets, groups } = read;
   const errors: PullError[] = [];
+  // A group holding both players of a number: each group needs one of each,
+  // so one of the pair didn't flex to the other side and neither group can
+  // resolve its lines (user, 2026-10-23, 2qgaAkxVypGWv9CN Pull 3 1:21.4:
+  // both In Line 1 and both In Line 4 on one side, "not resolvable").
+  // pantokrator-conga.ts keeps the one who belonged on the other side.
+  const doubled = num.size === 8 && sets.length ? (groups ?? []).flatMap((g) =>
+    [1, 2, 3, 4].map((k) => g.filter((p) => num.get(p) === k)).filter((pair) => pair.length === 2)) : [];
+  if (doubled.length) {
+    const t = sets[0].t;
+    for (const pair of doubled) {
+      for (const p of pair) {
+        const other = pair.find((x) => x !== p)!;
+        errors.push(playerError(p, {
+          ruleId: TOP1_LINE_RULE_ID, severity: "Major", name: SAME_SIDE_NAME,
+          description: `Pantokrator: had In Line ${num.get(p)} like ${other.name} and both joined the same group, so neither group had one of each number for its missiles and lines. One of the two should have flexed to the other group; the log can't say which. ${LINE_WHY}`,
+          timestamp: t, abilityId: LINE, abilityName: "Condensed Wave Cannon Kyrios",
+        }));
+      }
+    }
+    errors.push(raidMarker(TOP1_LINE_RULE_ID, "Pantokrator Groups Broken",
+      `Both players of In Line ${uniq(doubled.map((pair) => num.get(pair[0]))).join(" and ")} ended up in one group, so the groups couldn't share their lines or place their missiles; unresolvable from here, treated as the cutoff point.`,
+      t, LINE, "Condensed Wave Cannon Kyrios"));
+  }
   for (const s of sets) {
     const inLine = (p: PlayerInfo) => s.lines.some((l) => l.hit.includes(p));
     const carriers = players.filter((p) => num.get(p) === s.k);
@@ -771,8 +933,8 @@ function detectPantokrator(players: PlayerInfo[], life: Life, deaths: DeathEvent
     }
 
     // Lines: with everyone alive (a death leaves a group short through no
-    // one's fault at the line).
-    if (!allAlive(players, life, s.t - 500)) continue;
+    // one's fault at the line), and groups of one of each number.
+    if (doubled.length || !allAlive(players, life, s.t - 500)) continue;
     const lineErrors: PullError[] = [];
     const targets = players.filter((p) => p.debuffs.some((e) => LINE_MARKS.includes(e.abilityId) && e.debuffStatus === "removed" && Math.abs(e.timestamp - s.t) <= 1000));
     // Both lines aim at the set's two players of one In Line number, one per
@@ -842,21 +1004,41 @@ function detectPantokrator(players: PlayerInfo[], life: Life, deaths: DeathEvent
 
 // ── the final volley: Diffuse and Wave Cannon Kyrios ────────────────────────
 
-const DIFFUSE_WHY = "Diffuse Wave Cannon Kyrios fires at the two players farthest from Omega, five times: the tanks stand at max melee (north, invulns up) and everyone else stays inside the hitbox.";
+const DIFFUSE_WHY = "Diffuse Wave Cannon Kyrios fires at the two players farthest from Omega, five times: the tank or tanks taking it stand farthest out under an invuln, and everyone else stays inside the hitbox.";
 
 /**
  * Diffuse Wave Cannon Kyrios on a non-tank with both tanks alive: the
  * non-tank farthest from Omega among those hit baited it, and a tank no cone
  * reached wasn't farthest. One error per player for the whole volley.
+ * A tank the cones killed had no invuln up (2qgaAkxVypGWv9CN Pull 51
+ * 1:48.6: the DRK, who takes all five alone with Living Dead at
+ * 1:43-1:47 in every other pull, cast none and died to the first pair;
+ * user, 2026-10-23: "He should have hit invuln"). Raid when the cones then
+ * killed 3+ others (Pull 51: six).
  */
 function detectDiffuse(players: PlayerInfo[], life: Life, deaths: DeathEvent[], casts: EnemyEvent[], end: number): PullError[] {
   const tanks = players.filter(isTank);
   if (tanks.length !== 2) return [];
   const errors: PullError[] = [];
-  for (const v of clusterByGap(castsOf(casts, DIFFUSE, end), (c) => c.timestamp, 1000)) {
+  const volleys = clusterByGap(castsOf(casts, DIFFUSE, end), (c) => c.timestamp, 1000);
+  for (const v of volleys) {
     const t = v[0].timestamp;
     if (!tanks.every((p) => life.alive(p, t - 500))) break;
     const hits = v.flatMap((c) => instanceHits(players, life, c, 1000));
+    const fallen = uniq(hits.filter((x) => isTank(x.p) && life.diedFrom(x.p, t)).map((x) => x.p));
+    if (fallen.length) {
+      // Everyone else the remaining volleys killed.
+      const later = volleys.filter((w) => w[0].timestamp > t).flatMap((w) => w.flatMap((c) => instanceHits(players, life, c, 1000)));
+      const victims = uniq(later.filter((x) => !fallen.includes(x.p) && life.diedFrom(x.p, x.e.timestamp)).map((x) => x.p));
+      for (const p of fallen) {
+        errors.push(playerError(p, {
+          ruleId: TOP1_DIFFUSE_RULE_ID, severity: victims.length >= 3 ? "Raid" : "Major", name: "Tank Cones Without Invuln",
+          description: `Took Diffuse Wave Cannon Kyrios and died to it: no invuln was up for the tank cones.${victims.length ? ` The next cones went to the party: ${namesOf(victims)} died.` : ""} ${DIFFUSE_WHY}`,
+          timestamp: t, abilityId: DIFFUSE, abilityName: "Diffuse Wave Cannon Kyrios",
+        }));
+      }
+      break;
+    }
     const nonTanks = uniq(hits.filter((x) => !isTank(x.p)));
     if (!nonTanks.length) continue;
     const ox = v[0].x, oy = v[0].y;

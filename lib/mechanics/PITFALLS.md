@@ -207,6 +207,16 @@ philosophy and the data semantics this list assumes.
   becomes the real Plaint of Obloquy #n, cast at its holder. Fate
   Calibration β goes further and puts the real roles (beacons, tethers) on
   the players as statuses when playback starts.
+- **A helper's cast position can be stale.** Omega P1's tower helpers
+  logged round 1's spots again for round 2's towers (2qgaAkxVypGWv9CN Pull
+  12); the soaker's own hit is where the tower stood.
+- **A priority between two holders can be learned as order + scan.** Omega
+  P1's Blaster holders take the two free cardinals by a clockwise scan from
+  north, earlier conga slot first: one order and start fit 170 of 175 clean
+  rounds, and named the holder the user called out of place.
+- **A hand-off nobody took is the taker's.** The player who was due a
+  tether and has no hit from it didn't take it; the previous holder still
+  carrying it isn't at fault for what it hits (Omega P1, user).
 - **A shared line's groups can be read from the pull itself.** Union the
   players of every line that hit 2+; a component of four is one group and
   the other group is its complement. One set's lines rarely place the

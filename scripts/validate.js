@@ -399,7 +399,8 @@ const MECHANICS = {
       // each same-number pair to the player on the wrong side.
       const pullLikes = ctxs.map((c) => ({ c, players: c.relPlayers(), deathEvents: c.relDeaths(), enemyCasts: c.relEnemyCasts() }));
       const conga = mod.learnPantokratorConga(pullLikes);
-      if (conga) console.log(`  Pantokrator conga: ${conga.orders.length} order(s) fit ${conga.fits} of ${conga.pulls} splits`);
+      if (conga?.orders.length) console.log(`  Pantokrator conga: ${conga.orders.length} order(s) fit ${conga.fits} of ${conga.pulls} splits`);
+      if (conga?.loop) console.log(`  Program Loop holder priority: ${conga.loop.fits.length} fit(s) agree with ${conga.loop.agree} of ${conga.loop.rounds} clean rounds`);
       for (const p of pullLikes) {
         const errors = mod.detectOmegaErrors(p.players, p.deathEvents, p.enemyCasts);
         printPullErrors(p.c, mod.applyPantokratorConga(errors, p.players, p.deathEvents, p.enemyCasts, conga));
