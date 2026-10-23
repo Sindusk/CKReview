@@ -104,11 +104,16 @@
 // then 2, 4, 6, 13, 22, 23, 25, 30 (and P2's 66, 68, 71, 72 in
 // omega-mf.ts); rulings in expectations/rulings.json. Pull 14 1:18.9
 // (many on the wrong side, the group's first talk about it) stays
-// unruled. Pull 15 0:56.2 (the MNK took the SGE's tether and held it all
-// round; the SGE "isn't necessarily wrong") is unruled: the hits can't
-// say who held which tether, so the holder priority still names the SGE.
-// Last-moment tether steals need the tether events (89), which only the
-// replay fetches today.
+// unruled.
+// Tether takes (2026-10-23): the Blaster tether (89) logs an event at
+// every take, source = the taker, fetched with the head markers. Round 1's
+// first tethers form on three players at once (~0:21, random). Clean
+// rounds show the two In Line holders taking once each; failures show
+// late takes by the wrong player: Pull 4 the DRK 0.8s before the Blaster,
+// Pull 6 the MNK 1.1s before (after the SGE had taken), Pull 12 the SCH
+// 5.2s before (after the SAM), Pull 15 the MNK 6.1s before (the SGE never
+// took). Holders at the Blaster = the two latest takers the round's
+// Blasters hit; that matched every one of these user calls.
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-top1-avoidable (Major on Damage Down or death, else Minor): Flame
@@ -131,7 +136,13 @@
 //   an In Line player no Blaster hit took no tether, and the previous
 //   round's holders still holding one aren't named for what it hits
 //   (user, B7, B12); not when a tower owner of the round stood in a
-//   Blaster instead (they took it: user, B4).
+//   Blaster instead (they took it: user, B4). With tether takes, when an
+//   In Line player took none or no Blaster hit them: holders are the two
+//   latest takers the Blasters hit; a holder who took after an In Line
+//   player's own take took theirs ("Took Another's Tether"; a tower owner
+//   is left to the tower rules), and the victim is excused when the thief
+//   had no tether duty or took within LATE_STEAL_MS of the Blaster (user,
+//   B4, B6, B12, B15). A holder who kept last round's tether isn't named.
 // ffxiv-top1-tower "Tower Out of Turn" skips a player with no duty that
 //   round who covered for a tower owner stuck in a Blaster (user, B44).
 // ffxiv-top1-missile (Major on death, else Minor): a missile hitting
@@ -378,6 +389,7 @@ import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
+import type { Tether } from "@/types/Pull";
 import { kFmt, yd, joinNames, playerError, raidMarker, clusterByGap } from "@/lib/mechanics/wow/common";
 import {
   DAMAGE_DOWN, DEATH_EVENT_LAG_MS, PREVIEW_AMOUNT, type Hit, type Life,
@@ -407,6 +419,12 @@ const DOOM         = 1002519;
 const TOWER        = 31492; // Storage Violation: a soaked tower (cast target = its soaker)
 const OBLITERATION = 31494; // Storage Violation Obliteration: a tower nobody with Looper soaked
 const BLASTER      = 31498; // cast target = the tether holder (lost when it hit several)
+const BLASTER_TETHER = 89;  // tether event at each take (source = the taker)
+// A tether taken from its holder this close to the Blaster left them no
+// time to take another (user, 2026-10-23: Pull 4 0.8s and Pull 6 1.1s
+// before, the victim "was correct"; Pull 12 5.2s before, the victim
+// "should have adjusted").
+const LATE_STEAL_MS = 3000;
 const PANTOKRATOR  = 31499;
 const BALLISTIC    = 31500;
 const MISSILE      = 31502; // Guided Missile Kyrios (cast target = its carrier)
@@ -579,14 +597,20 @@ const WAITER_SPOT_DEG = 20;
  * Blaster: an instance that hit anyone but its holder, with all eight alive.
  */
 function detectProgramLoop(
-  players: PlayerInfo[], life: Life, deaths: DeathEvent[], casts: EnemyEvent[], end: number, occurrences?: ReportedOccurrence[],
+  players: PlayerInfo[], life: Life, deaths: DeathEvent[], casts: EnemyEvent[], end: number, occurrences?: ReportedOccurrence[], tethers: Tether[] = [],
 ): PullError[] {
   const loop = castsOf(casts, PROGRAM_LOOP, end)[0];
   if (!loop) return [];
   const num = numbersIn(players, loop.timestamp, loop.timestamp + 10_000);
   const errors: PullError[] = [];
   let failedAt = Infinity;
+  // Blaster tether (89) takes: the log marks each one, source = the taker.
+  const takes = tethers.filter((x) => x.tetherId === BLASTER_TETHER)
+    .flatMap((x) => { const p = players.find((q) => q.name === x.source); return p ? [{ t: x.timestamp, p }] : []; });
+  let prevT = loop.timestamp;
   for (const rd of loopRounds(casts, end)) {
+    const roundStart = prevT;
+    prevT = rd.t;
     const owners = players.filter((p) => num.get(p) === rd.r);
     occurrences?.push({ mechanicKey: TOP1_TOWER_RULE_ID, timestamp: rd.t, players: owners.map((p) => p.name) });
     if (failedAt < rd.t) continue;
@@ -644,7 +668,7 @@ function detectProgramLoop(
       failedAt = rd.t;
     }
 
-    errors.push(...blasterClips(players, life, deaths, rd, num, soaked, failed.length > 0));
+    errors.push(...blasterClips(players, life, deaths, rd, num, soaked, failed.length > 0, takes, roundStart));
   }
   return errors;
 }
@@ -670,26 +694,79 @@ function detectProgramLoop(
  */
 function blasterClips(
   players: PlayerInfo[], life: Life, deaths: DeathEvent[], rd: Round, num: Map<PlayerInfo, number>, soaked: Set<PlayerInfo>, towerFailed: boolean,
+  takes: { t: number; p: PlayerInfo }[] = [], roundStart = 0,
 ): PullError[] {
   if (!allAlive(players, life, rd.t - 500)) return [];
   const h = ((rd.r + 1) % 4) + 1; // tethers go 3-4-1-2
   const hPrev = (rd.r % 4) + 1;   // the previous round's tether number
   const errors: PullError[] = [];
+  const roundHit = new Set(rd.casts.filter((x) => x.abilityId === BLASTER).flatMap((c) => instanceHits(players, life, c).map((x) => x.p)));
+  const roundDoomed = [...roundHit].some((p) => doomedAt(p, rd.t) || diedOf(p, life, deaths, rd.t));
+
+  // With the tether takes (captures since 2026-10-23), when an In Line h
+  // player took no tether this round or no Blaster hit them: the holders
+  // are the two latest takers the round's Blasters hit, and a holder who
+  // took after them took theirs. Pull 4, 6, 12, 15 (user, 2026-10-23).
+  // Not when both took and both were hit: Pull 1 0:38.2's SGE took after
+  // both and was hit, yet the user had the SCH and RDM holding.
+  const lastTake = (p: PlayerInfo) => takes.filter((x) => x.p === p && x.t > roundStart && x.t < rd.t).reduce((m, x) => Math.max(m, x.t), -Infinity);
+  const hPlayers = players.filter((p) => num.get(p) === h);
+  const tetherMode = rd.r > 1 && takes.length > 0 && hPlayers.some((p) => !roundHit.has(p) || lastTake(p) === -Infinity);
+  let held: Set<PlayerInfo> | undefined;
+  if (tetherMode) {
+    const recent = uniq(takes.filter((x) => x.t < rd.t).sort((a, b) => b.t - a.t).map((x) => x.p)).filter((p) => roundHit.has(p)).slice(0, 2);
+    if (recent.length === 2) held = new Set(recent);
+  }
+  // Holders who never took this round kept last round's tether.
+  const kept = new Set(held ? [...held].filter((p) => num.get(p) !== h && lastTake(p) === -Infinity) : []);
+
   const blasts = rd.casts.filter((x) => x.abilityId === BLASTER).map((c) => {
     const hits = instanceHits(players, life, c);
     const hit = hits.map((x) => x.p);
-    const holders = hit.filter((p) => num.get(p) === h);
+    // A kept holder inside another holder's Blaster isn't that Blaster's.
+    const inHeld = held ? hit.filter((p) => held!.has(p)) : [];
+    const fresh = inHeld.filter((p) => !kept.has(p));
+    const holders = held ? (fresh.length ? fresh : inHeld) : hit.filter((p) => num.get(p) === h);
     return { c, hits, hit, holders, holder: hit.find((p) => p.name === c.target) ?? (holders.length === 1 ? holders[0] : undefined) };
   });
   const cards = roundCardinals(players, life, rd);
-  const roundDoomed = uniq(blasts.flatMap((b) => b.hit)).some((p) => doomedAt(p, rd.t) || diedOf(p, life, deaths, rd.t));
+
+  if (held) {
+    for (const v of hPlayers.filter((p) => !held!.has(p))) {
+      // Someone who took after them took theirs. One who never took was
+      // robbed only by a player of another number: the other In Line h
+      // player taking a tether is their own (Pull 7 0:55.8: the SCH's).
+      const since = Math.max(roundStart, lastTake(v));
+      const thief = [...held].filter((p) => p !== v && lastTake(p) > since && (lastTake(v) > -Infinity || num.get(p) !== h))
+        .sort((a, b) => lastTake(b) - lastTake(a))[0];
+      const late = thief !== undefined && rd.t - lastTake(thief) <= LATE_STEAL_MS;
+      // A tower owner who took a tether is named by the tower rules.
+      if (thief && num.get(thief) !== rd.r) {
+        errors.push(playerError(thief, {
+          ruleId: TOP1_BLASTER_RULE_ID, severity: roundDoomed ? "Major" : "Minor", name: "Took Another's Tether",
+          description: `Round ${rd.r}: took the Blaster tether ${lastTake(v) > -Infinity ? `${v.name} had taken` : `${v.name} was due to take`}, ${((rd.t - lastTake(thief)) / 1000).toFixed(1)}s before it went off.${roundDoomed ? " The round's Blasters gave Doom." : ""} ${BLASTER_WHY}`,
+          timestamp: rd.t, abilityId: BLASTER, abilityName: "Blaster",
+        }));
+      }
+      // The victim is excused when the tether went to someone with no
+      // business taking it, or too late to take another.
+      if (thief && (num.get(thief) !== h || late)) continue;
+      errors.push(playerError(v, {
+        ruleId: TOP1_BLASTER_RULE_ID, severity: roundDoomed ? "Major" : "Minor", name: "Tether Not Taken",
+        description: thief
+          ? `Round ${rd.r}: In Line ${h}, but ${thief.name} took their tether ${((rd.t - lastTake(thief)) / 1000).toFixed(1)}s before the Blaster and they didn't take the other.${roundDoomed ? " The round's Blasters gave Doom." : ""} ${BLASTER_WHY}`
+          : `Round ${rd.r}: In Line ${h}, but took no tether, so one stayed on its previous holder.${roundDoomed ? " The round's Blasters gave Doom." : ""} ${BLASTER_WHY}`,
+        timestamp: rd.t, abilityId: BLASTER, abilityName: "Blaster",
+      }));
+    }
+  }
   // A tether still on the wrong number: the In Line h player with no tether
   // this round didn't take it (A66 +47.1: the previous holder kept it and
   // got Doom). Not round 1, where the first holder is random.
   // Two holders inside one Blaster both count as holding (A37 +38.2).
   const holding = new Set(blasts.flatMap((b) => (b.holder ? [b.holder] : b.holders.length >= 2 ? b.holders : [])));
   for (const b of blasts) {
-    if (!b.holder || num.get(b.holder) === h || rd.r === 1) continue;
+    if (held || !b.holder || num.get(b.holder) === h || rd.r === 1) continue;
     const owed = players.filter((p) => num.get(p) === h && !holding.has(p));
     const doomed = doomedAt(b.holder, b.c.timestamp) || diedOf(b.holder, life, deaths, b.c.timestamp);
     const kept = num.get(b.holder) === hPrev;
@@ -707,14 +784,13 @@ function blasterClips(
   // Not when a tower owner of this round stood in a Blaster instead of a
   // tower: they took the tether (user, 2026-10-23, Pull 4 0:38.1: the DRK
   // crossed through the boss and took the RDM's at the last second).
-  // A tether taken from its rightful holder by another In Line h player
-  // (Pull 6 0:47.0, the MNK from the SGE) or by a player of another number
-  // (Pull 15 0:56.2, the MNK from the SGE) doesn't show in the hits: each
-  // Blaster's centre (the hit player whose 15y covers every hit and no
-  // miss) fit two or three players in those rounds. The tether events (89)
-  // would show it; detection doesn't fetch them yet.
+  // This is the fallback for captures without tether takes (before
+  // 2026-10-23); with them, the tether-mode block above decides. Hits alone
+  // can't show a steal: each Blaster's centre (the hit player whose 15y
+  // covers every hit and no miss) fit two or three players in Pull 6 and
+  // Pull 15.
   const towerTakers = players.filter((p) => num.get(p) === rd.r && holdsAt(p, LOOPER, rd.t - 300) && !soaked.has(p) && blasts.some((b) => b.hit.includes(p)));
-  const missing = rd.r === 1 ? [] : players.filter((p) => num.get(p) === h && !blasts.some((b) => b.hit.includes(p)));
+  const missing = rd.r === 1 || held ? [] : players.filter((p) => num.get(p) === h && !blasts.some((b) => b.hit.includes(p)));
   const untaken = towerTakers.length ? [] : missing;
   for (const p of untaken) {
     errors.push(playerError(p, {
@@ -723,13 +799,15 @@ function blasterClips(
       timestamp: rd.t, abilityId: BLASTER, abilityName: "Blaster",
     }));
   }
-  const stuck = new Set(missing.length ? players.filter((p) => num.get(p) === hPrev) : []);
+  const stuck = held ? kept : new Set(missing.length ? players.filter((p) => num.get(p) === hPrev) : []);
   const bearingOf = (b: (typeof blasts)[number], p: PlayerInfo) => {
     const e = b.hits.find((x) => x.p === p)?.e;
     return e?.x === undefined || e.y === undefined ? undefined : compassOf(e.x, e.y);
   };
   for (const b of blasts) {
     const { c, holders, holder } = b;
+    // A tether nobody took: its holder's Blaster is the taker's error.
+    if (holder && kept.has(holder)) continue;
     const hit = b.hit.filter((p) => !stuck.has(p) || p === holder);
     if (hit.length <= 1) continue;
     const doomed = hit.filter((p) => doomedAt(p, c.timestamp));
@@ -745,7 +823,14 @@ function blasterClips(
     }));
     if (!holder) {
       if (holders.length >= 2) {
-        for (const p of holders) push(p, HOLDERS_TOGETHER_NAME, `Round ${rd.r}: both Blaster holders (${namesOf(holders)}) stood within each other's Blaster${hit.length > holders.length ? `, which also hit ${namesOf(hit.filter((x) => !holders.includes(x)))}` : ""}.${tail}`);
+        for (const p of holders) {
+          // A tower owner holding a tether (from the takes) belonged in a tower.
+          if (num.get(p) === rd.r && holdsAt(p, LOOPER, rd.t - 300) && !soaked.has(p) && !towerFailed) {
+            push(p, "In a Tether, Not a Tower", `Round ${rd.r}: In Line ${rd.r} with Looper, took a Blaster tether instead of a tower.${tail}`);
+            continue;
+          }
+          push(p, HOLDERS_TOGETHER_NAME, `Round ${rd.r}: both Blaster holders (${namesOf(holders)}) stood within each other's Blaster${hit.length > holders.length ? `, which also hit ${namesOf(hit.filter((x) => !holders.includes(x)))}` : ""}.${tail}`);
+        }
       } else {
         // Nobody of the round's tether number: the soakers in their towers
         // are where they belong (A48 +47.1).
@@ -1170,7 +1255,7 @@ function detectWallDeaths(players: PlayerInfo[], deaths: DeathEvent[], called: S
  * exist).
  */
 export function detectOmegaErrors(
-  players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[], occurrences?: ReportedOccurrence[],
+  players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[], occurrences?: ReportedOccurrence[], tethers: Tether[] = [],
 ): PullError[] {
   if (!enemyCasts.some((c) => c.abilityId === PROGRAM_LOOP)) return [];
   const p2 = phase1End(enemyCasts);
@@ -1182,7 +1267,7 @@ export function detectOmegaErrors(
 
   const errors = [
     ...detectAvoidable(players, life, end),
-    ...detectProgramLoop(players, life, deaths, enemyCasts, end, occurrences),
+    ...detectProgramLoop(players, life, deaths, enemyCasts, end, occurrences, tethers),
     ...detectPantokrator(players, life, deaths, enemyCasts, end),
     ...detectDiffuse(players, life, deaths, enemyCasts, end),
     ...detectWaveCannon(players, life, enemyCasts, end),

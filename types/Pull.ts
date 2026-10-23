@@ -11,6 +11,9 @@ import type { HeadMarker } from "../lib/mechanics/ffxiv/fru/usurper-of-frost";
 // direction/priority detection — see lib/mechanics/ffxiv/dancingmad/
 // blackhole-strategy.ts's module comment for the full story. Undefined for
 // every non-FF pull (and FF pulls before this mechanic was reached).
+/** A tether forming: `source` and `target` are actor names, `tetherId` the game's tether kind. */
+export type Tether = { timestamp: number; source: string; target: string; tetherId: number };
+
 export type BlackHoleGeometry = {
   // Every sample of the boss's own FACING + position, straight from its
   // enemyCasts sourceResources. The boss (named "Kefka" in this fight)
@@ -86,6 +89,9 @@ export type Pull = {
   // Party Synergy order, lib/mechanics/ffxiv/top/synergy-order.ts).
   // Undefined when the pull had none, and on pulls saved before 2026-10-14.
   headMarkers?: HeadMarker[];
+  // FFXIV only: tethers forming (each take), by actor name. Undefined when
+  // the pull had none, and on pulls fetched before 2026-10-23.
+  tethers?: Tether[];
   // WoW only: buffs gained and lost by enemies (the same lists the WoW
   // encounter modules get as enemyBuffs / enemyBuffRemovals), for the damage
   // contexts' untargetable and shielded windows. Undefined on pulls saved

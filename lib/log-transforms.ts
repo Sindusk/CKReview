@@ -22,7 +22,7 @@
 // preferred over the masterData lookup when present — mirrors how
 // fflAbilityName already prefers `ability.name` over the masterData lookup.
 
-import type { Pull, BlackHoleGeometry, BossDebuffEvent, EnemyStackEvent } from "@/types/Pull";
+import type { Pull, BlackHoleGeometry, BossDebuffEvent, EnemyStackEvent, Tether } from "@/types/Pull";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PlayerInfo, PlayerEvent, ShieldAbsorb } from "@/types/PlayerInfo";
 import type { EnemyEvent, NpcHit } from "@/types/PullError";
@@ -53,6 +53,7 @@ import type {
   FFLBuffEvent,
   FFLCombatantInfoEvent,
   FFLHeadMarkerEvent,
+  FFLTetherEvent,
 } from "./ffl-client";
 import { getSpellName }                          from "./spell-data";
 import { getSpecInfo, getRosterSortOrder }        from "./spec-data";
@@ -1348,16 +1349,33 @@ const KEFKA_SAYS_STATE_ABILITY_ID = 1002056;
 // Head markers on players (usurper-of-frost.ts reads the Frigid Stone
 // marker). The marked actor is the event's sourceID.
 function fflBuildHeadMarkers(
-  headMarkerEvents: FFLHeadMarkerEvent[],
+  headMarkerEvents: (FFLHeadMarkerEvent | FFLTetherEvent)[],
   actorMap:         Map<number, FFLActor>,
   fightStart:       number
 ): HeadMarker[] {
   return headMarkerEvents
-    .filter((e) => actorMap.get(e.sourceID)?.type === "Player")
+    .filter((e): e is FFLHeadMarkerEvent => e.type !== "tether" && actorMap.get(e.sourceID)?.type === "Player")
     .map((e) => ({
       timestamp: Math.max(0, e.timestamp - fightStart),
       player:    actorMap.get(e.sourceID)!.name,
       markerId:  e.markerID,
+    }));
+}
+
+// Tethers forming (each take), from the same stream: The Omega Protocol's
+// Blaster tether (89) names who held each one (omega.ts).
+function fflBuildTethers(
+  events:     (FFLHeadMarkerEvent | FFLTetherEvent)[],
+  actorMap:   Map<number, FFLActor>,
+  fightStart: number
+): Tether[] {
+  return events
+    .filter((e): e is FFLTetherEvent => e.type === "tether")
+    .map((e) => ({
+      timestamp: Math.max(0, e.timestamp - fightStart),
+      source:    actorMap.get(e.sourceID)?.name ?? `Unknown (${e.sourceID})`,
+      target:    actorMap.get(e.targetID)?.name ?? `Unknown (${e.targetID})`,
+      tetherId:  e.tetherID,
     }));
 }
 
@@ -1678,6 +1696,7 @@ export function transformFFightToPull(
   const enemyBuffEvents = fflBuildEnemyBuffEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart);
   const kefkaSaysSignals = fflBuildKefkaSaysStateSignals(data.enemyDebuffEvents ?? [], actorMap, fightStart);
   const headMarkers = fflBuildHeadMarkers(data.headMarkerEvents ?? [], actorMap, fightStart);
+  const tethers = fflBuildTethers(data.headMarkerEvents ?? [], actorMap, fightStart);
   const blackHoleGeometry = fflBuildBlackHoleGeometry(data.enemyCastEvents ?? [], actorMap, abilityMap, fightStart);
   const stompiesPuddleSamples = fflBuildStompiesPuddleSamples(data.enemyCastEvents ?? [], abilityMap, fightStart);
   const playerPositionSamples = fflBuildPlayerPositionSamples(data.enemyDamageTakenEvents ?? [], actorMap, fightStart);
@@ -1711,7 +1730,7 @@ export function transformFFightToPull(
     ...detectBjccErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectAlexanderPrimeErrors(players, deathEvents, enemyCastEvents, headMarkers, reportedOccurrences),
     ...detectPerfectAlexanderErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
-    ...detectOmegaErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
+    ...detectOmegaErrors(players, deathEvents, enemyCastEvents, reportedOccurrences, tethers),
     ...detectOmegaMFErrors(players, deathEvents, enemyCastEvents, headMarkers, reportedOccurrences),
     ...detectOmegaReconfiguredErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectBlueScreenErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
@@ -1751,6 +1770,7 @@ export function transformFFightToPull(
     blackHoleGeometry,
     enemyCasts:    enemyCastEvents,
     headMarkers:   headMarkers.length ? headMarkers : undefined,
+    tethers:       tethers.length ? tethers : undefined,
     enemyStacks:   fflBuildEnemyStacks(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart),
     bossDebuffs:   data.enemyDebuffEvents
       ? fflBuildBossDebuffs(data.enemyDebuffEvents, actorMap, abilityMap, fightStart)

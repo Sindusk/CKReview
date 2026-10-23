@@ -214,6 +214,10 @@ philosophy and the data semantics this list assumes.
   P1's Blaster holders take the two free cardinals by a clockwise scan from
   north, earlier conga slot first: one order and start fit 170 of 175 clean
   rounds, and named the holder the user called out of place.
+- **Tether events name who took a passed tether.** FFXIV logs a `tether`
+  event at every take (source = the taker), fetched with the head markers
+  since 2026-10-23 (`Pull.tethers`). Hits alone couldn't show a last-second
+  steal; the two latest takers the payoff hit are the holders (Omega P1).
 - **A hand-off nobody took is the taker's.** The player who was due a
   tether and has no hit from it didn't take it; the previous holder still
   carrying it isn't at fault for what it hits (Omega P1, user).

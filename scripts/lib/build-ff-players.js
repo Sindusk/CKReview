@@ -288,8 +288,21 @@ function buildFFPlayerPositionSamples(rep, actorMap) {
 // the event's sourceID.
 function buildFFHeadMarkers(rep, actorMap) {
   return (rep.headMarkers?.data ?? [])
-    .filter((e) => actorMap.get(e.sourceID)?.type === 'Player')
+    .filter((e) => e.type !== 'tether' && actorMap.get(e.sourceID)?.type === 'Player')
     .map((e) => ({ timestamp: e.timestamp, player: actorMap.get(e.sourceID).name, markerId: e.markerID }));
 }
 
-module.exports = { buildFFPlayers, buildFFDeaths, buildFFBlackHoleGeometry, buildFFEnemyCastEvents, buildFFNpcHits, buildFFKefkaSaysStateSignals, buildFFStompiesPuddleSamples, buildFFPlayerPositionSamples, buildFFHeadMarkers };
+// Mirrors lib/log-transforms.ts's fflBuildTethers: tethers forming, from
+// the head-marker stream (captures fetched since 2026-10-23).
+function buildFFTethers(rep, actorMap) {
+  return (rep.headMarkers?.data ?? [])
+    .filter((e) => e.type === 'tether')
+    .map((e) => ({
+      timestamp: e.timestamp,
+      source: actorMap.get(e.sourceID)?.name ?? `Unknown (${e.sourceID})`,
+      target: actorMap.get(e.targetID)?.name ?? `Unknown (${e.targetID})`,
+      tetherId: e.tetherID,
+    }));
+}
+
+module.exports = { buildFFPlayers, buildFFDeaths, buildFFBlackHoleGeometry, buildFFEnemyCastEvents, buildFFNpcHits, buildFFKefkaSaysStateSignals, buildFFStompiesPuddleSamples, buildFFPlayerPositionSamples, buildFFHeadMarkers, buildFFTethers };

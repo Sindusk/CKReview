@@ -147,6 +147,7 @@ function makeFFPullCtx(pull, actorMap, abilityMap, getFFJobByName) {
     relNpcHits:      () => memo('relNpcHits', () => ffb.buildFFNpcHits(rel(), actorMap, abilityMap)),
     relStateSignals: () => memo('relStateSignals', () => ffb.buildFFKefkaSaysStateSignals(rel(), actorMap)),
     relHeadMarkers:  () => memo('relHeadMarkers', () => ffb.buildFFHeadMarkers(rel(), actorMap)),
+    relTethers:      () => memo('relTethers', () => ffb.buildFFTethers(rel(), actorMap)),
   };
 }
 
@@ -402,7 +403,7 @@ const MECHANICS = {
       if (conga?.orders.length) console.log(`  Pantokrator conga: ${conga.orders.length} order(s) fit ${conga.fits} of ${conga.pulls} splits`);
       if (conga?.loop) console.log(`  Program Loop holder priority: ${conga.loop.fits.length} fit(s) agree with ${conga.loop.agree} of ${conga.loop.rounds} clean rounds`);
       for (const p of pullLikes) {
-        const errors = mod.detectOmegaErrors(p.players, p.deathEvents, p.enemyCasts);
+        const errors = mod.detectOmegaErrors(p.players, p.deathEvents, p.enemyCasts, undefined, p.c.relTethers());
         printPullErrors(p.c, mod.applyPantokratorConga(errors, p.players, p.deathEvents, p.enemyCasts, conga));
       }
     },

@@ -447,6 +447,20 @@ export type FFLHeadMarkerEvent = {
   markerID:       number;
 };
 
+// A tether forming, fetched in the same filtered stream as head markers.
+// The log marks only when a tether forms (each take), never when it
+// breaks. `tetherID` is the game's tether kind (The Omega Protocol's
+// Blaster is 89; its source is the player taking it, its target Omega).
+export type FFLTetherEvent = {
+  timestamp:       number;
+  type:            "tether";
+  sourceID:        number;
+  sourceInstance?: number;
+  targetID:        number;
+  targetInstance?: number;
+  tetherID:        number;
+};
+
 // Mirrors FFLDebuffEvent, but for buffs. Needed for the "enemyBuffApplied"
 // raid-error trigger. Only ever fetched with hostilityType: "Enemies" — see
 // fetchFFightData below — because that's the whole point (a boss gaining a
@@ -477,7 +491,8 @@ export type FFLEvent =
   | FFLHealEvent
   | FFLDebuffEvent
   | FFLBuffEvent
-  | FFLHeadMarkerEvent;
+  | FFLHeadMarkerEvent
+  | FFLTetherEvent;
 
 export type FFLReport = {
   title:      string;
@@ -781,7 +796,8 @@ type StreamKey = typeof STREAM_KEYS[number];
 
 // FFLogs filterExpressions for the two dataType: All aliases — see the query
 // comments for why each needs one.
-const HEAD_MARKER_FILTER  = 'type="headmarker"';
+// Tethers ride in the same stream (a few dozen per pull as well).
+const HEAD_MARKER_FILTER  = 'type="headmarker" or type="tether"';
 const ENEMY_DEBUFF_FILTER =
   'target.type="npc" and (type="applydebuff" or type="removedebuff" or type="refreshdebuff")';
 
@@ -813,8 +829,9 @@ export type FFLFightData = {
   // query comment). Fetched for the `extraInfo` real/fake signal Dancing Mad
   // Phase 4 encodes there.
   enemyDebuffEvents: FFLDebuffEvent[];
-  // dataType: All filtered server-side to type="headmarker".
-  headMarkerEvents:  FFLHeadMarkerEvent[];
+  // dataType: All filtered server-side to type="headmarker" or "tether"
+  // (tethers since 2026-10-23; older captures hold head markers only).
+  headMarkerEvents:  (FFLHeadMarkerEvent | FFLTetherEvent)[];
   // Friendly Buffs, filtered to PLAYER_BUFF_FILTER. Absent on samples
   // fetched before the stream existed.
   playerBuffEvents?: FFLBuffEvent[];

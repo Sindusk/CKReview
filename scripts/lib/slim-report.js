@@ -170,7 +170,11 @@ const FFL_PROJECTORS = {
   // whole pull is a few dozen events. `markerID` is the payload;
   // abilityGameID is always 0 and targetID always -1 (the marker rides on
   // the SOURCE actor), so neither is worth keeping.
-  headMarkers: (e) => pick(e, ['timestamp', 'type', 'sourceID', 'sourceInstance', 'markerID']),
+  // Tethers share the stream (since 2026-10-23): they keep their target
+  // and tether kind.
+  headMarkers: (e) => e.type === 'tether'
+    ? pick(e, ['timestamp', 'type', 'sourceID', 'sourceInstance', 'targetID', 'targetInstance', 'tetherID'])
+    : pick(e, ['timestamp', 'type', 'sourceID', 'sourceInstance', 'markerID']),
   // Player buffs for the damage analysis, already filtered server-side.
   playerBuffs: (e) => pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'abilityGameID', 'duration', 'stack']),
 };
