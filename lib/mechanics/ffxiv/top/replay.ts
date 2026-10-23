@@ -42,6 +42,9 @@ const OVERRIDES: Record<number, Override> = {
   // estimated 180° over five non-tanks (1:50.1-1:52.2); aimed at the tanks
   // they hit, they hold only the tanks.
   [DIFFUSE]: { angle: 120, aim: "hits", style: "tankbuster" },
+  // Blaster: in game a black field with dark orbs floating in it (user,
+  // 2026-10-23, VOD screenshot of 2qgaAkxVypGWv9CN), not a red circle.
+  [BLASTER]: { style: "top-blaster-aoe" },
 };
 
 /**

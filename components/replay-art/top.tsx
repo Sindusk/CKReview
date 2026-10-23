@@ -37,6 +37,31 @@ function BlasterTether({ x1, y1, x2, y2, t }: TetherArtProps) {
 }
 
 /**
+ * Blaster's 15y hit on its holder: in game a black field with dark glassy
+ * orbs drifting inside it (user, VOD screenshot, 2026-10-23), so drawn as
+ * a near-black disc with a faint violet rim and slow orbs.
+ */
+function BlasterBlast({ x, y, r, t, opacity, resolving }: ShapeArtProps) {
+  return (
+    <g opacity={opacity} pointerEvents="none">
+      <circle cx={x} cy={y} r={r} fill="#07040c" fillOpacity={resolving ? 0.8 : 0.55} stroke="#5a3a7a" strokeWidth={2} strokeOpacity={0.8} />
+      {Array.from({ length: 7 }, (_, k) => {
+        // Seven orbs on fixed orbits at different radii and speeds.
+        const a = (k * 2.4) + t / (1600 + k * 230) * (k % 2 ? 1 : -1);
+        const d = r * (0.2 + 0.1 * k);
+        const ox = x + Math.cos(a) * d, oy = y + Math.sin(a) * d, or = r * (0.09 + 0.02 * (k % 3));
+        return (
+          <g key={k}>
+            <circle cx={ox} cy={oy} r={or} fill="#000" stroke="#3b2a52" strokeWidth={1.5} />
+            <circle cx={ox - or * 0.35} cy={oy - or * 0.35} r={or * 0.3} fill="#8a7aa8" fillOpacity={0.5} />
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
+/**
  * Pantokrator's Ballistic Impact puddles: eight at a time, two waves
  * overlapping, under the players. Drawn as rings with a faint fill so the
  * players and the Flame Thrower cones stay readable; the ring closes in
@@ -122,24 +147,41 @@ function Eye({ e, x, y, t }: EffectArtProps) {
   );
 }
 
-/** Party Synergy's PlayStation symbols over each pair (markers 416-419), in their usual colours. */
-const SYMBOL_COLORS: Record<string, string> = { "416": "#ff4d4d", "417": "#3ddc84", "418": "#e070ff", "419": "#4da3ff" };
+/**
+ * Party Synergy's PlayStation symbols over each pair (markers 416-419), as
+ * the game draws them (user, VOD screenshot, 2026-10-23): a red circle, a
+ * green triangle pointing down, a purple square with a square inside, a
+ * blue cross. Thick glowing glyphs, so a pair's colour reads at a glance.
+ */
+const SYMBOLS: Record<string, { c: string; rim: string }> = {
+  "416": { c: "#ff3b3b", rim: "#ffc2c2" }, "417": { c: "#22d38a", rim: "#bff5dc" },
+  "418": { c: "#c84bff", rim: "#efc8ff" }, "419": { c: "#2f8cff", rim: "#c4defe" },
+};
 function SymbolMarker({ e, x, y, t }: EffectArtProps) {
   const o = fade(e, t, 200);
   if (o <= 0) return null;
   const id = e.kind.slice("top-symbol-".length);
-  const c = SYMBOL_COLORS[id] ?? "#fff";
+  const { c, rim } = SYMBOLS[id] ?? { c: "#fff", rim: "#fff" };
   // Under the player: the effects layer is beneath the icons, and the
   // status row above them would cover it.
-  const cy = y + 34, s = 9;
-  const shape = id === "416" ? <circle cx={x} cy={cy} r={s} />
-    : id === "417" ? <path d={`M${x} ${cy - s * 1.1} L${x + s} ${cy + s * 0.7} L${x - s} ${cy + s * 0.7} Z`} />
-    : id === "418" ? <rect x={x - s * 0.85} y={cy - s * 0.85} width={s * 1.7} height={s * 1.7} />
-    : <path d={`M${x - s} ${cy - s} L${x + s} ${cy + s} M${x + s} ${cy - s} L${x - s} ${cy + s}`} />;
+  const cy = y + 36, s = 11;
+  const glyph = (w: number, col: string) => (
+    <g fill="none" stroke={col} strokeWidth={w} strokeLinejoin="round" strokeLinecap="round">
+      {id === "416" ? <circle cx={x} cy={cy} r={s} />
+        : id === "417" ? <path d={`M${x} ${cy + s * 1.05} L${x + s * 1.1} ${cy - s * 0.75} L${x - s * 1.1} ${cy - s * 0.75} Z`} />
+        : id === "418" ? <>
+            <rect x={x - s} y={cy - s} width={s * 2} height={s * 2} />
+            <rect x={x - s * 0.45} y={cy - s * 0.45} width={s * 0.9} height={s * 0.9} />
+          </>
+        : <path d={`M${x - s} ${cy - s} L${x + s} ${cy + s} M${x + s} ${cy - s} L${x - s} ${cy + s}`} />}
+    </g>
+  );
   return (
     <g opacity={o} pointerEvents="none">
-      <circle cx={x} cy={cy} r={s * 1.7} fill="rgba(0,0,0,0.55)" />
-      <g fill="none" stroke={c} strokeWidth={3.5} strokeLinejoin="round" strokeLinecap="round">{shape}</g>
+      <circle cx={x} cy={cy} r={s * 1.75} fill="rgba(0,0,0,0.55)" />
+      <g filter="url(#replay-glow)">{glyph(7, c)}</g>
+      {glyph(4.5, c)}
+      {glyph(1.5, rim)}
     </g>
   );
 }
@@ -304,7 +346,7 @@ export const TOP_ART: FightArt = {
     "top-local-prep": regressionTether(REGRESSION.local, true), "top-remote-prep": regressionTether(REGRESSION.remote, true),
   },
   shapes: {
-    "top-ballistic": BallisticPuddle,
+    "top-ballistic": BallisticPuddle, "top-blaster-aoe": BlasterBlast,
     "top-tower-red": ColorTower, "top-tower-blue": ColorTower,
     "top-rot-red-held": RotHeld, "top-rot-blue-held": RotHeld,
     "top-rot-red": RotBurst, "top-rot-blue": RotBurst,

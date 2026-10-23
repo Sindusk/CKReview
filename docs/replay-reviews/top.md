@@ -14,7 +14,9 @@ Nothing here is VOD-checked yet, and nothing becomes a ruling.
   each tower's helper. The game-data circle sat on the soaker instead.
 - **Blaster tethers:** crimson Omega-to-holder beams. They now end when
   someone takes them (new engine option `passed`), and after the last
-  round at the Blaster hit. The 15y Blaster flashes on the holder.
+  round at the Blaster hit. The 15y Blaster flashes on the holder as a
+  black field with dark orbs floating in it, as in game (user, VOD
+  screenshot, 2026-10-23).
 - **Pantokrator:** Flame Thrower cones from game data (60°, correct in
   25 of 28). Ballistic Impact puddles go under each living player at each
   wave's begincast, as faint rings that close in and flash on landing
@@ -60,7 +62,9 @@ players standing on a puddle at the moment it lands, likely sample lag.
 - **Solar Ray:** marker 343 reads "Tank buster" on both tanks; 5y purple
   busters.
 - **Party Synergy:** the four PlayStation symbols (markers 416-419) under
-  each pair in their usual colours until the Fire spreads, and a teal
+  each pair until the Fire spreads, drawn as the game shows them (user,
+  VOD screenshot, 2026-10-23): red circle, green downward triangle, purple
+  square inside a square, blue cross; and a teal
   partner tether between the two of each symbol for as long as their
   glitch lasts (to 3:04.5). The eye on the arena
   edge where its laser enters (the unit logs one spot, 45y out), labelled
@@ -89,8 +93,8 @@ Sagittarius Arrow shows 5 "drawn-not-hit": the party stood about 5y from
 its centre, on the edge of the 10y line.
 
 ### Couldn't find out
-- The clones' and symbols' in-game colours; only BossMod's shapes and
-  timing are sourced.
+- The clones' in-game colours; only BossMod's shapes and timing are
+  sourced. (The symbols' look is now from the user's VOD screenshot.)
 - Whether the five swords after Discharger also show 5.1s ahead.
 - The symbol markers still get the generic "Marker 416..." text for their
   first 5s: the engine names a marker only when a hit follows within 12s,
