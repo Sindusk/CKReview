@@ -486,7 +486,8 @@ philosophy and the data semantics this list assumes.
   split into no-bounce, too-late and too-early, and exposed waves where
   nobody bounced (The Lost Explorers).
 - **A raised player drawing a bait from where they were raised is bad
-  luck,** not an overlap (The Tyrant's raise grace).
+  luck,** not an overlap (The Tyrant's raise grace; Ultimate Kefka's Holy,
+  raised the same second the spread landed).
 - **Immunity soaks are strategy.** Skip zero-damage hits unless the player
   died (The Coiled Altar).
 - **A lethal stack cap needs a ledger, not a threshold** (The Twin Fangs'
@@ -554,6 +555,8 @@ Classify every one before counting a called wipe. Known meanings:
   - Lindwurm: 2.4-2.9s
   - The Tyrant: 4.4s
   - Lindwurm II: 2.2-2.8s after a Mana Burst defam (off a platform)
+  - Dancing Mad P1: 3.1s after a Confetti (Double-Trouble Trap) blast; the
+    jump rule must not read it as a reset
   - Omega P1: ~2.3s after a Guided Missile Kyrios hit on a non-carrier
   - Omega P2: 2.5-2.8s after Beyond Defense jumped the party
   - TEA Limit Cut: 2.1-3.1s after a sword or charge's damage event (often

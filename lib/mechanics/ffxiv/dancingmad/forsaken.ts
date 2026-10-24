@@ -93,6 +93,17 @@
 //     death be suppressed? (DEATH DURING FORSAKEN already drops every tower
 //     after the fatal one, h2JvDkntZCaBgmLF pull 45; only the fatal tower's
 //     own errors survive.)
+//   - Report gTkMH91DWRmLbNCn pull 7 4:21 (tower 2, two cones on the DRG
+//     and the PCT): the user couldn't tell from the VOD who the bait was;
+//     unruled.
+//
+// VOD review 2026-10-24 (user): report gTkMH91DWRmLbNCn pulls 6, 9, 13,
+// rulings in expectations/rulings.json. Two narrow fixes:
+//   - A Stack holder's cone-bait overlap / Stack Misplaced is skipped when
+//     their tower partner was flagged Wrong Spot In Tower there (pull 9:
+//     the partner was late; the holder was right).
+//   - Cone Bait Too Far skips a candidate within 50 units (half a yalm) of
+//     the victim's distance: too close to call (pull 13: 648 vs 633).
 // Not modeled:
 //   - the 47807 failed-tower kill
 //   - clone-overlap positioning geometry (the rule is outcome-gated only)
@@ -1979,6 +1990,7 @@ function detectWrongTowerPositionErrors(
       // the wrong bait — the observed case cleaved five players).
       if (pair.tower === undefined) continue;
 
+      const wrongSpotPlayers = new Set<number>();
       pair.soaks.forEach((soak, i) => {
         const debuff   = pair.assignments[i];
         const partner  = pair.assignments[1 - i];
@@ -1993,6 +2005,7 @@ function detectWrongTowerPositionErrors(
         // flare-outcome comment above the spot table).
         if (expected === "flare" && !coneOutcomeBad) return;
 
+        wrongSpotPlayers.add(soak.player.actorId);
         errors.push({
           ruleId:      FORSAKEN_WRONG_SPOT_RULE_ID,
           severity:    "Major",
@@ -2077,7 +2090,14 @@ function detectWrongTowerPositionErrors(
           });
         }
 
-        const coneOverlapError = stackConeOverlapError(holderSoak, partnerSoak, pair.tower!, volleyVictims, holderHit);
+        // A partner flagged for the wrong spot at this tower is the root
+        // cause; the holder's overlap is fallout (user, 2026-10-24,
+        // gTkMH91DWRmLbNCn pull 9 5:13: the partner was late to their spot
+        // "and is inevitably why everything goes wrong"; the holder was
+        // right where she belonged).
+        const coneOverlapError = wrongSpotPlayers.has(partnerSoak.player.actorId)
+          ? null
+          : stackConeOverlapError(holderSoak, partnerSoak, pair.tower!, volleyVictims, holderHit);
         const overlappedConeBait = coneOverlapError !== null;
         if (coneOverlapError) errors.push(coneOverlapError);
 
@@ -2115,7 +2135,8 @@ function detectWrongTowerPositionErrors(
             (towerLabel === "" || e.description.includes(towerLabel))
         );
 
-        if (volleyVictims !== undefined && volleyVictims.size < 3 && !partnerDeath && !overlappedConeBait && !crowdedByIntruder) {
+        if (volleyVictims !== undefined && volleyVictims.size < 3 && !partnerDeath && !overlappedConeBait && !crowdedByIntruder &&
+            !wrongSpotPlayers.has(partnerSoak.player.actorId)) {
           errors.push({
             ruleId:      FORSAKEN_STACK_MISSED_RULE_ID,
             severity:    "Major",
@@ -2278,6 +2299,12 @@ function detectWrongTowerPositionErrors(
               ? Math.round(Math.hypot(candidatePos.x - holderSoak.x, candidatePos.y - holderSoak.y))
               : undefined;
 
+          // Practically as close as the victim: too close to call (user,
+          // 2026-10-24, gTkMH91DWRmLbNCn pull 13 4:21: the bait at ~648 vs
+          // the melee victim's ~633 — "reasonable to not mark either player
+          // here and just call it bad luck").
+          if (candidateDist !== undefined && candidateDist - victimDist < CONE_BAIT_TIE_MARGIN_UNITS) continue;
+
           const distanceNote =
             candidateDist !== undefined
               ? ` (stood ~${candidateDist} units away — too far to be the closest player, versus ${actualVictim.name}'s ~${victimDist})`
@@ -2308,6 +2335,8 @@ export const FORSAKEN_LETHAL_STACK_CLIP_RULE_ID = "ffxiv-forsaken-stack-clipped-
 export const FORSAKEN_STACK_MISSED_RULE_ID      = "ffxiv-forsaken-stack-misplaced";
 export const FORSAKEN_STACK_CONE_OVERLAP_RULE_ID = "ffxiv-forsaken-stack-overlapped-cone-bait";
 export const FORSAKEN_CONE_BAIT_TOO_FAR_RULE_ID  = "ffxiv-forsaken-cone-bait-too-far";
+// Half a yalm. Tied: 15 (gTkMH91DWRmLbNCn pull 13, user: call neither).
+const CONE_BAIT_TIE_MARGIN_UNITS = 50;
 
 export const FORSAKEN_LETHAL_CONE_BAIT_RULE_ID = "ffxiv-forsaken-baited-cone-too-close";
 

@@ -146,6 +146,15 @@
 //    Sayacissa Morsaelth, Kup'o Noodles, and Azura Salus this pull (the
 //    first two swapped to the mirror-opposite tower; Azura was simply lost).
 //
+// 3. "Wrong Stomp-a-Mole Tower" (Major, ffxiv-stompies-mole-partner) — the
+//    Stomp-a-Mole towers (47856) after wave 2 are soaked in pairs MT+H1,
+//    OT+H2, M1+R1, M2+R2; a player in a tower already holding another
+//    complete pair, while their own partner was alive, is flagged. See
+//    detectMolePartnerErrors for the evidence.
+//
+// VOD review 2026-10-24 (user): report gTkMH91DWRmLbNCn pull 1, ruling in
+// expectations/rulings.json.
+//
 // ── KNOWN LIMITATIONS (first pass, single-pull validation) ─────────────────
 //
 // - Wave 1's bait-too-close check still doesn't recover Archidel Del'archi
@@ -517,6 +526,72 @@ function detectWrongTowerErrors(
   return errors;
 }
 
+// ── STOMP-A-MOLE TOWER PARTNERS (2026-10-24, gTkMH91DWRmLbNCn) ─────────────
+// Each Stomp-a-Mole tower is soaked by a pair, the slots this module's wave-2
+// model already puts at the same tower: MT+H1, OT+H2, M1+R1, M2+R2 (user,
+// 2026-10-24). The four towers fire one after another ~1.3s apart (47856, one
+// hit set each). All 10 clean resolutions on disk (gTkMH91DWRmLbNCn pulls
+// 3/8/11, 2T1HzdPKgbhM43am 9, qjCMx4bRfgNKwX9T 1/6/9/16, yBKPqGwHparm7Tk4 5)
+// hit exactly those pairs, ~56-175k each. gTkMH91DWRmLbNCn pull 1 11:47: H1
+// soaked alone (205k, died) while the MT stood in the M1+R1 tower; the user
+// called it a Major on the MT. So a player standing in a tower that already
+// holds another complete pair, while their own partner was alive, is flagged.
+const STOMP_A_MOLE_TOWER_ABILITY_ID = 47856;
+const STOMP_TOWER_GAP_MS = 500;
+export const STOMPIES_MOLE_PARTNER_RULE_ID = "ffxiv-stompies-mole-partner";
+const STOMP_PARTNER: Readonly<Partial<Record<FFRoleSlot, FFRoleSlot>>> = {
+  MT: "H1", H1: "MT", OT: "H2", H2: "OT", M1: "R1", R1: "M1", M2: "R2", R2: "M2",
+};
+
+function detectMolePartnerErrors(players: PlayerInfo[], deathEvents: DeathEvent[], slotByName: Map<string, FFRoleSlot>): PullError[] {
+  type Hit = { player: PlayerInfo; slot: FFRoleSlot | undefined; timestamp: number; amount: number };
+  const hits: Hit[] = players
+    .flatMap((p) => p.damageTaken
+      .filter((e) => e.abilityId === STOMP_A_MOLE_TOWER_ABILITY_ID)
+      .map((e) => ({ player: p, slot: slotByName.get(p.name), timestamp: e.timestamp, amount: e.amount ?? 0 })))
+    .sort((a, b) => a.timestamp - b.timestamp);
+  if (hits.length === 0) return [];
+  const first = hits[0].timestamp;
+  const towers: Hit[][] = [];
+  for (const h of hits.filter((x) => x.timestamp - first <= STOMP_A_MOLE_SOAK_WINDOW_MS)) {
+    const last = towers[towers.length - 1];
+    if (last && h.timestamp - last[last.length - 1].timestamp <= STOMP_TOWER_GAP_MS) last.push(h);
+    else towers.push([h]);
+  }
+
+  const errors: PullError[] = [];
+  for (const tower of towers) {
+    const slots = new Set(tower.map((h) => h.slot));
+    for (const h of tower) {
+      const partner = h.slot && STOMP_PARTNER[h.slot];
+      if (!partner || slots.has(partner)) continue;
+      const otherPair = tower.find((o) => o !== h && o.slot && STOMP_PARTNER[o.slot] && slots.has(STOMP_PARTNER[o.slot]!));
+      if (!otherPair) continue;
+      const partnerName = [...slotByName].find(([, s]) => s === partner)?.[0];
+      // Alive when the towers began (their solo soak may have killed them since).
+      if (!partnerName || isDeadBefore(deathEvents, partnerName, first)) continue;
+      const partnerTower = towers.find((t) => t.some((x) => x.player.name === partnerName));
+      const alone = partnerTower && partnerTower.length === 1 ? partnerTower[0] : undefined;
+      const others = tower.filter((o) => o !== h).map((o) => o.player.name).join(" and ");
+      errors.push({
+        ruleId:      STOMPIES_MOLE_PARTNER_RULE_ID,
+        severity:    "Major",
+        name:        "Wrong Stomp-a-Mole Tower",
+        description: `Stood in ${others}'s Stomp-a-Mole tower instead of their own partner ${partnerName}'s` +
+          (alone ? `, who soaked theirs alone (~${Math.round(alone.amount / 1000)}k).` : "."),
+        timestamp:   h.timestamp,
+        player:      h.player.name,
+        class:       h.player.className,
+        specId:      h.player.specId,
+        role:        h.player.role,
+        abilityId:   STOMP_A_MOLE_TOWER_ABILITY_ID,
+        abilityName: STOMP_A_MOLE_ABILITY_NAME,
+      });
+    }
+  }
+  return errors;
+}
+
 /**
  * Returns [] for any pull that never reaches this mechanic (no "Earthquake"
  * cast from the real Kefka, or fewer than 2 Blizzard III waves), or where
@@ -554,6 +629,8 @@ export function detectStompiesErrors(
   if (dataWave2 !== null) {
     errors.push(...detectWrongTowerErrors(players, deathEvents, kefkaBearing, dropTime2, dataWave2, slotByName, positionSamples));
   }
+  const wrongTower = new Set(errors.filter((e) => e.ruleId === STOMPIES_WRONG_TOWER_RULE_ID).map((e) => e.player));
+  errors.push(...detectMolePartnerErrors(players, deathEvents, slotByName).filter((e) => !wrongTower.has(e.player)));
 
   return errors.sort((a, b) => a.timestamp - b.timestamp);
 }

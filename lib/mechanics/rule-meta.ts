@@ -240,6 +240,10 @@ mechanic("dm-black-hole", "Black Hole", 3, [
 mechanic("dm-stompies", "Stompies", 3, [
   "ffxiv-stompies-bait-too-close-to-center",
   "ffxiv-stompies-wrong-tower",
+  "ffxiv-stompies-mole-partner",
+]);
+mechanic("dm-exdeath-enrage", "Enrage check (P3)", 3, [
+  "ffxiv-exdeath-meteor-enrage",
 ]);
 phase(3, [
   "ffxiv-exdeath-shockwave-silent-kill",

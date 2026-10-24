@@ -46,6 +46,23 @@
 // too close to guess, so both get flagged rather than risk blaming the
 // wrong tank.
 //
+// Override (2026-10-24, gTkMH91DWRmLbNCn): Thunder III lands in pairs ~3.0s
+// apart (this static: MT then OT at ~10:38/10:41, every pull). When both
+// tanks are hit, a tank who took the pair's first hit is the bystander,
+// whatever their cooldowns: pull 5 10:41.7 the PLD took 10:38.7 and stood
+// in the DRK's hit (user: the PLD is wrong, the DRK should take it). The
+// mitigation split above runs only when neither or both took the first hit.
+//
+// ── PHASE 3 ENRAGE: METEOR (2026-10-24, same report) ─────────────────────
+//
+// Exdeath casts Meteor (50718) when he survives the DPS check; it kills the
+// party (pull 11, 12:10.7, Exdeath at 0.1%). Pulls that killed him by
+// ~12:07 entered Phase 4 at 12:10.8. One Raid error,
+// ffxiv-exdeath-meteor-enrage, at the first Meteor hit.
+//
+// VOD review 2026-10-24 (user): report gTkMH91DWRmLbNCn pulls 5 and 11,
+// rulings in expectations/rulings.json.
+//
 // Job coverage is necessarily partial: only Paladin and Dark Knight have
 // been observed taking Thunder III in this report's logs so far, so only
 // their ability lists are populated from real data. Warrior/Gunbreaker
@@ -92,6 +109,7 @@ import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
 
 export const THUNDER_III_WRONG_TANK_RULE_ID   = "ffxiv-exdeath-thunder3-wrong-tank";
 export const SHOCKWAVE_SILENT_KILL_RULE_ID    = "ffxiv-exdeath-shockwave-silent-kill";
+export const METEOR_ENRAGE_RULE_ID            = "ffxiv-exdeath-meteor-enrage";
 
 const THUNDER_III_MARK_ABILITY_ID   = 1002998; // pre-cast targeting marker
 const THUNDER_III_DAMAGE_ABILITY_ID = 47884;
@@ -104,6 +122,9 @@ const MARK_CLUSTER_TOLERANCE_MS = 100;
 // How far from the mark timestamp to look for the matching damage tick and
 // its activeBuffNames snapshot.
 const MARK_TO_DAMAGE_WINDOW_MS = 1000;
+
+// A pair's two hits land 3.0-3.1s apart (gTkMH91DWRmLbNCn, every pull).
+const THUNDER_III_PAIR_GAP_MS = 4500;
 
 // Each tank job's own "big personal" defensive cooldowns — the ones a tank
 // times specifically because THEY expect to take a hit, as opposed to
@@ -199,7 +220,17 @@ function detectThunderIIIErrors(players: PlayerInfo[], occurrences?: ReportedOcc
     // Decisive only on a clean split — some tanks prepped, some didn't. If
     // every candidate (or none) shows their own big cooldown, the call is
     // ambiguous and every marked tank gets flagged rather than a guess.
+    // Overrides the mitigation split: Thunder III comes in pairs ~3s apart,
+    // and a tank who took the pair's first hit (still vulnerable) should be
+    // clear of the second. gTkMH91DWRmLbNCn pull 5 10:41.7: the PLD took
+    // 10:38.7 and stood in 10:41.7, which the DRK was prepped for (user,
+    // 2026-10-24: the PLD is wrong; the DRK "should be taking the
+    // tankbuster"). Every other pair in that report hit one tank per cast.
+    const tookPrevious = candidates.filter(({ player }) => player.damageTaken.some(
+      (e) => e.abilityId === THUNDER_III_DAMAGE_ABILITY_ID &&
+        e.timestamp < clusterTime - MARK_TO_DAMAGE_WINDOW_MS && clusterTime - e.timestamp <= THUNDER_III_PAIR_GAP_MS));
     const toFlag =
+      tookPrevious.length === 1 ? tookPrevious :
       withMitigation.length > 0 && withoutMitigation.length > 0 ? withoutMitigation : candidates;
 
     for (const { player } of toFlag) {
@@ -207,7 +238,9 @@ function detectThunderIIIErrors(players: PlayerInfo[], occurrences?: ReportedOcc
         ruleId:      THUNDER_III_WRONG_TANK_RULE_ID,
         severity:    "Major",
         name:        "Wrong Tank Hit By Thunder III",
-        description: "Was hit by Thunder III alongside the other tank at the same moment — the cast landed as an untargeted AoE instead of locking a single tank, and this player wasn't the one prepped with their own mitigation for it. The leftover vulnerability can make their next Thunder III lethal.",
+        description: tookPrevious.length === 1
+          ? "Was hit by Thunder III alongside the other tank at the same moment — having just taken the previous Thunder III, they should have been clear of this one, which belonged to the other tank. The stacked vulnerability can make the next hit lethal."
+          : "Was hit by Thunder III alongside the other tank at the same moment — the cast landed as an untargeted AoE instead of locking a single tank, and this player wasn't the one prepped with their own mitigation for it. The leftover vulnerability can make their next Thunder III lethal.",
         timestamp:   clusterTime,
         player:      player.name,
         class:       player.className,
@@ -260,13 +293,40 @@ function detectShockwaveSilentKillErrors(players: PlayerInfo[], deathEvents: Dea
   return errors;
 }
 
+// Meteor (50718) is Phase 3's enrage: Exdeath casts it when he survives the
+// DPS check, and it kills the party. gTkMH91DWRmLbNCn pull 11: cast 12:10.7
+// with Exdeath at ~1.3%, all eight dead; pulls 3 and 8 killed him by 12:06.7
+// and entered Phase 4 at 12:10.8 (user, 2026-10-24: "a failure of the DPS
+// check"). Seen in no other pull on disk.
+const METEOR_ABILITY_ID = 50718;
+
+function detectMeteorEnrageError(players: PlayerInfo[]): PullError[] {
+  const hits = players.flatMap((p) => p.damageTaken.filter((e) => e.abilityId === METEOR_ABILITY_ID));
+  if (hits.length === 0) return [];
+  const t = Math.min(...hits.map((e) => e.timestamp));
+  const exdeath = players
+    .flatMap((p) => p.damageDone)
+    .filter((e) => e.target === "Exdeath" && e.timestamp <= t && e.maxHealth)
+    .sort((a, b) => b.timestamp - a.timestamp)[0];
+  const hp = exdeath ? ` at ${((100 * (exdeath.healthAfter ?? 0)) / exdeath.maxHealth!).toFixed(1)}% HP` : "";
+  return [{
+    ruleId:      METEOR_ENRAGE_RULE_ID,
+    severity:    "Raid",
+    name:        "Phase 3 Enrage (Meteor)",
+    description: `Exdeath survived${hp} and cast Meteor — the Phase 3 DPS check wasn't met.`,
+    timestamp:   t,
+    abilityId:   METEOR_ABILITY_ID,
+    abilityName: "Meteor",
+  }];
+}
+
 /**
  * Returns [] immediately for any pull that never touches either mechanic —
  * self-gating on the Thunder III marker debuff / a Shockwave killing blow
  * rather than an encounter-name check, so it's safe to always call.
  */
 export function detectExdeathErrors(players: PlayerInfo[], deathEvents: DeathEvent[], occurrences?: ReportedOccurrence[]): PullError[] {
-  return [...detectThunderIIIErrors(players, occurrences),...detectShockwaveSilentKillErrors(players, deathEvents)].sort(
+  return [...detectThunderIIIErrors(players, occurrences), ...detectShockwaveSilentKillErrors(players, deathEvents), ...detectMeteorEnrageError(players)].sort(
     (a, b) => a.timestamp - b.timestamp
   );
 }

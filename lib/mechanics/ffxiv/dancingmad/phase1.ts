@@ -1236,12 +1236,26 @@
 //     No ruling yet.
 //   - Pull 49 bait positions (same report): the user named a different pair
 //     than detection flags.
+//   - Tele-Trouncing arrow, report gTkMH91DWRmLbNCn pull 6 2:40: the DRG's
+//     N arrow reads ~2.4y off (Major) but sits correctly in game (user's
+//     screenshot, 2026-10-24). A position-sampling error; the 1.95y line
+//     can't move past a confirmed 2.06y Major. Left unruled.
+//
+// VOD review 2026-10-24 (user): report gTkMH91DWRmLbNCn pulls 2, 4, 12,
+// rulings in expectations/rulings.json:
+//   - JUMPED OFF THE ARENA skips a fall within 4s of a Confetti blast hit
+//     (knocked off, not a reset): pull 12 0:51.3 hit, death event 0:54.4.
+//   - CONFETTI FINAL POSITION skips a player who falls off within 10s of
+//     the snapshot without a blast hit (walking off to reset): pull 2.
+//   - Pull 4: a Blizzard III Blowout Damage Down at 0:38 ended the pull
+//     (the group walked off); the DNC's double Wave Cannon death after it
+//     is fallout and stays unflagged.
 // Not built:
 //   - [STALE?] the second Confetti resolution (its holder/victim geometry is
 //     still unbuilt, but CONFETTI GROUP MISPLACED above already checks the
 //     second resolution's headcount)
 //   - relative Confetti stack cohesion
-//   - a "Phase 4 enrage / died to Meteor" Raid error
+// (The Phase 3 Meteor enrage is built in exdeath.ts.)
 
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { PullError, EnemyEvent } from "@/types/PullError";
@@ -2170,6 +2184,20 @@ function detectHyperdriveOutOfPositionErrors(players: PlayerInfo[], deathEvents:
   return errors;
 }
 
+// A fall shortly after a Confetti blast hit the player is the knockback
+// carrying them off, not a jump. gTkMH91DWRmLbNCn pull 12: hit 0:51.3, death
+// event 0:54.4 (user, 2026-10-24: stepped back thinking he held Confetti
+// "and eventually got knocked off the arena"). Death events trail the fall
+// by ~2s. Kept under yBKPqGwHparm7Tk4 pull 3's 5.2s (a blast hit at 0:51.2,
+// death event 0:56.4), still read as the first jump: unreviewed.
+const CONFETTI_KNOCKOFF_WINDOW_MS = 4000;
+
+function knockedOffByConfetti(players: PlayerInfo[], death: DeathEvent): boolean {
+  const player = players.find((p) => p.name === death.player);
+  return player?.damageTaken.some((e) => e.abilityId === CONFETTI_EXPLOSION_ABILITY_ID &&
+    e.timestamp <= death.timestamp && death.timestamp - e.timestamp <= CONFETTI_KNOCKOFF_WINDOW_MS) ?? false;
+}
+
 function detectJumpedOffArenaError(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
   const hadDamageDownAt = (playerName: string, timestamp: number) => {
     const player = players.find((p) => p.name === playerName);
@@ -2185,6 +2213,7 @@ function detectJumpedOffArenaError(players: PlayerInfo[], deathEvents: DeathEven
   const jump = deathEvents
     .filter((d) => d.timestamp <= PHASE_1_END_MS && d.cause === "Environmental")
     .filter((d) => !hadDamageDownAt(d.player, d.timestamp))
+    .filter((d) => !knockedOffByConfetti(players, d))
     .sort((a, b) => a.timestamp - b.timestamp)[0];
   if (!jump) return [];
 
@@ -3973,7 +4002,14 @@ function detectConfettiGroupMisplacedErrors(players: PlayerInfo[]): PullError[] 
  * of a dedicated one, and its own snapshot moment is found as the last
  * Confetti-explosion damage in the pull, after that group's own window.
  */
-function detectConfettiFinalPositionMisplacedErrors(players: PlayerInfo[]): PullError[] {
+// A player who falls off soon after the final snapshot without any Confetti
+// blast hitting them was walking off to reset. gTkMH91DWRmLbNCn pull 2:
+// snapshot 2:48.8, ~166° off, death event 2:55.3, no blast hit (user,
+// 2026-10-24: the Sage "just jumped off indicating a reset"). One knocked off
+// by a blast keeps the flag: the blast is the outcome of where they stood.
+const CONFETTI_FINAL_WALKOFF_WINDOW_MS = 10000;
+
+function detectConfettiFinalPositionMisplacedErrors(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
   const resolutions = collectConfettiResolutions(players);
   if (resolutions.length < 2) return []; // no second (Graven 2) resolution to carry a holder into a third at all
 
@@ -4003,6 +4039,11 @@ function detectConfettiFinalPositionMisplacedErrors(players: PlayerInfo[]): Pull
     const expectedBearing = isSupport ? CONFETTI_FINAL_SUPPORT_BEARING_DEG : CONFETTI_FINAL_DPS_BEARING_DEG;
     const off = angularDistance(bearing, expectedBearing);
     if (off < CONFETTI_FINAL_QUADRANT_TOLERANCE_DEG) continue; // within normal jitter of the expected quadrant
+
+    const walkedOff = deathEvents.some((d) => d.player === player.name && d.cause === "Environmental" &&
+      d.timestamp > snapshotTime && d.timestamp - snapshotTime <= CONFETTI_FINAL_WALKOFF_WINDOW_MS &&
+      !knockedOffByConfetti(players, d));
+    if (walkedOff) continue;
 
     const expectedDir = isSupport ? "northwest" : "southeast";
     const isHolder = holderNames.has(player.name);
@@ -4720,7 +4761,7 @@ export function detectPhase1Errors(
     ...detectConfettiKnockbackVictimErrors(players),
     ...detectConfettiHolderMisplacedErrors(players, occurrences),
     ...detectConfettiGroupMisplacedErrors(players),
-    ...detectConfettiFinalPositionMisplacedErrors(players),
+    ...detectConfettiFinalPositionMisplacedErrors(players, deathEvents),
     ...detectTeleTrouncingArrowErrors(players),
     ...detectTeleTrouncingBaitPositionErrors(players, enemyCasts),
     ...detectTeleTrouncingDeathWipeError(deathEvents, enemyCasts),

@@ -108,6 +108,11 @@
 //   (49769). Flare Diffusion / Chaotic Holy's helpers sit at (100, 100);
 //   the holders' Surprise statuses place them.
 //
+// VOD review 2026-10-24 (user): report gTkMH91DWRmLbNCn pull 3 (Celestriad
+// missed tower confirmed; the Orchestra 2 Holy overlap was fallout of a
+// raise landing at 17:04.9 with the spread at 17:04.9), rulings in
+// expectations/rulings.json.
+//
 // -- RULES IMPLEMENTED --
 // Major unless noted; a hit that neither killed nor applied Damage Down is
 // Minor. Damage Down counts as Major, matching ffxiv-damage-down.
@@ -126,7 +131,8 @@
 //   ffxiv-uk-orchestra-holy        stood in another player's Holy, or took a
 //                                   second Holy while vulnerable (only with
 //                                   3+ eligible baiters and tanks holding
-//                                   both auras)
+//                                   both auras; a circle holding someone
+//                                   raised in the last 8s is skipped)
 //   ffxiv-uk-orchestra-diffusion   non-tank hit by an on-time Flare Diffusion
 //   ffxiv-uk-orchestra-early-flare Surprise Flare carrier died, Diffusion hit
 //                                   the party (Raid, player-less); the carrier
@@ -509,6 +515,10 @@ const INVULN_BUFFS = ["hallowed ground", "living dead", "walking dead", "superbo
 // follows within this window.
 const DEATH_EVENT_LAG_MS = 2000;
 const DIED_FROM_HIT_MS   = 3000;
+// A Holy circle holding someone raised this recently is fallout: they get up
+// where the raiser stands. gTkMH91DWRmLbNCn pull 3: raised 17:04.9, Holy hit
+// 17:04.9 (user, 2026-10-24: "a fallout from dying earlier").
+const RECENT_RAISE_MS    = 8000;
 // Collapse marker: see header (no pull recovered from 4 dead mid-phase).
 const COLLAPSE_DEAD_COUNT = 4;
 // A "group" error replaces per-player errors when this many were caught at
@@ -797,6 +807,9 @@ function detectOrchestra(players: PlayerInfo[], deaths: DeathEvent[], life: Life
         for (const circle of circles.values()) {
           const deadly = circle.some((h) => life.diedFrom(h.p, h.e.timestamp));
           const inCircle = uniq(circle.map((h) => h.p));
+          const justRaised = circle.some((h) => life.outIntervals.some((w) =>
+            w.p === h.p && w.end !== Infinity && w.end <= h.e.timestamp + 1000 && h.e.timestamp - w.end <= RECENT_RAISE_MS));
+          if (justRaised) continue;
           if (inCircle.length >= 2) {
             for (const h of circle) flag(h, inCircle.filter((x) => x !== h.p), false, deadly);
           }
