@@ -415,12 +415,13 @@ const MECHANICS = {
     load: () => ({
       ...requireTsFromRoot('lib/mechanics/ffxiv/top/omega-mf.ts'),
       ...requireTsFromRoot('lib/mechanics/ffxiv/top/synergy-order.ts'),
+      ...requireTsFromRoot('lib/mechanics/ffxiv/top/pantokrator-conga.ts'),
     }),
     run({ mod, ctxs }) {
       // Cross-pull, as in the app: the report's Party Synergy order narrows
       // each glitch pair to the partner in the wrong row or stack.
       const pullLikes = ctxs.map((c) => ({ c, players: c.relPlayers(), deathEvents: c.relDeaths(), enemyCasts: c.relEnemyCasts(), headMarkers: c.relHeadMarkers() }));
-      const order = mod.learnSynergyOrder(pullLikes);
+      const order = mod.learnSynergyOrder(pullLikes, mod.learnPantokratorConga(pullLikes));
       if (order) console.log(`  Party Synergy order: ${order.orders.length} order(s) fit ${order.fits} of ${order.pairs} clean pairs`);
       for (const p of pullLikes) {
         const errors = mod.detectOmegaMFErrors(p.players, p.deathEvents, p.enemyCasts, p.headMarkers);

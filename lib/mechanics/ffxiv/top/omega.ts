@@ -114,6 +114,28 @@
 // 5.2s before (after the SAM), Pull 15 the MNK 6.1s before (the SGE never
 // took). Holders at the Blaster = the two latest takers the round's
 // Blasters hit; that matched every one of these user calls.
+// Report C = LG64YVQy2KZbtpN8 (the user's static, day 2, 48 pulls, same
+// roster; conga SGE RDM SAM GNB DRK MNK DNC SCH, user). VOD review
+// 2026-10-24 (user): Pulls 12, 20, 23, 28, 34, 37, 38, 45 here (11, 29, 31,
+// 40 in omega-mf.ts, 48 in omega-reconfiguredd.ts); rulings in
+// expectations/rulings.json. Findings:
+// - Pulls 20, 21, 32: silent deaths at 0:04-0:19, before the first towers,
+//   were a reset after a cooldown was burned (Pull 21: only four died and
+//   the rest played on into an empty tower). Not pulls.
+// - C28 1:57.8: the GNB died at the wall still holding Flame Thrower's
+//   Damage Down (20.2s after it) and was raised: deliberate, "the correct
+//   thing to do".
+// - C34 0:28.8 and C38 0:28.5: the MNK clipped by a round-1 Blaster died
+//   at their own round-2 tower / tether to Doom (Ruin still up): Minor for
+//   the clip, Major for the death. C12, C13, C48's round-4 tower deaths
+//   (In Line 4 left low after HP Penalty) are healing and fallout: none.
+// - C37 1:21.1: the MNK took their line alone, the GNB and RDM 1.9y apart
+//   in no line: the MNK went to the wrong side (2qgaAkxVypGWv9CN Pulls 27
+//   and 50 show the same shape, unreviewed).
+// - C45 0:46.9: the SCH and DNC (In Line 1) took the same tether, the DNC
+//   last (0.5s before), while the GNB kept theirs: the DNC should have
+//   flexed to the GNB's.
+// - C23 0:56.1: both holders together, both at an intercardinal: both named.
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-top1-avoidable (Major on Damage Down or death, else Minor): Flame
@@ -143,6 +165,11 @@
 //   is left to the tower rules), and the victim is excused when the thief
 //   had no tether duty or took within LATE_STEAL_MS of the Blaster (user,
 //   B4, B6, B12, B15). A holder who kept last round's tether isn't named.
+//   Both In Line players in one Blaster while another stayed on last
+//   round's holder (no take): the later taker ("Took Another's Tether";
+//   user, C45). "Died From a Blaster Clip" (Major): a player named for
+//   standing in a Blaster who died at their own next tower/tether within
+//   Ruin's 11s, unless that round already names them (user, C34, C38).
 // ffxiv-top1-tower "Tower Out of Turn" skips a player with no duty that
 //   round who covered for a tower owner stuck in a Blaster (user, B44).
 // ffxiv-top1-missile (Major on death, else Minor): a missile hitting
@@ -156,7 +183,9 @@
 //   set; the cross-pull conga then keeps only the one who belonged on the
 //   other side, "Didn't Cross"); else a group member in neither line or the other group's
 //   (groups read from the pull's lines), the aimed player taking the line
-//   to the other group, a player in both lines.
+//   to the other group, a player in both lines; the aimed player alone in
+//   their line while the two missing members stood within 5y in no line:
+//   the aimed player ("Left the Group"; user, C37).
 // ffxiv-top1-diffuse (Major on death, else Minor), both tanks alive: the
 //   farthest non-tank a cone hit, and a tank no cone reached. A tank the
 //   cones killed had no invuln ("Tank Cones Without Invuln", Major; Raid
@@ -164,7 +193,10 @@
 // ffxiv-top1-wave-cannon: a line hitting 2+ players, all six non-tanks
 //   alive (everyone it hit named: the log can't say who moved).
 // ffxiv-top1-wall (Major): a silent death no Doom, missile, reset or own
-//   Damage Down explains.
+//   Damage Down explains (applied within 20s, or still held at the fatal
+//   moment: user, C28).
+// A pull with 3+ silent deaths before the first towers is a reset: no
+// errors at all (user, C20; also 2qgaAkxVypGWv9CN Pull 64).
 // ffxiv-top1-enrage / -called-wipe (3+ silent deaths within 10s or 12s of
 //   the end, Doom and missile deaths excluded) / -collapse (4 dead, pull
 //   over within 20s): Raid, only the earliest, only before any mechanic
@@ -390,6 +422,7 @@ import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
 import type { Tether } from "@/types/Pull";
+import { interpolatePlayerPosition } from "@/lib/mechanics/player-position";
 import { kFmt, yd, joinNames, playerError, raidMarker, clusterByGap } from "@/lib/mechanics/wow/common";
 import {
   DAMAGE_DOWN, DEATH_EVENT_LAG_MS, PREVIEW_AMOUNT, type Hit, type Life,
@@ -438,12 +471,12 @@ const ATOMIC_RAY   = 31480;
 const P2_CASTS     = [31550, 31551, 31552, 31553, 32362, 32363];
 
 type Avoidable = { name: string; hit: string; why: string };
-const FLAME_WHY = "Two Flame Thrower cones rotate around the boss; move with the safe sector, the opposite way to the cones' sweep.";
+const FLAME_WHY = "Move with the safe sector, against the two cones' rotation.";
 const AVOIDABLE: Record<number, Avoidable> = {
   31501: { name: "Flame Thrower", hit: "Hit by Flame Thrower", why: FLAME_WHY },
   32368: { name: "Flame Thrower", hit: "Hit by Flame Thrower", why: FLAME_WHY },
   [BALLISTIC]: { name: "Ballistic Impact", hit: "Stood in a Ballistic Impact puddle",
-    why: "Ballistic Impact drops a puddle under every player during Pantokrator; drop it with the group and step just clear before it goes off." },
+    why: "Drop the puddle with the group and step just clear." },
 };
 
 const EPISODE_MS          = 3000;
@@ -455,6 +488,8 @@ const DOOM_DEATH_MS       = 7000;
 // A missile knockback into the deathwall: death event ~2.3s after the hit,
 // no killing blow (A58 +81.5 -> +83.8).
 const KNOCK_DEATH_MS      = 4000;
+// Twice-come Ruin lasts 11s; a second Ruin-giver inside it is Doom.
+const RUIN_MS             = 11_000;
 const DD_RESET_MS         = 20_000;
 const CALLED_WIPE_END_MS  = 12_000;
 const CALLED_WIPE_COUNT   = 3;
@@ -499,10 +534,33 @@ function instanceHits(players: PlayerInfo[], life: Life, c: EnemyEvent, ms = 150
 }
 
 const doomedAt = (p: PlayerInfo, t: number) => gotAura(p, DOOM, t, 1500);
+/**
+ * "A and B got Doom and died; C died; D got Doom" for a description;
+ * "All 4" / "All but X" when a clause covers every player just `named`
+ * (or all but one of three or more).
+ */
+function fateOf(named: PlayerInfo[], doomed: PlayerInfo[], died: PlayerInfo[]): string {
+  const both = died.filter((p) => doomed.includes(p));
+  const clause = (xs: PlayerInfo[], verb: string) => {
+    if (!xs.length) return "";
+    const missing = named.filter((p) => !xs.includes(p));
+    const extra = xs.filter((p) => !named.includes(p));
+    if (named.length < 2 || missing.length > 1 || (missing.length && (extra.length || named.length < 3))) return `${namesOf(xs)} ${verb}`;
+    return `${missing.length ? `All but ${missing[0].name}` : named.length === 2 ? "Both" : `All ${named.length}`}${extra.length ? ` and ${namesOf(extra)}` : ""} ${verb}`;
+  };
+  return [
+    clause(both, "got Doom and died"),
+    clause(died.filter((p) => !both.includes(p)), "died"),
+    clause(doomed.filter((p) => !both.includes(p)), "got Doom"),
+  ].filter(Boolean).join("; ");
+}
 /** Died from a hit at `t`: a killing blow within 3s, or Doom from it running out. */
 function diedOf(p: PlayerInfo, life: Life, deaths: DeathEvent[], t: number): boolean {
   return !!life.diedFrom(p, t) || (doomedAt(p, t) && deaths.some((d) => d.player === p.name && d.timestamp > t && d.timestamp - t <= DOOM_DEATH_MS));
 }
+
+/** m:ss from the pull start, as the user reads a VOD. */
+const mmssOf = (t: number) => `${Math.floor(t / 60_000)}:${((t % 60_000) / 1000).toFixed(1).padStart(4, "0")}`;
 
 /** One error per player per instance key: the first wins. */
 function firstPer(errors: PullError[], key: (e: PullError) => string): PullError[] {
@@ -566,8 +624,8 @@ function loopRounds(casts: EnemyEvent[], end: number): Round[] {
     .slice(0, 4).map((g, i) => ({ r: i + 1, t: g[0].timestamp, casts: g }));
 }
 
-const TOWER_WHY = "Round n's towers belong to the two In Line n players (towers 1-2-3-4, tethers 3-4-1-2); each takes one tower of their own while they still hold Looper.";
-const BLASTER_WHY = "The tether holders (In Line 3, 4, 1, 2 in rounds 1-4) take Blaster to the two cardinals the towers leave empty, by priority, away from the towers, the other holder and the waiting players (who wait by the towers without taking them): it hits everyone near the holder, and a second hit before Twice-come Ruin wears off (11s) is Doom.";
+const TOWER_WHY = "Each In Line n player takes one round n tower while holding Looper.";
+const BLASTER_WHY = "Holders take Blaster to the free cardinals, away from all; a 2nd hit in 11s is Doom.";
 
 // TOP's arena is centred on (100, 100); positions are in hundredths of a yalm.
 const ARENA_X = 10000, ARENA_Y = 10000;
@@ -630,7 +688,7 @@ function detectProgramLoop(
     for (const p of players.filter((x) => soaked.has(x) && looped(x) && num.get(x) !== rd.r && life.alive(x, rd.t - 500) && !(ownerStuck && num.get(x) !== h))) {
       errors.push(playerError(p, {
         ruleId: TOP1_TOWER_RULE_ID, severity: "Major", name: "Tower Out of Turn",
-        description: `Soaked a round ${rd.r} tower as In Line ${num.get(p)}: that spent their Looper early, so their own round ${num.get(p)} tower has one soaker short. ${TOWER_WHY}`,
+        description: `Soaked a round ${rd.r} tower as In Line ${num.get(p)}, spending their Looper early: their own round ${num.get(p)} tower is a soaker short. ${TOWER_WHY}`,
         timestamp: rd.t, abilityId: TOWER, abilityName: "Storage Violation",
       }));
     }
@@ -644,14 +702,14 @@ function detectProgramLoop(
       for (const p of absent) {
         errors.push(playerError(p, {
           ruleId: TOP1_TOWER_RULE_ID, severity: "Major", name: "Missed Tower",
-          description: `In Line ${rd.r} with Looper, but stood in no tower in round ${rd.r}: the tower was left empty and Storage Violation Obliteration gave the whole raid Doom. ${TOWER_WHY}`,
+          description: `In Line ${rd.r} with Looper but in no round ${rd.r} tower: it was left empty and Obliteration gave the raid Doom. ${TOWER_WHY}`,
           timestamp: rd.t, abilityId: OBLITERATION, abilityName: "Storage Violation Obliteration",
         }));
       }
       for (const p of doubled) {
         errors.push(playerError(p, {
           ruleId: TOP1_TOWER_RULE_ID, severity: "Major", name: "Same Tower",
-          description: `Both In Line ${rd.r} players (${namesOf(doubled)}) stood in the same round ${rd.r} tower, so the other was left empty: Storage Violation Obliteration gave the whole raid Doom. ${TOWER_WHY}`,
+          description: `Both In Line ${rd.r} players (${namesOf(doubled)}) stood in one round ${rd.r} tower, leaving the other empty: Obliteration gave the raid Doom. Either could have moved.`,
           timestamp: rd.t, abilityId: OBLITERATION, abilityName: "Storage Violation Obliteration",
         }));
       }
@@ -659,18 +717,42 @@ function detectProgramLoop(
       const spent = alive.filter((p) => !looped(p));
       const why = [
         dead.length ? `${namesOf(dead)} ${dead.length === 1 ? "was" : "were"} already dead` : "",
-        spent.length ? `${namesOf(spent)} had already used up their Looper` : "",
+        spent.length ? `${namesOf(spent)} had used their Looper` : "",
         absent.length || doubled.length ? `the In Line ${rd.r} ${absent.length + doubled.length === 1 ? "player" : "players"} with Looper ${absent.length ? "stood in no tower" : "shared one tower"}` : "",
       ].filter(Boolean).join("; ");
       errors.push(raidMarker(TOP1_TOWER_RULE_ID, "Tower Left Empty",
-        `A round ${rd.r} tower had nobody with Looper in it${why ? ` (${why})` : ""}. Storage Violation Obliteration gives everyone Doom and Damage Down; unresolvable from here, treated as the cutoff point.`,
+        `A round ${rd.r} tower had nobody with Looper${why ? ` (${why})` : ""}. Obliteration gives everyone Doom and Damage Down; treated as the cutoff point.`,
         rd.t, OBLITERATION, "Storage Violation Obliteration"));
       failedAt = rd.t;
     }
 
     errors.push(...blasterClips(players, life, deaths, rd, num, soaked, failed.length > 0, takes, roundStart));
   }
-  return errors;
+  return [...errors, ...clipDooms(players, life, deaths, errors)];
+}
+
+/**
+ * A player named for standing in a Blaster who then died to Doom at their
+ * own next tower or tether, still under that hit's Twice-come Ruin: Major on
+ * the death, besides the Minor clip (user, 2026-10-24, LG64YVQy2KZbtpN8 Pull
+ * 34 0:38.4 and Pull 38 0:38.1: the MNK). Not when that round already
+ * names them (2qgaAkxVypGWv9CN Pull 1 0:38.2: the SCH grabbed a tether
+ * that wasn't theirs).
+ */
+function clipDooms(players: PlayerInfo[], life: Life, deaths: DeathEvent[], errors: PullError[]): PullError[] {
+  const out: PullError[] = [];
+  for (const e of errors.filter((x) => x.name === "Stood in a Blaster")) {
+    const p = players.find((x) => x.name === e.player);
+    const next = p?.damageTaken.find((x) => (x.abilityId === TOWER || x.abilityId === BLASTER) && x.timestamp > e.timestamp + ROUND_GAP_MS && x.timestamp - e.timestamp <= RUIN_MS);
+    if (!p || !next || !diedOf(p, life, deaths, next.timestamp)) continue;
+    if (errors.some((x) => x.player === p.name && Math.abs(x.timestamp - next.timestamp) <= ROUND_GAP_MS)) continue;
+    out.push(playerError(p, {
+      ruleId: TOP1_BLASTER_RULE_ID, severity: "Major", name: "Died From a Blaster Clip",
+      description: `Still had Twice-come Ruin from the Blaster at ${mmssOf(e.timestamp)}, so their own ${next.abilityName} ${((next.timestamp - e.timestamp) / 1000).toFixed(1)}s later gave Doom and they died.`,
+      timestamp: next.timestamp, abilityId: next.abilityId, abilityName: next.abilityName,
+    }));
+  }
+  return out;
 }
 
 /**
@@ -731,6 +813,28 @@ function blasterClips(
   });
   const cards = roundCardinals(players, life, rd);
 
+  // Both In Line h players in one Blaster while another stayed on last
+  // round's holder, whom nobody took it from: the later taker took the
+  // tether the other already had instead of the one left over (user,
+  // 2026-10-24, LG64YVQy2KZbtpN8 Pull 45 0:46.9: the DNC should have flexed
+  // to the GNB's; the SCH was right). Neither Blaster is anyone else's.
+  const flexed = new Set<(typeof blasts)[number]>();
+  if (!held && takes.length && hPlayers.length === 2 && hPlayers.every((p) => lastTake(p) > -Infinity)) {
+    const both = blasts.find((b) => hPlayers.every((p) => b.hit.includes(p)));
+    const left = blasts.find((b) => b !== both && !b.hit.some((p) => num.get(p) === h) && b.hit.some((p) => num.get(p) === hPrev && lastTake(p) === -Infinity));
+    if (both && left) {
+      const [first, later] = [...hPlayers].sort((a, b) => lastTake(a) - lastTake(b));
+      const stuckOn = left.hit.find((p) => num.get(p) === hPrev)!;
+      errors.push(playerError(later, {
+        ruleId: TOP1_BLASTER_RULE_ID, severity: roundDoomed ? "Major" : "Minor", name: "Took Another's Tether",
+        description: `Round ${rd.r}: took ${first.name}'s tether ${((rd.t - lastTake(later)) / 1000).toFixed(1)}s before the Blaster instead of ${stuckOn.name}'s, which stayed put.${roundDoomed ? " Doom followed." : ""} ${BLASTER_WHY}`,
+        timestamp: rd.t, abilityId: BLASTER, abilityName: "Blaster",
+      }));
+      flexed.add(both);
+      flexed.add(left);
+    }
+  }
+
   if (held) {
     for (const v of hPlayers.filter((p) => !held!.has(p))) {
       // Someone who took after them took theirs. One who never took was
@@ -744,7 +848,7 @@ function blasterClips(
       if (thief && num.get(thief) !== rd.r) {
         errors.push(playerError(thief, {
           ruleId: TOP1_BLASTER_RULE_ID, severity: roundDoomed ? "Major" : "Minor", name: "Took Another's Tether",
-          description: `Round ${rd.r}: took the Blaster tether ${lastTake(v) > -Infinity ? `${v.name} had taken` : `${v.name} was due to take`}, ${((rd.t - lastTake(thief)) / 1000).toFixed(1)}s before it went off.${roundDoomed ? " The round's Blasters gave Doom." : ""} ${BLASTER_WHY}`,
+          description: `Round ${rd.r}: took the tether ${lastTake(v) > -Infinity ? `${v.name} had taken` : `${v.name} was due to take`}, ${((rd.t - lastTake(thief)) / 1000).toFixed(1)}s before the Blaster.${roundDoomed ? " Doom followed." : ""} ${BLASTER_WHY}`,
           timestamp: rd.t, abilityId: BLASTER, abilityName: "Blaster",
         }));
       }
@@ -754,8 +858,8 @@ function blasterClips(
       errors.push(playerError(v, {
         ruleId: TOP1_BLASTER_RULE_ID, severity: roundDoomed ? "Major" : "Minor", name: "Tether Not Taken",
         description: thief
-          ? `Round ${rd.r}: In Line ${h}, but ${thief.name} took their tether ${((rd.t - lastTake(thief)) / 1000).toFixed(1)}s before the Blaster and they didn't take the other.${roundDoomed ? " The round's Blasters gave Doom." : ""} ${BLASTER_WHY}`
-          : `Round ${rd.r}: In Line ${h}, but took no tether, so one stayed on its previous holder.${roundDoomed ? " The round's Blasters gave Doom." : ""} ${BLASTER_WHY}`,
+          ? `Round ${rd.r}: In Line ${h}, but ${thief.name} took their tether ${((rd.t - lastTake(thief)) / 1000).toFixed(1)}s before the Blaster and they didn't take the other.${roundDoomed ? " Doom followed." : ""} ${BLASTER_WHY}`
+          : `Round ${rd.r}: In Line ${h} but took no tether, so one stayed on its previous holder.${roundDoomed ? " Doom followed." : ""} ${BLASTER_WHY}`,
         timestamp: rd.t, abilityId: BLASTER, abilityName: "Blaster",
       }));
     }
@@ -773,7 +877,7 @@ function blasterClips(
     for (const p of [...owed, ...(kept ? [] : [b.holder])]) {
       errors.push(playerError(p, {
         ruleId: TOP1_BLASTER_RULE_ID, severity: doomed ? "Major" : "Minor", name: p === b.holder ? "Took Another's Tether" : "Tether Not Taken",
-        description: `Round ${rd.r}: a Blaster tether was on ${b.holder.name} (In Line ${num.get(b.holder)}) instead of an In Line ${h} player${kept ? ", still from the round before" : ""}${owed.length ? `; ${namesOf(owed)} had no tether` : ""}.${doomed ? ` ${b.holder.name} got Doom.` : ""} ${BLASTER_WHY}`,
+        description: `Round ${rd.r}: a Blaster tether was on ${b.holder.name} (In Line ${num.get(b.holder)}) instead of an In Line ${h} player${kept ? ", kept from the round before" : ""}${owed.length ? `; ${namesOf(owed)} had no tether` : ""}.${doomed ? ` ${b.holder.name} got Doom.` : ""} ${BLASTER_WHY}`,
         timestamp: b.c.timestamp, abilityId: BLASTER, abilityName: "Blaster",
       }));
     }
@@ -795,7 +899,7 @@ function blasterClips(
   for (const p of untaken) {
     errors.push(playerError(p, {
       ruleId: TOP1_BLASTER_RULE_ID, severity: roundDoomed ? "Major" : "Minor", name: "Tether Not Taken",
-      description: `Round ${rd.r}: In Line ${h}, but no Blaster hit them: they took no tether, so one stayed on its previous holder.${roundDoomed ? " The round's Blasters gave Doom." : ""} ${BLASTER_WHY}`,
+      description: `Round ${rd.r}: In Line ${h} but no Blaster hit them: they took no tether, so one stayed on its previous holder.${roundDoomed ? " Doom followed." : ""} ${BLASTER_WHY}`,
       timestamp: rd.t, abilityId: BLASTER, abilityName: "Blaster",
     }));
   }
@@ -807,17 +911,18 @@ function blasterClips(
   for (const b of blasts) {
     const { c, holders, holder } = b;
     // A tether nobody took: its holder's Blaster is the taker's error.
-    if (holder && kept.has(holder)) continue;
+    if ((holder && kept.has(holder)) || flexed.has(b)) continue;
     const hit = b.hit.filter((p) => !stuck.has(p) || p === holder);
     if (hit.length <= 1) continue;
     const doomed = hit.filter((p) => doomedAt(p, c.timestamp));
     const died = hit.filter((p) => diedOf(p, life, deaths, c.timestamp));
     const severity = doomed.length || died.length ? "Major" : "Minor";
-    const outcome = [
-      doomed.length ? `Doom on ${namesOf(doomed)}` : "",
-      died.length ? `${namesOf(died)} died` : "",
-    ].filter(Boolean).join("; ");
-    const tail = `${outcome ? ` ${outcome}.` : ""} ${BLASTER_WHY}`;
+    const tailFor = (named: PlayerInfo[], rule = true) => {
+      const o = fateOf(named, doomed, died);
+      return `${o ? ` ${o}.` : ""}${rule ? ` ${BLASTER_WHY}` : ""}`;
+    };
+    const outcome = fateOf(hit, doomed, died);
+    const tail = tailFor([]);
     const push = (p: PlayerInfo, name: string, description: string) => errors.push(playerError(p, {
       ruleId: TOP1_BLASTER_RULE_ID, severity, name, description, timestamp: c.timestamp, abilityId: BLASTER, abilityName: "Blaster",
     }));
@@ -829,13 +934,13 @@ function blasterClips(
             push(p, "In a Tether, Not a Tower", `Round ${rd.r}: In Line ${rd.r} with Looper, took a Blaster tether instead of a tower.${tail}`);
             continue;
           }
-          push(p, HOLDERS_TOGETHER_NAME, `Round ${rd.r}: both Blaster holders (${namesOf(holders)}) stood within each other's Blaster${hit.length > holders.length ? `, which also hit ${namesOf(hit.filter((x) => !holders.includes(x)))}` : ""}.${tail}`);
+          push(p, HOLDERS_TOGETHER_NAME, `Round ${rd.r}: holders ${namesOf(holders)} stood in each other's Blaster${hit.length > holders.length ? `, also hitting ${namesOf(hit.filter((x) => !holders.includes(x)))}` : ""}.${outcome ? ` ${outcome}.` : ""}`);
         }
       } else {
         // Nobody of the round's tether number: the soakers in their towers
         // are where they belong (A48 +47.1).
         const named = hit.filter((p) => !soaked.has(p));
-        for (const p of named) push(p, "Blaster Hit Several", `Round ${rd.r}: a Blaster hit ${namesOf(hit)}, none of them In Line ${h}, and the log doesn't say whose tether it was.${tail}`);
+        for (const p of named) push(p, "Blaster Hit Several", `Round ${rd.r}: a Blaster hit ${namesOf(hit)}, none of them In Line ${h}; whose tether it was is unknown.${tailFor(hit)}`);
       }
       continue;
     }
@@ -847,20 +952,23 @@ function blasterClips(
     const rest = others.filter((p) => !wrongJob.includes(p));
     if (!rest.length) continue;
     let blamed = rest.some((p) => soaked.has(p)) || rest.length >= 2 ? [holder] : [holder, rest[0]];
-    let why = blamed.length > 1 ? "; either the holder or the player hit was out of place" : "";
+    let why = blamed.length > 1 ? "; either could have moved" : "";
     if (blamed.length === 2 && cards) {
       const hb = bearingOf(b, holder), vb = bearingOf(b, rest[0]);
       if (hb !== undefined && Math.min(...cards.free.map((f) => offCardinal(hb, f))) <= HOLDER_SPOT_DEG) {
         blamed = [rest[0]];
-        why = `; ${holder.name} held it on a free cardinal, so ${rest[0].name} wasn't waiting by a tower`;
+        why = `; the holder was on a free cardinal, so ${rest[0].name} wasn't waiting by a tower`;
       } else if (vb !== undefined && Math.min(...cards.towers.map((f) => offCardinal(vb, f))) <= WAITER_SPOT_DEG) {
         blamed = [holder];
-        why = `; ${rest[0].name} was waiting by a tower and ${holder.name} wasn't on a free cardinal`;
+        why = `; ${rest[0].name} was waiting by a tower, the holder wasn't on a free cardinal`;
       }
     }
+    // A placed verdict or a Blaster in a tower already says the rule; skip
+    // the generic tail.
+    const placed = (blamed.length === 1 && why !== "") || rest.some((x) => soaked.has(x));
     for (const p of blamed) {
       push(p, p === holder ? "Blaster Hit Others" : "Stood in a Blaster",
-        `Round ${rd.r}: ${holder.name}'s Blaster (In Line ${h}) also hit ${namesOf(rest)}${rest.some((x) => soaked.has(x)) ? ", in a tower" : ""}${why}.${tail}`);
+        `Round ${rd.r}: ${holder.name}'s Blaster (In Line ${h}) also hit ${namesOf(rest)}${rest.some((x) => soaked.has(x)) ? ", in a tower" : ""}${why}.${tailFor([holder, ...rest], !placed)}`);
     }
   }
   return firstPer(errors, (e) => `${e.player}`);
@@ -905,8 +1013,12 @@ function lineGroups(players: PlayerInfo[], sets: { lines: PlayerInfo[][] }[]): P
   return tryWith(4) ?? tryWith(3);
 }
 
-const LINE_WHY = "Each group of four has one missile carrier and three players sharing the group's Condensed Wave Cannon Kyrios line; the line splits its damage over whoever stands in it, so two players take a lethal share.";
-const MISSILE_WHY = "The In Line carrier leaves their group before Guided Missile Kyrios lands (drop it at the edge of the hitbox) and rejoins for the next line; anyone else it hits is knocked back toward the wall.";
+// Two group members this close (centi-yalms) stood together at the line.
+const GROUP_TOGETHER = 500;
+const POS_WINDOW_MS = 3000;
+const POS_SPAN_MS   = 6000;
+const LINE_WHY = "Each group's three non-carriers share its line; two alone take a lethal share.";
+const MISSILE_WHY = "The carrier drops the missile at the hitbox edge, away from everyone, then rejoins.";
 
 type PantoSet = {
   k: number; t: number;
@@ -1002,13 +1114,13 @@ function detectPantokrator(players: PlayerInfo[], life: Life, deaths: DeathEvent
         const other = pair.find((x) => x !== p)!;
         errors.push(playerError(p, {
           ruleId: TOP1_LINE_RULE_ID, severity: "Major", name: SAME_SIDE_NAME,
-          description: `Pantokrator: had In Line ${num.get(p)} like ${other.name} and both joined the same group, so neither group had one of each number for its missiles and lines. One of the two should have flexed to the other group; the log can't say which. ${LINE_WHY}`,
+          description: `Pantokrator: In Line ${num.get(p)} like ${other.name}, and both joined one group, so neither group had one of each number. One should have flexed; the log can't say which.`,
           timestamp: t, abilityId: LINE, abilityName: "Condensed Wave Cannon Kyrios",
         }));
       }
     }
     errors.push(raidMarker(TOP1_LINE_RULE_ID, "Pantokrator Groups Broken",
-      `Both players of In Line ${uniq(doubled.map((pair) => num.get(pair[0]))).join(" and ")} ended up in one group, so the groups couldn't share their lines or place their missiles; unresolvable from here, treated as the cutoff point.`,
+      `Both players of In Line ${uniq(doubled.map((pair) => num.get(pair[0]))).join(" and ")} ended up in one group, so the groups couldn't share lines or place missiles; treated as the cutoff point.`,
       t, LINE, "Condensed Wave Cannon Kyrios"));
   }
   for (const s of sets) {
@@ -1027,7 +1139,7 @@ function detectPantokrator(players: PlayerInfo[], life: Life, deaths: DeathEvent
         const died = diedOf(carrier, life, deaths, s.t);
         errors.push(playerError(carrier, {
           ruleId: TOP1_MISSILE_RULE_ID, severity: died ? "Major" : "Minor", name: "Missile in the Stack",
-          description: `Set ${s.k}: stayed in a line stack while their Guided Missile Kyrios (In Line ${s.k}) went off, taking both${died ? " and dying" : ""}. ${MISSILE_WHY}`,
+          description: `Set ${s.k}: stayed in a line stack while their missile (In Line ${s.k}) went off, taking both${died ? " and dying" : ""}. ${MISSILE_WHY}`,
           timestamp: s.t, abilityId: MISSILE, abilityName: "Guided Missile Kyrios",
         }));
         continue;
@@ -1037,7 +1149,7 @@ function detectPantokrator(players: PlayerInfo[], life: Life, deaths: DeathEvent
       for (const p of blamed) {
         errors.push(playerError(p, {
           ruleId: TOP1_MISSILE_RULE_ID, severity: died.length ? "Major" : "Minor", name: p === carrier ? "Missile on Others" : "Stood by a Missile",
-          description: `Set ${s.k}: ${carrier.name}'s Guided Missile Kyrios (In Line ${s.k}) also hit ${namesOf(others)}${stayed ? `; ${carrier.name} was still in the line stack` : ""}${blamed.length > 1 ? "; either the carrier or the player hit was out of place" : ""}.${died.length ? ` ${namesOf(died)} died.` : ""} ${MISSILE_WHY}`,
+          description: `Set ${s.k}: ${carrier.name}'s missile (In Line ${s.k}) also hit ${namesOf(others)}${stayed ? "; the carrier was still in the line stack" : ""}${blamed.length > 1 ? "; either could have moved" : ""}.${died.length ? ` ${fateOf([carrier, ...others], [], died)}.` : ""} ${MISSILE_WHY}`,
           timestamp: s.t, abilityId: MISSILE, abilityName: "Guided Missile Kyrios",
         }));
       }
@@ -1060,7 +1172,7 @@ function detectPantokrator(players: PlayerInfo[], life: Life, deaths: DeathEvent
         const other = targets.find((x) => x !== p)!;
         lineErrors.push(playerError(p, {
           ruleId: TOP1_LINE_RULE_ID, severity: died.length ? "Major" : "Minor", name: SAME_SIDE_NAME,
-          description: `Set ${s.k}: had In Line ${num.get(p) ?? "?"} like ${other.name} and stood on the same side, so both lines went into one stack (${namesOf(hit)})${died.length ? `; ${namesOf(died)} died` : ""}. One of the two should have crossed to the other group; the log can't say which. ${LINE_WHY}`,
+          description: `Set ${s.k}: In Line ${num.get(p) ?? "?"} like ${other.name} and on the same side, so both lines hit one stack (${namesOf(hit)})${died.length ? `; ${died.length === hit.length ? "all" : namesOf(died)} died` : ""}. One should have crossed; the log can't say which.`,
           timestamp: s.t, abilityId: LINE, abilityName: "Condensed Wave Cannon Kyrios",
         }));
       }
@@ -1099,6 +1211,21 @@ function detectPantokrator(players: PlayerInfo[], life: Life, deaths: DeathEvent
         continue;
       }
       const missing = g.filter((p) => p !== carrier && !own.hit.includes(p));
+      // The aimed player alone in their line while the rest of their group
+      // stood together in no line: the aimed player left the group and the
+      // others are excused (user, 2026-10-24, LG64YVQy2KZbtpN8 Pull 37
+      // 1:21.1: the MNK went to the wrong side; the GNB and RDM 1.9y apart).
+      if (target && own.hit.length === 1 && own.hit[0] === target && missing.length === 2 && missing.every((p) => !inLine(p))) {
+        const [a, b] = missing.map((p) => interpolatePlayerPosition(p, s.t, { windowMs: POS_WINDOW_MS, maxSpanMs: POS_SPAN_MS }));
+        if (a && b && Math.hypot(a.x - b.x, a.y - b.y) <= GROUP_TOGETHER) {
+          lineErrors.push(playerError(target, {
+            ruleId: TOP1_LINE_RULE_ID, severity, name: "Left the Group",
+            description: `Set ${s.k}: took their line away from ${namesOf(missing)}, who stood together, so they took it alone${died.length ? " and died" : ""}. ${LINE_WHY}`,
+            timestamp: s.t, abilityId: LINE, abilityName: "Condensed Wave Cannon Kyrios",
+          }));
+          continue;
+        }
+      }
       for (const p of missing) {
         const elsewhere = inLine(p);
         lineErrors.push(playerError(p, {
@@ -1115,7 +1242,7 @@ function detectPantokrator(players: PlayerInfo[], life: Life, deaths: DeathEvent
 
 // ── the final volley: Diffuse and Wave Cannon Kyrios ────────────────────────
 
-const DIFFUSE_WHY = "Diffuse Wave Cannon Kyrios fires at the two players farthest from Omega, five times: the tank or tanks taking it stand farthest out under an invuln, and everyone else stays inside the hitbox.";
+const DIFFUSE_WHY = "The two farthest from Omega take all five cones: tanks, farthest out under invuln.";
 
 /**
  * Diffuse Wave Cannon Kyrios on a non-tank with both tanks alive: the
@@ -1144,7 +1271,7 @@ function detectDiffuse(players: PlayerInfo[], life: Life, deaths: DeathEvent[], 
       for (const p of fallen) {
         errors.push(playerError(p, {
           ruleId: TOP1_DIFFUSE_RULE_ID, severity: victims.length >= 3 ? "Raid" : "Major", name: "Tank Cones Without Invuln",
-          description: `Took Diffuse Wave Cannon Kyrios and died to it: no invuln was up for the tank cones.${victims.length ? ` The next cones went to the party: ${namesOf(victims)} died.` : ""} ${DIFFUSE_WHY}`,
+          description: `Died to Diffuse Wave Cannon Kyrios with no invuln up.${victims.length ? ` The later cones went to the party and killed ${namesOf(victims)}.` : ""}`,
           timestamp: t, abilityId: DIFFUSE, abilityName: "Diffuse Wave Cannon Kyrios",
         }));
       }
@@ -1159,7 +1286,7 @@ function detectDiffuse(players: PlayerInfo[], life: Life, deaths: DeathEvent[], 
     const caught = uniq(nonTanks.map((x) => x.p));
     const died = caught.filter((p) => life.diedFrom(p, t));
     const severity = died.length ? "Major" : "Minor";
-    const tail = `${caught.length > 1 ? ` It hit ${namesOf(caught)}.` : ""}${died.length ? ` ${namesOf(died)} died.` : ""} ${DIFFUSE_WHY}`;
+    const tail = `${caught.length > 1 ? ` It hit ${namesOf(caught)}${died.length ? `; ${died.length === caught.length ? "all" : namesOf(died)} died` : ""}.` : died.length ? ` ${namesOf(died)} died.` : ""} ${DIFFUSE_WHY}`;
     errors.push(playerError(far.p, {
       ruleId: TOP1_DIFFUSE_RULE_ID, severity, name: "Baited a Tank Cone",
       description: `Stood farther from Omega than a tank${dist(far.e) >= 0 ? ` (~${yd(dist(far.e))} yalms)` : ""}, so Diffuse Wave Cannon Kyrios went to them.${tail}`,
@@ -1168,7 +1295,7 @@ function detectDiffuse(players: PlayerInfo[], life: Life, deaths: DeathEvent[], 
     for (const p of idle) {
       errors.push(playerError(p, {
         ruleId: TOP1_DIFFUSE_RULE_ID, severity, name: "Didn't Bait the Tank Cone",
-        description: `No Diffuse Wave Cannon Kyrios cone reached them: a non-tank was farther from Omega, so the cone went to ${far.p.name}.${tail}`,
+        description: `No Diffuse Wave Cannon Kyrios cone reached them: a non-tank was farther out, so it went to ${far.p.name}.${tail}`,
         timestamp: t, abilityId: DIFFUSE, abilityName: "Diffuse Wave Cannon Kyrios",
       }));
     }
@@ -1176,7 +1303,7 @@ function detectDiffuse(players: PlayerInfo[], life: Life, deaths: DeathEvent[], 
   return firstPer(errors, (e) => `${e.player}`);
 }
 
-const WAVE_WHY = "Wave Cannon Kyrios marks three non-tanks, then the other three; each line hits everyone along it and leaves Magic Vulnerability Up, so the marked players spread to distinct angles inside the hitbox.";
+const WAVE_WHY = "Marked players spread to distinct angles inside the hitbox; each line leaves Magic Vulnerability Up.";
 
 /** A Wave Cannon Kyrios line that hit more than one player, with all six non-tanks alive. */
 function detectWaveCannon(players: PlayerInfo[], life: Life, casts: EnemyEvent[], end: number): PullError[] {
@@ -1192,7 +1319,7 @@ function detectWaveCannon(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
       for (const p of hit) {
         errors.push(playerError(p, {
           ruleId: TOP1_WAVE_CANNON_RULE_ID, severity: died.length ? "Major" : "Minor", name: "Wave Cannon Overlap",
-          description: `One Wave Cannon Kyrios line hit ${namesOf(hit)}${c.target ? ` (aimed at ${c.target})` : ""}${died.length ? `; ${namesOf(died)} died` : ""}. Whoever stood on another's line is at fault; the log can't tell which. ${WAVE_WHY}`,
+          description: `One Wave Cannon Kyrios line hit ${namesOf(hit)}${c.target ? ` (aimed at ${c.target})` : ""}${died.length ? `; ${namesOf(died)} died` : ""}. Whoever stood on another's line is at fault. ${WAVE_WHY}`,
           timestamp: c.timestamp, abilityId: WAVE_CANNON, abilityName: "Wave Cannon Kyrios",
         }));
       }
@@ -1236,6 +1363,10 @@ function detectWallDeaths(players: PlayerInfo[], deaths: DeathEvent[], called: S
     if (!p) continue;
     if (deaths.some((k) => k !== d && k.timestamp <= d.timestamp && d.timestamp - k.timestamp <= RESET_AFTER_DEATH_MS)) continue;
     if (p.debuffs.some((e) => e.abilityId === DAMAGE_DOWN && e.debuffStatus === "applied" && e.timestamp < d.timestamp && d.timestamp - e.timestamp <= DD_RESET_MS)) continue;
+    // Still holding Damage Down at the fatal moment: a deliberate death to
+    // drop it, raised after (user, 2026-10-24, LG64YVQy2KZbtpN8 Pull 28
+    // 1:57.8: the GNB, 20.2s after the Flame Thrower; "the correct thing").
+    if (holdsAt(p, DAMAGE_DOWN, d.timestamp - DEATH_EVENT_LAG_MS - 500)) continue;
     if (p.damageTaken.some((e) => (e.amount ?? 0) > 0 && e.timestamp <= d.timestamp && d.timestamp - e.timestamp <= SILENT_HIT_MS)) continue;
     errors.push(playerError(p, {
       ruleId: TOP1_WALL_RULE_ID, severity: "Major", name: "Walked Into the Wall",
@@ -1264,6 +1395,11 @@ export function detectOmegaErrors(
   const lastEvent = Math.max(0, ...players.flatMap((p) => [...p.damageTaken, ...p.casts].map((e) => e.timestamp)), ...deathEvents.map((d) => d.timestamp));
   const end = Math.min(p2, lastEvent);
   const called = calledWipeDeaths(players, deaths, p2 === Infinity ? lastEvent : Infinity);
+  // Three or more silent deaths before the first towers: a reset to get a
+  // cooldown back, not a pull (user: 2qgaAkxVypGWv9CN Pull 64;
+  // LG64YVQy2KZbtpN8 Pull 20, "someone burned a cooldown"; Pulls 21 and 32).
+  const firstRound = loopRounds(enemyCasts, end)[0]?.t ?? Infinity;
+  if (deaths.filter((d) => !d.killingAbilityGameId && d.timestamp - DEATH_EVENT_LAG_MS < firstRound).length >= CALLED_WIPE_COUNT) return [];
 
   const errors = [
     ...detectAvoidable(players, life, end),

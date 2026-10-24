@@ -112,6 +112,21 @@
 // order, so all six stay named; the RDM, MNK and SCH are unruled.
 // VOD review 2026-10-23 (user): report D Pulls 66, 72; rulings in
 // expectations/rulings.json.
+// Report E = LG64YVQy2KZbtpN8 (the user's static, day 2; omega.ts's
+// report C). VOD review 2026-10-24 (user): Pulls 11, 29, 31, 40; rulings in
+// expectations/rulings.json.
+// - The Party Synergy order is the Pantokrator conga (SGE RDM SAM GNB DRK
+//   MNK DNC SCH, user); the 27 clean pairs alone tie 42 orders, so
+//   synergy-order.ts lets the conga pick.
+// - E11 2:54.1: the DRK and SCH swapped rows (on the wrong side of the
+//   eye), the DNC off its Mid Glitch spot (inside the RDM's Fire).
+// - E29 2:53.4 (Remote): the SAM on the SCH's spot, the DNC right; the GNB /
+//   RDM pair unsettled (the RDM maybe a few degrees CCW, near the line).
+// - E31 3:43.9: the GNB died to their own Bladedance, under-mitigated: not
+//   a mechanic error, and Beyond Defense on the SGE plus Pile Pitch after
+//   it are fallout.
+// - E40 3:58.6: Pile Pitch hit only the unjumped GNB (clean: all seven
+//   share it, E44, E48): the GNB should have brought it into the party.
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-top2-avoidable (Major on death, else Minor: no Damage Down in P2):
@@ -122,10 +137,13 @@
 //   both alive: the tank with none didn't hold their Omega.
 // ffxiv-top2-glitch: at the Fire, all eight alive, a pair under the glitch
 //   Vulnerability Up (both named, unless one took the laser or a clone:
-//   that's theirs). synergy-order.ts keeps the partner off their Fire slot
+//   that's theirs; or only one shared a Fire with a player outside the
+//   glitch: they stood on someone else's spot, user, E11, E29; not with
+//   another vulnerable player, D72). synergy-order.ts keeps the partner off their Fire slot
 //   (>= 9y, partner <= 7y; the slot model from the learned order).
 // ffxiv-top2-fire: one Fire that hit 2+ players names them all (not the
-//   glitch-vulnerable ones).
+//   glitch-vulnerable ones); synergy-order.ts keeps the ones on the wrong
+//   side of the eye for their row when the rest weren't (user, E11).
 // ffxiv-top2-stack: at Spotlight, all eight alive: a pair in one stack
 //   (both; synergy-order.ts keeps the one outside their expected stack),
 //   both marks together (3+ in both stacks: the two marked players), else
@@ -140,7 +158,9 @@
 // ffxiv-top2-beyond-defense (targeted: both tanks): it jumped only
 //   non-tanks (both tanks named). Raid when 3+ died.
 // ffxiv-top2-pile-pitch (targeted: the jumped player): Pile Pitch on the
-//   player Beyond Defense jumped, with Doom (Major).
+//   player Beyond Defense jumped, with Doom (Major). "Pile Pitch Not
+//   Shared" (Major on death, else Minor): its target, not the jumped one,
+//   hit with at most one other, all eight alive (user, E40).
 // ffxiv-top2-wall (Major): a silent death no knockback, reset or hit explains.
 // ffxiv-top2-enrage (Laser Shower hits that killed) / -called-wipe (3+
 //   silent deaths within 10s, or within 12s of the end, Beyond Defense
@@ -406,6 +426,8 @@ const BLADEDANCE    = 32629; // one cast per tether, from the clone the tether c
 const ARROW         = 31539;
 const BEYOND_DEF    = 31528;
 const PILE_PITCH    = 31529;
+// Pile Pitch on this many or fewer wasn't shared (clean: 7).
+const PILE_ALONE_MAX = 2;
 const LASER_SHOWER  = 31557;
 const MID_GLITCH    = 1003427;
 const REMOTE_GLITCH = 1003428;
@@ -423,19 +445,19 @@ const P3_CASTS      = [31561, 31562, 31563, 31564, 31567, 31573];
 type Sym = "X" | "S" | "O" | "T";
 
 type Avoidable = { name: string; hit: string; why: string };
-const CLONE_WHY = "Party Synergy's real Omega-M and Omega-F clones resolve together: read both weapons and stand in the one area both leave safe.";
+const CLONE_WHY = "The real Omega-M and Omega-F clones resolve together: stand where both weapons leave safe.";
 const AVOIDABLE: Record<number, Avoidable> = {
   [OPTICAL_LASER]: { name: "Optical Laser", hit: "Stood in Optical Laser",
-    why: "The eye's Optical Laser fires a wide line through the middle; the two rows stand either side of it." },
+    why: "The eye's Optical Laser fires a wide line down the middle; the rows stand either side." },
   [BLADEWORK]: { name: "Efficient Bladework", hit: "Hit by Efficient Bladework", why: CLONE_WHY },
   31525: { name: "Beyond Strength", hit: "Hit by Beyond Strength", why: CLONE_WHY },
   31533: { name: "Optimized Blizzard III", hit: "Hit by Optimized Blizzard III", why: CLONE_WHY },
   31531: { name: "Superliminal Steel", hit: "Hit by Superliminal Steel", why: CLONE_WHY },
   31532: { name: "Superliminal Steel", hit: "Hit by Superliminal Steel", why: CLONE_WHY },
   [ARROW]: { name: "Optimized Sagittarius Arrow", hit: "Hit by Optimized Sagittarius Arrow",
-    why: "Limitless Synergy's Sagittarius Arrow fires a line through the party's bait spot; bait it together, then step out of the line." },
+    why: "Sagittarius Arrow fires a line through the bait spot; bait together, then step out." },
   [BLADEDANCE]: { name: "Optimized Bladedance", hit: "Stood in a tank's Optimized Bladedance cone",
-    why: "Each tank takes one Bladedance tether and points its cone away from the party; stay out of both cones." },
+    why: "Each tank takes a Bladedance tether and aims its cone away; stay out of both." },
 };
 
 const EPISODE_MS          = 3000;
@@ -641,6 +663,19 @@ export function readSynergy(
 
 const fireKey = (actor: string | undefined, instance: number) => `${actor ?? "?"}#${instance}`;
 
+/** The players each Fire (actor and instance) hit at the spreads. */
+export function fireGroups(players: PlayerInfo[], fireT: number): PlayerInfo[][] {
+  const byFire = new Map<string, PlayerInfo[]>();
+  for (const p of players) {
+    for (const e of p.damageTaken) {
+      if (e.abilityId !== FIRE || Math.abs(e.timestamp - fireT) > RESOLUTION_MS || bodyHit(e) || e.sourceInstance === undefined) continue;
+      const k = fireKey(e.source, e.sourceInstance);
+      byFire.set(k, uniq([...(byFire.get(k) ?? []), p]));
+    }
+  }
+  return [...byFire.values()];
+}
+
 /** The glitch partner of `name`, if the symbols were logged. */
 export function partnerOf(read: SynergyRead, name: string): string | undefined {
   const pair = read.pairs.find((x) => x.includes(name));
@@ -668,7 +703,7 @@ function detectAvoidable(players: PlayerInfo[], life: Life, from: number, end: n
       const hit = kinds.map((k, i) => (i === 0 ? k.hit : k.hit.charAt(0).toLowerCase() + k.hit.slice(1))).join(", and ");
       errors.push(playerError(p, {
         ruleId: TOP2_AVOIDABLE_RULE_ID, severity: death ? "Major" : "Minor", name: `Hit by ${uniq(kinds.map((k) => k.name)).join(" / ")}`,
-        description: `${hit} (${g.length > 1 ? `${g.length} hits, ` : ""}${total > 0 ? kFmt(total) : "lethal"})${vuln ? " while out of their glitch partner's range" : ""}.${death ? " They died." : ""} ${uniq(kinds.map((k) => k.why)).join(" ")}`,
+        description: `${hit} (${g.length > 1 ? `${g.length} hits, ` : ""}${total > 0 ? kFmt(total) : "lethal"})${vuln ? " while out of glitch-partner range" : ""}.${death ? " They died." : ""} ${uniq(kinds.map((k) => k.why)).join(" ")}`,
         timestamp: g[0].timestamp, abilityId: g[0].abilityId, abilityName: g[0].abilityName,
       }));
     }
@@ -698,7 +733,7 @@ function cloneCollapse(players: PlayerInfo[], life: Life, avoidable: PullError[]
     }).map((e) => e.player!));
     if (died.length < CLONE_COLLAPSE_DEAD) continue;
     errors.push(raidMarker(TOP2_SYNERGY_RULE_ID, "Party Synergy Failed",
-      `Party Synergy's clones killed ${died.length} at once (${joinNames(died)}): the raid wasn't in the one area both clones leave safe. ${CLONE_WHY}`,
+      `Party Synergy's clones killed ${died.length} at once (${joinNames(died)}): the raid wasn't where both clones' weapons leave safe.`,
       g[0].timestamp, g[0].abilityId ?? 0, g[0].abilityName ?? "Party Synergy"));
   }
   return errors;
@@ -706,7 +741,7 @@ function cloneCollapse(players: PlayerInfo[], life: Life, avoidable: PullError[]
 
 // ── Solar Ray: one buster per tank ──────────────────────────────────────────
 
-const SOLAR_WHY = "Each tank holds their own Omega (M for the Omega-M group, F for the other) into Solar Ray; with both on one tank, that tank takes both busters.";
+const SOLAR_WHY = "Each tank holds their own Omega (M or F) into Solar Ray.";
 
 /**
  * Both Solar Rays on one tank, both tanks alive: the other tank didn't hold
@@ -729,16 +764,16 @@ function detectSolarRay(players: PlayerInfo[], life: Life, casts: EnemyEvent[], 
   const died = !!life.diedFrom(victim, hits.find((h) => h.p === victim)!.e.timestamp);
   return [playerError(idle[0], {
     ruleId: TOP2_SOLAR_RAY_RULE_ID, severity: died ? "Major" : "Minor", name: "Didn't Hold Their Omega",
-    description: `Both Solar Rays went to ${victim.name}${died ? `, who died` : ""}: ${idle[0].name} didn't have their Omega's attention when the busters were cast. ${SOLAR_WHY}`,
+    description: `Both Solar Rays went to ${victim.name}${died ? `, who died` : ""}: ${idle[0].name} didn't have their Omega's attention at the cast. ${SOLAR_WHY}`,
     timestamp: t, abilityId: rays[0].abilityId, abilityName: "Solar Ray",
   })];
 }
 
 // ── Party Synergy: glitch distance, Fire spreads, Spotlight stacks ─────────
 
-const GLITCH_WHY = "Same-symbol partners stand in opposite rows either side of the eye's laser (Mid Glitch: facing each other, 20-26 yalms; Remote Glitch: the far end of the other row, 35+ yalms). Out of that band both get Vulnerability Up and the next hit kills.";
-const FIRE_WHY = "Optimized Fire III goes off on every player at once: keep your own spot in the row so your circle touches nobody else.";
-const STACK_WHY = "Each row stacks for its own Spotlight; when both marks land in one row, the mark nearer the eye swaps rows with their partner. Glitch partners never share a stack.";
+const GLITCH_WHY = "Partners take opposite rows: Mid 20-26y apart, Remote 35+y.";
+const FIRE_WHY = "All Fires go off at once: hold your own spot.";
+const STACK_WHY = "Each row stacks its own Spotlight; if both marks share a row, the one nearer the eye swaps.";
 
 /**
  * Party Synergy, with all eight alive at the resolution (a death changes
@@ -760,17 +795,26 @@ function detectSynergy(players: PlayerInfo[], life: Life, read: SynergyRead | un
 
   // Fire.
   if (allAlive(players, life, read.fireT - 500)) {
+    const fires = fireGroups(players, read.fireT);
     for (const [a, b] of read.pairs) {
       if (!read.vulnAtFire.has(a) && !read.vulnAtFire.has(b)) continue;
       if (tookAvoidable(a, read.fireT) || tookAvoidable(b, read.fireT)) continue;
       const pair = [byName.get(a)!, byName.get(b)!];
       const died = pair.filter((p) => life.diedFrom(p, read.fireT));
       const sameRow = read.rows?.get(a) !== undefined && read.rows.get(a) === read.rows.get(b);
-      for (const p of pair) {
+      // A partner sharing a Fire with a player outside the glitch stood on
+      // someone else's spot; the other partner stays out of it (user,
+      // 2026-10-24, LG64YVQy2KZbtpN8 Pull 29 2:53.4: the SAM, on the SCH's
+      // spot; Pull 11 2:54.1: the DNC). Not with another vulnerable player:
+      // 2qgaAkxVypGWv9CN Pull 72's MNK and DRK overlapped in a shuffled row
+      // and the user named the MNK's partner.
+      const crowded = pair.filter((p) => fires.some((g) => g.includes(p) && g.some((q) => q !== p && !read.vulnAtFire.has(q.name))));
+      const named = crowded.length === 1 ? crowded : pair;
+      for (const p of named) {
         const other = pair.find((x) => x !== p)!;
         errors.push(playerError(p, {
           ruleId: TOP2_GLITCH_RULE_ID, severity: died.length ? "Major" : "Minor", name: "Out of Glitch Range",
-          description: `${kind} (${read.symbol.get(a) ?? "?"} pair with ${other.name}) at the Fire spreads: the pair was out of range${sameRow ? " (both in the same row)" : ""}, so both had Vulnerability Up${died.length ? ` and ${namesOf(died)} died` : ""}. One of the two was out of place; the log alone can't say which. ${GLITCH_WHY}`,
+          description: `${kind} (${read.symbol.get(a) ?? "?"} pair with ${other.name}) at Fire: out of range${sameRow ? " (same row)" : ""}, both had Vulnerability Up${died.length ? `; ${namesOf(died)} died` : ""}. ${named.length === 1 ? "Their Fire also hit a third player: wrong spot." : "Either could have moved."} ${GLITCH_WHY}`,
           timestamp: read.fireT, abilityId: FIRE, abilityName: "Optimized Fire III",
         }));
       }
@@ -780,15 +824,7 @@ function detectSynergy(players: PlayerInfo[], life: Life, read: SynergyRead | un
     // (B22 +41.4), so who owned it isn't known. The glitch already explains
     // a vulnerable player's death.
     const overlaps = new Map<PlayerInfo, Set<PlayerInfo>>();
-    const byFire = new Map<string, PlayerInfo[]>();
-    for (const p of players) {
-      for (const e of p.damageTaken) {
-        if (e.abilityId !== FIRE || Math.abs(e.timestamp - read.fireT) > RESOLUTION_MS || bodyHit(e) || e.sourceInstance === undefined) continue;
-        const k = fireKey(e.source, e.sourceInstance);
-        byFire.set(k, uniq([...(byFire.get(k) ?? []), p]));
-      }
-    }
-    for (const hit of byFire.values()) {
+    for (const hit of fireGroups(players, read.fireT)) {
       for (const p of hit) for (const q of hit) if (p !== q) overlaps.set(p, (overlaps.get(p) ?? new Set()).add(q));
     }
     for (const [p, with_] of overlaps) {
@@ -798,7 +834,7 @@ function detectSynergy(players: PlayerInfo[], life: Life, read: SynergyRead | un
       const died = [p, ...others].filter((q) => life.diedFrom(q, read.fireT));
       errors.push(playerError(p, {
         ruleId: TOP2_FIRE_RULE_ID, severity: died.length ? "Major" : "Minor", name: "Fire Overlap",
-        description: `Stood within Optimized Fire III range of ${namesOf(others)}, so one Fire hit them both${died.length ? `; ${namesOf(died)} died (each Fire leaves Magic Vulnerability Up)` : ""}. Either could have been off their spot; the log can't say which. ${FIRE_WHY}`,
+        description: `In Fire III range of ${namesOf(others)}: one Fire hit both${died.length ? `; ${namesOf(died)} died (Magic Vulnerability Up)` : ""}. Either could have been off their spot. ${FIRE_WHY}`,
         timestamp: read.fireT, abilityId: FIRE, abilityName: "Optimized Fire III",
       }));
     }
@@ -822,7 +858,7 @@ function detectSynergy(players: PlayerInfo[], life: Life, read: SynergyRead | un
         const p = byName.get(n)!, other = n === a ? b : a;
         stackErrors.push(playerError(p, {
           ruleId: TOP2_STACK_RULE_ID, severity: died.length ? "Major" : "Minor", name: "Same Stack as Partner",
-          description: `Took the same Spotlight as their glitch partner ${other} (${namesOf(stack)}: ${stack.length} in that stack)${died.length ? `; ${namesOf(died)} died` : ""}. One of the two belonged in the other stack; the log alone can't say which. ${STACK_WHY}`,
+          description: `Same Spotlight as glitch partner ${other} (${stack.length} in it: ${namesOf(stack)})${died.length ? `; ${namesOf(died)} died` : ""}. Either belonged in the other stack. Partners never share a stack.`,
           timestamp: spotT, abilityId: SPOTLIGHT, abilityName: "Spotlight",
         }));
       }
@@ -836,7 +872,7 @@ function detectSynergy(players: PlayerInfo[], life: Life, read: SynergyRead | un
       for (const p of marked) {
         stackErrors.push(playerError(p, {
           ruleId: TOP2_STACK_RULE_ID, severity: died.length ? "Major" : "Minor", name: "Stack Marks Together",
-          description: `Both Spotlight marks (${namesOf(marked)}) stood together, so the two stacks landed on ${namesOf(inBoth)} at once${died.length ? `; ${namesOf(died)} died` : ""}. Either marked player could have been off their row. ${STACK_WHY}`,
+          description: `Both Spotlight marks (${namesOf(marked)}) stood together; both stacks hit ${namesOf(inBoth)}${died.length ? `; ${namesOf(died)} died` : ""}. Either mark could have been off their row.`,
           timestamp: spotT, abilityId: SPOTLIGHT, abilityName: "Spotlight",
         }));
       }
@@ -860,7 +896,7 @@ function detectSynergy(players: PlayerInfo[], life: Life, read: SynergyRead | un
     const killed = uniq(players.flatMap((p) => p.damageTaken.filter((e) => (ids as readonly number[]).includes(e.abilityId) && Math.abs(e.timestamp - t) <= RESOLUTION_MS && !bodyHit(e) && life.diedFrom(p, e.timestamp)).map(() => p)));
     if (killed.length < SYNERGY_RAID_DEATHS) continue;
     errors.push(raidMarker(TOP2_SYNERGY_RULE_ID, "Party Synergy Failed",
-      `The ${name === "Fire" ? "Fire spreads" : "Spotlight stacks"} killed ${killed.length} (${namesOf(killed)}). Party Synergy has no time to raise before the next hits; unresolvable from here, treated as the cutoff point.`,
+      `The ${name === "Fire" ? "Fire spreads" : "Spotlight stacks"} killed ${killed.length} (${namesOf(killed)}). No time to raise before the next hits; treated as the cutoff.`,
       t + RAID_MARKER_SORT_OFFSET_MS, ids[0], name === "Fire" ? "Optimized Fire III" : "Spotlight"));
     break;
   }
@@ -869,7 +905,7 @@ function detectSynergy(players: PlayerInfo[], life: Life, read: SynergyRead | un
 
 // ── Limitless Synergy ───────────────────────────────────────────────────────
 
-const BLADEDANCE_WHY = "Each tank takes one Optimized Bladedance tether from an outer clone and turns its cone away from the party.";
+const BLADEDANCE_WHY = "Each tank takes one Bladedance tether and turns its cone away from the party.";
 
 /**
  * Optimized Bladedance, both tanks alive. Per cone (its caster instance):
@@ -932,13 +968,13 @@ function detectBladedance(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
   const killed = died.filter((p) => !isTank(p));
   if (errors.length && killed.length >= SYNERGY_RAID_DEATHS) {
     errors.push(raidMarker(TOP2_BLADEDANCE_RULE_ID, "Bladedance Through the Party",
-      `Optimized Bladedance killed ${killed.length} (${namesOf(killed)}); unresolvable from here, treated as the cutoff point.`,
+      `Optimized Bladedance killed ${killed.length} (${namesOf(killed)}); treated as the cutoff.`,
       t + RAID_MARKER_SORT_OFFSET_MS, BLADEDANCE, "Optimized Bladedance"));
   }
   return { errors: firstPer(errors, (e) => `${e.player ?? "raid"}`), owned };
 }
 
-const JUMP_WHY = "Beyond Defense jumps one of the two players nearest the shield clone: the tanks stand closest, the party behind them. The jumped tank then leaves the stack: Pile Pitch goes to one of the two players nearest the clone, and a second Ruin is Doom.";
+const JUMP_WHY = "Tanks stand nearest the shield clone; the jumped tank then leaves, as Pile Pitch hits the two nearest and a second Ruin is Doom.";
 
 /**
  * Beyond Defense on non-tanks only, both tanks alive: neither tank was
@@ -959,13 +995,13 @@ function detectBeyondDefense(players: PlayerInfo[], life: Life, deaths: DeathEve
     for (const p of tanks) {
       errors.push(playerError(p, {
         ruleId: TOP2_BEYOND_DEFENSE_RULE_ID, severity: died.length ? "Major" : "Minor", name: "Didn't Bait Beyond Defense",
-        description: `Beyond Defense jumped the party instead of a tank, hitting ${namesOf(hit)}${died.length ? `; ${namesOf(died)} died (knocked into the wall)` : ""}. Neither tank was nearest the shield clone. ${JUMP_WHY}`,
+        description: `Beyond Defense jumped the party, not a tank, hitting ${namesOf(hit)}${died.length ? `; ${namesOf(died)} died (knocked into the wall)` : ""}. Neither tank was nearest the shield clone; tanks stand closest, the party behind.`,
         timestamp: jump.timestamp, abilityId: BEYOND_DEF, abilityName: "Beyond Defense",
       }));
     }
     if (died.length >= SYNERGY_RAID_DEATHS) {
       errors.push(raidMarker(TOP2_BEYOND_DEFENSE_RULE_ID, "Beyond Defense on the Party",
-        `Beyond Defense knocked ${died.length} into the wall (${namesOf(died)}); unresolvable from here, treated as the cutoff point.`,
+        `Beyond Defense knocked ${died.length} into the wall (${namesOf(died)}); treated as the cutoff.`,
         jump.timestamp + RAID_MARKER_SORT_OFFSET_MS, BEYOND_DEF, "Beyond Defense"));
     }
   }
@@ -975,12 +1011,26 @@ function detectBeyondDefense(players: PlayerInfo[], life: Life, deaths: DeathEve
   const pile = castsOf(casts, PILE_PITCH, end).find((c) => c.timestamp > jump.timestamp);
   if (pile) occurrences?.push({ mechanicKey: TOP2_PILE_PITCH_RULE_ID, timestamp: pile.timestamp, players: jumped.map((p) => p.name) });
   if (pile) {
+    // Shared by seven in every clean pull (LG64YVQy2KZbtpN8 Pulls 44, 48).
+    // Its target alone, or with one more, all eight alive: the target didn't
+    // bring it into the party (user, 2026-10-24, Pull 40 3:58.6: the GNB
+    // took it alone, 116k, and died).
+    const shared = uniq(hitsNear(players, life, [PILE_PITCH], pile.timestamp + 800, 2000).map((h) => h.p));
+    const target = shared.find((p) => p.name === pile.target);
+    if (target && shared.length <= PILE_ALONE_MAX && !jumped.includes(target) && allAlive(players, life, pile.timestamp - 500)) {
+      const died = !!life.diedFrom(target, pile.timestamp + 800);
+      errors.push(playerError(target, {
+        ruleId: TOP2_PILE_PITCH_RULE_ID, severity: died ? "Major" : "Minor", name: "Pile Pitch Not Shared",
+        description: `Took Pile Pitch ${shared.length === 1 ? "alone" : `with only ${namesOf(shared.filter((p) => p !== target))}`}${died ? " and died" : ""}: the unjumped tank brings it into the party to share it seven ways.`,
+        timestamp: pile.timestamp, abilityId: PILE_PITCH, abilityName: "Pile Pitch",
+      }));
+    }
     for (const { p, e } of hitsNear(players, life, [PILE_PITCH], pile.timestamp + 800, 2000)) {
       if (!jumped.includes(p) || !gotAura(p, DOOM, e.timestamp, 2000)) continue;
       const died = !!deaths.some((d) => d.player === p.name && d.timestamp > e.timestamp && d.timestamp - e.timestamp <= 6000);
       errors.push(playerError(p, {
         ruleId: TOP2_PILE_PITCH_RULE_ID, severity: "Major", name: "Stayed for Pile Pitch",
-        description: `Jumped by Beyond Defense (Twice-come Ruin), then still close enough to be picked for Pile Pitch: a second Ruin gave them Doom${died ? " and they died" : ""}. ${JUMP_WHY}`,
+        description: `Jumped by Beyond Defense (Twice-come Ruin), then stayed close enough for Pile Pitch: a second Ruin gave Doom${died ? " and they died" : ""}. The jumped tank leaves the stack.`,
         timestamp: e.timestamp, abilityId: PILE_PITCH, abilityName: "Pile Pitch",
       }));
     }

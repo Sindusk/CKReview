@@ -411,7 +411,7 @@ function readSlots(players: PlayerInfo[], life: Life, rounds: Round[]): Map<Play
 
 // ── Wave Repeater rings ─────────────────────────────────────────────────────
 
-const RING_WHY = "Wave Repeater pulses outward from the centre in two sets of four rings during the second and third rounds: bait at your protean spot, then step into each ring just after it goes off.";
+const RING_WHY = "Rings pulse out in two sets of four (rounds 2-3): bait at your protean spot, then step in just after each ring.";
 
 /** Ring hits: Major on death or Damage Down (D13 +49.8), else Minor. */
 function detectRings(players: PlayerInfo[], life: Life, from: number, to: number): PullError[] {
@@ -437,7 +437,7 @@ function detectRings(players: PlayerInfo[], life: Life, from: number, to: number
 
 // ── Proteans and their afterimages ──────────────────────────────────────────
 
-const PROTEAN_WHY = "Each Wave Cannon is aimed through one player and gives Magic Vulnerability Up, so a second line on the same player is usually lethal: bait your own angle (four east, four west), away from everyone else's.";
+const PROTEAN_WHY = "Each line gives Magic Vulnerability Up, so a second is usually lethal: bait your own angle (four east, four west).";
 
 /**
  * A player hit by two proteans in one round, with everyone alive (after a
@@ -468,7 +468,7 @@ function detectProteanDoubles(players: PlayerInfo[], life: Life, rounds: Round[]
   return errors;
 }
 
-const AFTERIMAGE_WHY = "Each round's eight Wave Cannon lanes fire again ~5s later, at the same moment as the stacks: the stacks sit south-east and south-west between the lanes, so stand on your stack's spot, not in a lane on the way there.";
+const AFTERIMAGE_WHY = "Lanes fire again ~5s later, with the stacks: stand on your stack spot (SE/SW, between lanes), not in a lane.";
 
 /**
  * Afterimage hits, with everyone alive at that round's proteans. Each lane is
@@ -499,7 +499,7 @@ function detectAfterimages(players: PlayerInfo[], life: Life, rounds: Round[], s
         const sev = died ? "Major" : "Minor";
         errors.push(playerError(p, {
           ruleId: TOP4_AFTERIMAGE_RULE_ID, severity: sev, name: "Hit by Wave Cannon Afterimage",
-          description: `Stood${where} in the ${ORDINAL[r.n - 1] ?? `#${r.n}`} round's afterimage of ${whose}${lane} (${realAmount(e) > 0 ? kFmt(realAmount(e)) : "lethal"}).${died ? " They died." : ""}${blameOwner ? ` ${owner!.name} baited it ~${ownerOff!.toFixed(0)} degrees off their usual spot.` : ""} ${AFTERIMAGE_WHY}`,
+          description: `Stood${where} in the ${ORDINAL[r.n - 1] ?? `#${r.n}`} round's afterimage of ${whose}${lane}, ${realAmount(e) > 0 ? kFmt(realAmount(e)) : "lethal"}.${died ? " They died." : ""}${blameOwner ? ` ${owner!.name} baited it ~${ownerOff!.toFixed(0)} degrees off their spot.` : ""} ${AFTERIMAGE_WHY}`,
           timestamp: e.timestamp, abilityId: AFTERIMAGE, abilityName: "Wave Cannon",
         }));
         if (blameOwner) {
@@ -518,7 +518,7 @@ function detectAfterimages(players: PlayerInfo[], life: Life, rounds: Round[], s
 
 // ── Stacks ──────────────────────────────────────────────────────────────────
 
-const STACK_WHY = "Each half stacks on its own marked player (east south-east, west south-west), four per line. When both markers are on one half, that half's southernmost marked player crosses and the other half's southernmost player (the 135 / 225 bait) crosses back.";
+const STACK_WHY = "Halves stack on their marker (east SE, west SW); both on one half: its south marker swaps with the other half's south player.";
 
 type Expected = { side: Map<PlayerInfo, Side>; crosser?: PlayerInfo; partner?: PlayerInfo };
 
@@ -570,11 +570,11 @@ function detectStacks(players: PlayerInfo[], life: Life, rounds: Round[], slots:
     const inStacks = (p: PlayerInfo) => stacks.filter((g) => g.includes(p));
     const died = players.filter((p) => p.damageTaken.some((e) => e.abilityId === STACK && Math.abs(e.timestamp - st) <= 1000 && !bodyHit(e) && life.diedFrom(p, e.timestamp)));
     const sev = died.length ? "Major" : "Minor";
-    const outcome = `The stacks hit ${stacks.map((g) => g.length).join(" and ")}.${died.length ? ` ${names(died.map((p) => p.name))} died.` : ""}`;
+    const outcome = `Stacks hit ${stacks.map((g) => g.length).join(" and ")}${died.length ? `; died: ${names(died.map((p) => p.name))}` : ""}.`;
     const swapper = (p: PlayerInfo) => p === exp.crosser || p === exp.partner;
-    const push = (p: PlayerInfo, name: string, what: string) => errors.push(playerError(p, {
+    const push = (p: PlayerInfo, name: string, what: string, tail = ` ${STACK_WHY}`) => errors.push(playerError(p, {
       ruleId: swapper(p) ? TOP4_SWAP_RULE_ID : TOP4_STACK_RULE_ID, severity: sev, name,
-      description: `${what} in the ${ORDINAL[r.n - 1] ?? `#${r.n}`} round. ${outcome} ${STACK_WHY}`,
+      description: `${what} in the ${ORDINAL[r.n - 1] ?? `#${r.n}`} round. ${outcome}${tail}`,
       timestamp: st, abilityId: STACK, abilityName: "Wave Cannon",
     }));
     const halfMates = (p: PlayerInfo) => players.filter((q) => q !== p && exp.side.get(q) === exp.side.get(p));
@@ -591,23 +591,23 @@ function detectStacks(players: PlayerInfo[], life: Life, rounds: Round[], slots:
       const at = interpolatePlayerPosition(m, st, { windowMs: 2500, maxSpanMs: 4000 });
       const pos = left.map((q) => interpolatePlayerPosition(q, st, { windowMs: 2500, maxSpanMs: 4000 })).filter((x): x is { x: number; y: number } => !!x);
       const gap = at && pos.length ? ` ~${(Math.min(...pos.map((q) => distanceBetween(at, q))) / 100).toFixed(1)}y` : "";
-      push(m, "Took the Stack Away", `Had the stack marker but stood${gap} off ${names(left.map((q) => q.name))}, the ${exp.side.get(m)} group${m === exp.crosser ? " they crossed to" : ""}, so their line missed them`);
+      push(m, "Took the Stack Away", `Had the stack marker but stood${gap} off ${names(left.map((q) => q.name))} (the ${exp.side.get(m)} group${m === exp.crosser ? " they crossed to" : ""}), so their line missed them`, "");
     }
     if (takers.length) continue;
 
     for (const p of players) {
       const own = inStacks(p);
-      if (own.length === 0) push(p, "Missed the Stack", `In neither Wave Cannon stack (the ${exp.side.get(p)} group's)`);
+      if (own.length === 0) push(p, "Missed the Stack", `In neither stack (${exp.side.get(p)} group's)`);
       else if (own.length === 2) push(p, "Took Both Stacks", "Was hit by both Wave Cannon stacks");
       else {
         const g = own[0];
         const sides = g.filter((q) => q !== p).map((q) => exp.side.get(q));
         const otherSide = other(exp.side.get(p)!);
         if (sides.filter((s) => s === otherSide).length > sides.filter((s) => s === exp.side.get(p)).length) {
-          const why = p === exp.crosser ? "Had to cross (both markers on their side, southernmost marked) but stayed"
-            : p === exp.partner ? "Had to cross back for the marked player (the other side's southernmost) but stayed"
+          const why = p === exp.crosser ? "Had to cross (southernmost marker, both on their side) but stayed"
+            : p === exp.partner ? "Had to cross back (other side's southernmost) but stayed"
             : "Stacked";
-          push(p, swapper(p) ? "Missed the Stack Swap" : "Wrong Stack Group", `${why} with the ${otherSide} group instead of the ${exp.side.get(p)} group`);
+          push(p, swapper(p) ? "Missed the Stack Swap" : "Wrong Stack Group", `${why} with ${otherSide}, not ${exp.side.get(p)},`);
         }
       }
     }
@@ -637,7 +637,7 @@ function detectMassDeath(players: PlayerInfo[], life: Life, from: number, to: nu
     if (who.length < RAID_DEATHS) continue;
     const kinds = uniq(g.map((h) => (RINGS.includes(h.e.abilityId) ? "Wave Repeater" : h.e.abilityId === STACK ? "the stacks" : h.e.abilityId === AFTERIMAGE ? "the afterimages" : "the proteans")));
     return raidMarker(TOP4_WAVE_CANNON_RULE_ID, "Wave Cannon Killed Several",
-      `${joinNames(kinds)} killed ${who.length} players at once (${names(who.map((p) => p.name))}). With that many down Blue Screen can't be met; treated as the cutoff point.`,
+      `${joinNames(kinds)} killed ${who.length} at once (${names(who.map((p) => p.name))}). Blue Screen can't be met; treated as the cutoff.`,
       g[0].e.timestamp, g[0].e.abilityId, g[0].e.abilityName);
   }
   return undefined;
@@ -676,7 +676,7 @@ export function detectBlueScreenErrors(
     const hp = bs.hitPoints !== undefined && bs.maxHitPoints ? 100 * bs.hitPoints / bs.maxHitPoints : undefined;
     const down = uniq(p4Deaths.filter((d) => d.timestamp < bs.timestamp).map((d) => d.player));
     raids.push(raidMarker(TOP4_BLUE_SCREEN_RULE_ID, "Blue Screen Failed",
-      `Blue Screen's HP check failed: Omega was ${hp !== undefined ? `at ${hp.toFixed(1)}%` : "still"} when it resolved and needs to be under ${BS_THRESHOLD}%.${down.length ? ` ${names(down)} died during the phase.` : ""} A raid DPS check, so nobody in particular is named.`,
+      `Blue Screen's HP check failed: Omega was ${hp !== undefined ? `at ${hp.toFixed(1)}%` : "still above"} when it resolved, needs under ${BS_THRESHOLD}%.${down.length ? ` Died in the phase: ${names(down)}.` : ""} A raid DPS check; nobody named.`,
       bs.timestamp, BS_CAST, "Blue Screen"));
   }
   const firstMech = raids.sort((a, b) => a.timestamp - b.timestamp)[0];

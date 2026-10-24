@@ -221,6 +221,19 @@ philosophy and the data semantics this list assumes.
 - **A hand-off nobody took is the taker's.** The player who was due a
   tether and has no hit from it didn't take it; the previous holder still
   carrying it isn't at fault for what it hits (Omega P1, user).
+- **The log hands a mechanic's duties to dead players too.** Omega P3's
+  Code Smells land on a body; check who is alive when the duties take
+  effect, and count a death to the mechanic's own raidwide (Omega P3,
+  user: "any player dead going into Hello World is unresolvable").
+- **Two takers on one tether while another stays put:** the later taker
+  took the first one's instead of the leftover (Omega P1, user).
+- **An aimed share taken alone, with the rest of its group together
+  nearby, was taken away by the aimed player** (Omega P1 Pantokrator,
+  user). Don't name the group members it left.
+- **Two learned priorities can be one line.** When the clean data ties
+  many orders for one, another learned order of the same raid can break
+  the tie (Omega: the Pantokrator conga picked one of 42 Party Synergy
+  orders; user).
 - **A shared line's groups can be read from the pull itself.** Union the
   players of every line that hit 2+; a component of four is one group and
   the other group is its complement. One set's lines rarely place the
@@ -578,7 +591,11 @@ Classify every one before counting a called wipe. Known meanings:
   Omega P5's World holders and tethered players dying at the wall fired
   Hello World or the failed Patch at once; the death is the error.
 - **A reset after the player's own Damage Down** (Fatebreaker): the Damage
-  Down's cause is the error.
+  Down's cause is the error. Test "still holding it at the fatal moment",
+  not a window from the apply: Omega P1's GNB died 20.2s after theirs, on
+  purpose, and was raised (user: "the correct thing to do").
+- **Silent deaths before the first mechanic are a cooldown reset**, not a
+  pull (Omega P1, user), even when only half the raid dies.
 - **A delayed death:** Mark of Mortality, Doom (Oracle of Darkness).
 - **A Dreadmarch walk-off, or a feared player falling** (The Coiled Altar).
 - **A death right after another death:** usually the raid resetting

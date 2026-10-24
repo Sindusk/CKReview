@@ -219,7 +219,7 @@ function applySplits(
         rewrite.set(e, {
           ...e,
           name: "Didn't Cross",
-          description: `${e.description.replace(/ One of the two should have (crossed|flexed) to the other group; the log can't say which\./, "")} By the raid's conga (learned from ${conga.fits} of ${conga.pulls} Pantokrator splits in this report), ${wrong} belonged on the other side and ${right} was where they should be.`,
+          description: `${e.description.replace(/ One should have (crossed|flexed); the log can't say which\./, "")} By the conga (${conga.fits}/${conga.pulls} splits), ${wrong} belonged on the other side; ${right} was right.`,
         });
       }
     }
@@ -264,7 +264,7 @@ function applyLoopPriority(
       rewrite.set(e, {
         ...e,
         name: "Wrong Tether Spot",
-        description: `${e.description} By the raid's holder priority (learned from ${loop.agree} of ${loop.rounds} clean Program Loop rounds in this report), ${wrong} belonged ${CARDINAL[wrongCard]}, and the other holder was on their spot.`,
+        description: `${e.description} Holder priority (${loop.agree}/${loop.rounds} rounds) put ${wrong} ${CARDINAL[wrongCard]}; the other was in place.`,
       });
     }
   }

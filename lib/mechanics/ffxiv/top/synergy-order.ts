@@ -29,7 +29,8 @@ import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import type { HeadMarker } from "../fru/usurper-of-frost";
-import { readSynergy, partnerOf, TOP2_GLITCH_RULE_ID, TOP2_STACK_RULE_ID, type SynergyRead } from "./omega-mf";
+import type { PantokratorConga } from "./pantokrator-conga";
+import { readSynergy, partnerOf, fireGroups, TOP2_GLITCH_RULE_ID, TOP2_STACK_RULE_ID, TOP2_FIRE_RULE_ID, type SynergyRead } from "./omega-mf";
 
 export type SynergyOrder = {
   /** Every best-fitting order of keys (jobs, or names when keyed by name). */
@@ -75,9 +76,11 @@ export function slotDeviations(read: SynergyRead, early: (n: string) => boolean 
   const lat = (q: { x: number; y: number }) => u.x * (q.y - 10000) - u.y * (q.x - 10000);
   const al = (q: { x: number; y: number }) => u.x * (q.x - 10000) + u.y * (q.y - 10000);
   const names = [...read.firePos.keys()].filter((n) => early(n) !== undefined && read.symbol.has(n));
-  const clean = names.filter((n) => read.clean.has(n));
-  // B14 kept only three clean (overlaps and deaths); they still place the slots.
-  if (clean.length < 3) return undefined;
+  // B14 kept only three clean (overlaps and deaths); they still place the
+  // slots. With fewer, everyone votes (LG64YVQy2KZbtpN8 Pull 11: two clean,
+  // five of eight on their slots).
+  const clean = names.filter((n) => read.clean.has(n)).length >= 3 ? names.filter((n) => read.clean.has(n)) : names;
+  if (clean.length < 6) return undefined;
   const sideVote = clean.reduce((a, n) => a + (early(n) ? 1 : -1) * Math.sign(lat(read.firePos.get(n)!)), 0);
   if (sideVote === 0) return undefined;
   const earlySign = Math.sign(sideVote);
@@ -93,6 +96,17 @@ export function slotDeviations(read: SynergyRead, early: (n: string) => boolean 
   }));
 }
 
+/** Players on the wrong side of the eye's axis for their row (every player votes on which side is early). */
+function wrongSide(read: SynergyRead, early: (n: string) => boolean | undefined): Set<string> | undefined {
+  const u = read.axis;
+  if (!u) return undefined;
+  const lat = (q: { x: number; y: number }) => u.x * (q.y - 10000) - u.y * (q.x - 10000);
+  const names = [...read.firePos.keys()].filter((n) => early(n) !== undefined);
+  const vote = names.reduce((a, n) => a + (early(n) ? 1 : -1) * Math.sign(lat(read.firePos.get(n)!)), 0);
+  if (Math.abs(vote) < 4) return undefined;
+  return new Set(names.filter((n) => Math.sign(lat(read.firePos.get(n)!)) !== (early(n) ? Math.sign(vote) : -Math.sign(vote))));
+}
+
 function permutations<T>(xs: T[]): T[][] {
   if (xs.length <= 1) return [xs];
   return xs.flatMap((x, i) => permutations([...xs.slice(0, i), ...xs.slice(i + 1)]).map((r) => [x, ...r]));
@@ -105,8 +119,15 @@ function keyer(players: PlayerInfo[], byName: boolean): (name: string) => string
   return (name) => (byName ? name : job.get(name) ?? name);
 }
 
-/** Learn the report's Party Synergy order; undefined when it can't. */
-export function learnSynergyOrder(pulls: PullLike[]): SynergyOrder | undefined {
+/**
+ * Learn the report's Party Synergy order; undefined when it can't. When the
+ * clean pairs leave several orders tied, the report's Pantokrator conga
+ * (either direction) picks among them: the user's static uses one line for
+ * both (user, 2026-10-24, LG64YVQy2KZbtpN8: SGE RDM SAM GNB DRK MNK DNC SCH;
+ * 42 orders fit its 27 clean pairs, and the conga is one of them). Another
+ * static's Synergy order differs from its conga, and it fits uniquely anyway.
+ */
+export function learnSynergyOrder(pulls: PullLike[], conga?: PantokratorConga): SynergyOrder | undefined {
   const reads = pulls.map((p) => ({ p, read: readSynergy(p.players, p.deathEvents, p.enemyCasts, p.headMarkers ?? []) }))
     .filter((x): x is { p: PullLike; read: SynergyRead } => !!x.read);
   if (!reads.length) return undefined;
@@ -133,6 +154,13 @@ export function learnSynergyOrder(pulls: PullLike[]): SynergyOrder | undefined {
     else if (fit === bestFit && best.length < MAX_ORDERS) best.push(o);
   }
   if (bestFit < MIN_FIT * obs.length) return undefined;
+  if (best.length > 1 && conga?.orders.length === 1) {
+    const key = keyer(reads[0].p.players, byName);
+    const line = conga.orders[0].map(key);
+    const same = (o: string[], l: string[]) => o.length === l.length && o.every((k, i) => k === l[i]);
+    const fit = best.filter((o) => same(o, line) || same(o, [...line].reverse()));
+    if (fit.length) best = fit;
+  }
   return { orders: best, byName, pairs: obs.length, fits: bestFit };
 }
 
@@ -154,7 +182,8 @@ export function applySynergyOrder(
   errors: PullError[], players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[], headMarkers: HeadMarker[] | undefined, so: SynergyOrder | undefined,
 ): PullError[] {
   if (!so) return errors;
-  const pairErr = (e: PullError) => (e.ruleId === TOP2_GLITCH_RULE_ID && e.name === "Out of Glitch Range") || (e.ruleId === TOP2_STACK_RULE_ID && e.name === "Same Stack as Partner");
+  const pairErr = (e: PullError) => (e.ruleId === TOP2_GLITCH_RULE_ID && e.name === "Out of Glitch Range") || (e.ruleId === TOP2_STACK_RULE_ID && e.name === "Same Stack as Partner")
+    || (e.ruleId === TOP2_FIRE_RULE_ID && e.name === "Fire Overlap");
   if (!errors.some(pairErr)) return errors;
   const read = readSynergy(players, deathEvents, enemyCasts, headMarkers ?? []);
   if (!read) return errors;
@@ -221,13 +250,31 @@ export function applySynergyOrder(
       }
     }
   }
+  // Fire overlaps: within each Fire that hit several, the players off their
+  // slot keep "Fire Overlap" when the rest stood on theirs (user,
+  // 2026-10-24, LG64YVQy2KZbtpN8 Pull 11 2:54.1: the DRK and SCH went to
+  // the wrong sides, the RDM and SAM they overlapped were right).
+  const wrong = wrongSide(read, (n) => (expRow.has(n) ? expRow.get(n) === 0 : undefined));
+  if (wrong) {
+    const fireErr = (n: string) => errors.find((e) => e.ruleId === TOP2_FIRE_RULE_ID && e.name === "Fire Overlap" && e.player === n);
+    for (const g of fireGroups(players, read.fireT)) {
+      const named = g.map((p) => p.name).filter((n) => fireErr(n) && expRow.has(n));
+      const off = named.filter((n) => wrong.has(n));
+      if (named.length < 2 || !off.length || off.length === named.length) continue;
+      for (const n of named) {
+        if (off.includes(n)) narrowed.set(fireErr(n)!, n);
+        else drop.add(fireErr(n)!);
+      }
+    }
+  }
   return errors.filter((e) => !drop.has(e)).map((e) => {
     if (!narrowed.has(e)) return e;
     const off = offBy.get(e.player ?? "");
     return {
       ...e,
-      description: e.description.replace("One of the two was out of place; the log alone can't say which.", `By the raid's Party Synergy order (learned from this report's clean pulls), ${e.player} stood ~${off?.toFixed(1) ?? "?"} yalms off their Fire spot; their partner was on theirs.`)
-        .replace("One of the two belonged in the other stack; the log alone can't say which.", `By the raid's Party Synergy order and stack swap (learned from this report's clean pulls), ${e.player} belonged in the other stack.`),
+      description: e.description.replace("Either could have moved.", `By the raid's order, ${e.player} was ~${off?.toFixed(1) ?? "?"}y off their spot.`)
+        .replace("Either belonged in the other stack.", `By the raid's order and swap, ${e.player} belonged in the other stack.`)
+        .replace("Either could have been off their spot.", `By the raid's order, ${e.player} was on the wrong side of the eye.`),
     };
   });
 }

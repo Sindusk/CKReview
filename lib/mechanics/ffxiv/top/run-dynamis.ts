@@ -763,18 +763,18 @@ function detectDeltaArms(players: PlayerInfo[], life: Life, casts: EnemyEvent[],
       }).filter((x): x is { p: PlayerInfo; d: number } => !!x).sort((a, b) => a.d - b.d);
       if (near.length > 1 && near[1].d - near[0].d >= ARM_NEAREST_MARGIN) { baiter = near[0].p; gap = near[0].d; }
     }
-    const outcome = `Its lines hit ${names(victims.map((p) => p.name))}${died.length ? `; ${names(died.map((p) => p.name))} died` : dd.length ? `; ${names(dd.map((p) => p.name))} got Damage Down` : ""}.`;
-    const why = "Bait your arm from its correct side so its rotation turns out of the arena, and stay until the line is telegraphed.";
+    const outcome = died.length === victims.length ? `Its lines hit and killed ${names(victims.map((p) => p.name))}.` : `Its lines hit ${names(victims.map((p) => p.name))}${died.length ? `; ${names(died.map((p) => p.name))} died` : dd.length ? `; ${names(dd.map((p) => p.name))} got Damage Down` : ""}.`;
+    const why = "Bait from your arm's correct side so it turns out of the arena.";
     const sev = died.length || dd.length ? "Major" : "Minor";
     if (baiter) {
       errors.push(playerError(baiter, {
         ruleId: TOP5_DELTA_ARM_RULE_ID, severity: sev, name: "Arm Baited Inwards",
-        description: `Baited a Delta arm's Hyper Pulse${gap !== undefined ? ` (nearest to it, ~${(gap / 100).toFixed(1)}y)` : ""} so it rotated into the party. ${outcome} ${why}`,
+        description: `Baited a Delta arm's Hyper Pulse inward${gap !== undefined ? ` (nearest it, ~${(gap / 100).toFixed(1)}y)` : ""}. ${outcome} ${why}`,
         timestamp: first.timestamp, abilityId: first.abilityId, abilityName: first.abilityName,
       }));
     } else {
       errors.push(playerlessMinor(TOP5_DELTA_ARM_RULE_ID, "Arm Baited Inwards",
-        `A Delta arm's Hyper Pulse rotated into the party; its baiter isn't in the log. ${outcome} ${why}`,
+        `A Delta arm's Hyper Pulse turned into the party; its baiter isn't logged. ${outcome} ${why}`,
         first.timestamp, first.abilityId, first.abilityName));
     }
   }
@@ -855,7 +855,7 @@ function readTethers(players: PlayerInfo[], casts: EnemyEvent[], from: number, t
   return out.sort((a, b) => a.broke - b.broke);
 }
 
-const TETHER_WHY = "The long Remote pair breaks at once, the other Remote pair before Beyond Defense; the Local pairs break after the monitors' and Pile Pitch's Ruin has worn off, the second one with a few seconds left.";
+const TETHER_WHY = "Long Remote breaks at once, other Remote before Beyond Defense; Locals after the monitors' and Pile Pitch's Ruin, the second late.";
 
 /**
  * A failed Patch (32505) with both partners alive: a Local tether that ran
@@ -876,7 +876,7 @@ function detectTethers(players: PlayerInfo[], life: Life, tethers: Tether[], occ
       errors.push(playerError(p, {
         ruleId: TOP5_PATCH_RULE_ID, severity: "Major", name: timeout ? "Tether Ran Out" : "Tether Broken Early",
         description: timeout
-          ? `Their ${t.kind} tether with ${names(t.pair.filter((q) => q !== p).map((q) => q.name))} ran its full ${sec(ran)}s without being broken, so Patch failed on the party. ${TETHER_WHY}`
+          ? `Their ${t.kind} tether with ${names(t.pair.filter((q) => q !== p).map((q) => q.name))} ran its full ${sec(ran)}s unbroken: Patch failed. ${TETHER_WHY}`
           : `Broke their ${t.kind} tether with ${names(t.pair.filter((q) => q !== p).map((q) => q.name))} ${sec(ran)}s after it appeared, while the party couldn't take another Patch. ${TETHER_WHY}`,
         timestamp: t.broke, abilityId: PATCH_FAIL, abilityName: "Patch",
       }));
@@ -908,7 +908,7 @@ function detectMonitors(players: PlayerInfo[], life: Life, start: number, tether
       const left = local.filter((q) => !picked.includes(q));
       errors.push(playerError(p, {
         ruleId: TOP5_MONITOR_RULE_ID, severity: doom || died ? "Major" : "Minor", name: "Took a Monitor",
-        description: `Picked by an Oversampled Wave Cannon monitor although not a Local player${doom ? " and, with Ruin already on them, got Doom" : ""}${died ? "; they died" : ""}.${left.length ? ` ${names(left.map((q) => q.name))} (Local) went unpicked.` : ""} The four Local players take the monitors; the Remote players stack for Pile Pitch away from them, the Beyond Defense target alone.`,
+        description: `Took a Wave Cannon monitor without a Local tether${doom ? "; with Ruin already on them, got Doom" : ""}${died ? (doom ? " and died" : "; they died") : ""}.${left.length ? ` ${names(left.map((q) => q.name))} (Local) went unpicked.` : ""} Only the four Locals take monitors; Remotes stack for Pile Pitch away from them.`,
         timestamp: t, abilityId: MONITOR, abilityName: "Oversampled Wave Cannon",
       }));
     }
@@ -933,17 +933,17 @@ function detectMonitors(players: PlayerInfo[], life: Life, start: number, tether
       const alive = missing.filter((q) => life.alive(q, t0));
       if (missing.length !== alive.length) continue;
       const died = deathsAfter(p, life, w.e.timestamp);
-      const what = `${w.e.abilityName} jumped onto ${p.name}, a monitor sit-out${died ? ", and the second hit killed them" : ""}`;
-      const why = "The World spots are fixed: each jump player stands where Near picks them as the next-nearest and Distant as the next-farthest, beyond the sit-outs on the monitor side.";
+      const what = `${w.e.abilityName} jumped onto ${p.name}, a monitor sit-out${died ? ", the second hit killing them" : ""}`;
+      const why = "World spots are fixed: jump players stand where Near/Distant pick them, past the sit-outs.";
       if (alive.length === 1) {
         errors.push(playerError(alive[0], {
           ruleId: TOP5_MONITOR_RULE_ID, severity: died ? "Major" : "Minor", name: "Missed a World Jump",
-          description: `Took no World hit in Omega's first set: ${what}, so the jump wasn't picking ${alive[0].name}. ${why}`,
+          description: `Took no World hit in Omega's first set: ${what}, instead of ${alive[0].name}. ${why}`,
           timestamp: w.e.timestamp, abilityId: w.e.abilityId, abilityName: w.e.abilityName,
         }));
       } else {
         errors.push(playerlessMinor(TOP5_MONITOR_RULE_ID, "Missed a World Jump",
-          `${what}; the chain player it should have picked can't be told (${alive.length ? names(alive.map((q) => q.name)) : "nobody"} took no hit). ${why}`,
+          `${what}; who it should have picked can't be told (${alive.length ? names(alive.map((q) => q.name)) : "nobody"} took no hit). ${why}`,
           w.e.timestamp, w.e.abilityId, w.e.abilityName));
       }
     }
@@ -970,7 +970,6 @@ function readWorldSets(players: PlayerInfo[], life: Life, casts: EnemyEvent[], f
 }
 
 const SET_NAME = ["Delta", "Sigma", "Omega's first", "Omega's second"];
-const WORLD_WHY = "Each World's 8y origin and its two 4y jumps must hit only their own player: origins well apart, jump players spaced and ranked so Near picks the next-nearest and Distant the next-farthest, sit-outs out of both.";
 
 /**
  * The chains, set by set (the kill: six distinct players each set, all
@@ -1007,8 +1006,8 @@ function detectWorlds(players: PlayerInfo[], life: Life, sets: WorldSet[], flagg
         errors.push(playerError(h.p, {
           ruleId: TOP5_WORLD_RULE_ID, severity: "Major", name: holder ? "In Another World's Circle" : "World Jump Overlap",
           description: holder
-            ? `Stood${at !== undefined && h.e.x !== undefined && holder.e.x !== undefined ? ` ~${(at / 100).toFixed(1)}y` : ""} from ${holder.p.name}, the ${c[0].e.abilityName.replace("Hello, ", "")} origin, inside its 8y circle in ${setName} Worlds${died ? "; they died" : ""}. The splash failed the chain (Hello World). ${WORLD_WHY}`
-            : `${names(c.map((x) => x.p.name))} were all caught by one ${c[0].e.abilityName} jump in ${setName} Worlds${died ? "; they died" : ""}. ${WORLD_WHY}`,
+            ? `Stood${at !== undefined && h.e.x !== undefined && holder.e.x !== undefined ? ` ~${(at / 100).toFixed(1)}y` : ""} from ${holder.p.name}, the ${c[0].e.abilityName.replace("Hello, ", "")} origin, inside its 8y circle in ${setName} Worlds${died ? "; they died" : ""}. The splash failed the chain. Origins stand well apart.`
+            : `${names(c.map((x) => x.p.name))} were all caught by one ${c[0].e.abilityName} jump in ${setName} Worlds${died ? "; they died" : ""}. Each 4y jump must hit only its own player.`,
           timestamp: h.e.timestamp, abilityId: h.e.abilityId, abilityName: h.e.abilityName,
         }));
       }
@@ -1023,7 +1022,7 @@ function detectWorlds(players: PlayerInfo[], life: Life, sets: WorldSet[], flagg
         const died = deathsAfter(p, life, hs[1].e.timestamp);
         errors.push(playerError(p, {
           ruleId: TOP5_WORLD_RULE_ID, severity: died ? "Major" : "Minor", name: "World Jumped Back",
-          description: `Took ${hs.length} World hits in ${setName} Worlds (${hs.map((h) => h.e.abilityName.replace("Hello, ", "")).join(", then ")}): a jump came back to them through the vulnerability${died ? " and killed them" : ""}, and only one counts. ${WORLD_WHY}`,
+          description: `Took ${hs.length} World hits in ${setName} Worlds (${hs.map((h) => h.e.abilityName.replace("Hello, ", "")).join(", then ")}): a jump came back through the vulnerability${died ? " and killed them" : ""}; only one counts. Near picks the next-nearest player, Distant the next-farthest.`,
           timestamp: hs[1].e.timestamp, abilityId: hs[1].e.abilityId, abilityName: hs[1].e.abilityName,
         }));
       } else if (before >= 3) {
@@ -1077,9 +1076,9 @@ function detectSigmaArms(players: PlayerInfo[], life: Life, casts: EnemyEvent[],
         const unmarked = marks.length === 6 && marked.length === 6 ? players.filter((p) => !marked.includes(p.name) && !g.some((x) => x.target === p.name)) : [];
         const victim = byName(players, c.target);
         const died = victim ? deathsAfter(victim, life, t) : false;
-        const desc = `An arm's Hyper Pulse picked ${c.target}, who had a prey mark, as the farthest player${died ? "; with both hits they died" : ""}. The two unmarked players stand farthest from the arms (north-west and north-east of their pairs) so the arms take them.`;
+        const desc = `An arm's Hyper Pulse picked ${c.target}, who had a prey mark, as farthest${died ? "; both hits killed them" : ""}. The two unmarked players stand farthest from the arms, NW and NE of their pairs.`;
         if (unmarked.length) for (const p of unmarked) errors.push(playerError(p, { ruleId: TOP5_PREY_RULE_ID, severity: died ? "Major" : "Minor", name: "Not Farthest From the Arm", description: `${desc} ${p.name} had no prey mark but wasn't farther.`, timestamp: t, abilityId: SIGMA_ARM, abilityName: "Hyper Pulse" }));
-        else errors.push(playerlessMinor(TOP5_PREY_RULE_ID, "Arm on a Prey Player", `${desc} Some prey casts lost their targets, so the unmarked player can't be named.`, t, SIGMA_ARM, "Hyper Pulse"));
+        else errors.push(playerlessMinor(TOP5_PREY_RULE_ID, "Arm on a Prey Player", `${desc} The unmarked player can't be named (prey targets missing).`, t, SIGMA_ARM, "Hyper Pulse"));
       }
       const hits = liveHits(players, life, [SIGMA_ARM], c.timestamp, c.timestamp + 1500).filter((h) => h.e.sourceInstance === c.sourceInstance);
       // A line over two players loses its cast target (K4 K12 K20 K21 L9).
@@ -1171,7 +1170,7 @@ function detectTowers(players: PlayerInfo[], life: Life, casts: EnemyEvent[], fr
   });
   const none = players.filter((p) => life.alive(p, ob.timestamp) && !soaks.some((h) => h.p === p));
   const out: PullError[] = [];
-  for (const p of none) out.push(playerError(p, { ruleId: TOP5_TOWER_RULE_ID, severity: "Major", name: "Missed a Tower", description: `In no Sigma tower when one stood empty: Storage Violation Obliteration gave everyone Damage Down and Doom.${over.length ? ` ${names(over.map((q) => q.name))} crowded one tower.` : ""} Every player soaks: Mid has four singles and two doubles, Remote two singles and three doubles.`, timestamp: ob.timestamp, abilityId: OBLITERATION, abilityName: "Storage Violation Obliteration" }));
+  for (const p of none) out.push(playerError(p, { ruleId: TOP5_TOWER_RULE_ID, severity: "Major", name: "Missed a Tower", description: `In no Sigma tower when one stood empty: Obliteration gave everyone Damage Down and Doom.${over.length ? ` ${names(over.map((q) => q.name))} crowded one tower.` : ""} Everyone soaks: Mid has four singles and two doubles, Remote two singles and three doubles.`, timestamp: ob.timestamp, abilityId: OBLITERATION, abilityName: "Storage Violation Obliteration" }));
   for (const p of uniq(over)) out.push(playerError(p, { ruleId: TOP5_TOWER_RULE_ID, severity: "Major", name: "Overfilled a Tower", description: `In an overfilled Sigma tower${over.length === 2 ? ` with their glitch partner ${names(over.filter((q) => q !== p).map((q) => q.name))}` : ` (${names(over.map((q) => q.name))})`} while another stood empty: Storage Violation Obliteration gave everyone Damage Down and Doom. ${over.length === 2 ? "Partners never share a tower: one of the two" : "One of them"} belonged in the empty tower.`, timestamp: ob.timestamp, abilityId: OBLITERATION, abilityName: "Storage Violation Obliteration" }));
   return out;
 }
@@ -1190,7 +1189,7 @@ function detectBlaster(players: PlayerInfo[], life: Life, from: number, to: numb
     const died = g.filter((h) => !life.alive(h.p, h.e.timestamp + 10_000) || !!life.diedFrom(h.p, h.e.timestamp));
     for (const h of g) out.push(playerError(h.p, {
       ruleId: TOP5_BLASTER_RULE_ID, severity: died.length ? "Major" : "Minor", name: "Blaster Overlap",
-      description: `One Blaster circle hit ${names(g.map((x) => x.p.name))}: HP Penalty on both${died.length ? `, and ${names(died.map((x) => x.p.name))} died soon after` : ""}. The two three-stack tether holders take Blaster at the walls near the Beetle, away from each other and every World player. Holder and neighbour can't be told apart, so both are named.`,
+      description: `One Blaster circle hit ${names(g.map((x) => x.p.name))}: HP Penalty on both${died.length === g.length ? "; both died soon after" : died.length ? `; ${names(died.map((x) => x.p.name))} died soon after` : ""}. Three-stack holders take Blaster at the walls by the Beetle, clear of each other and the World players. Holder and neighbour can't be told apart.`,
       timestamp: h.e.timestamp, abilityId: BLASTER, abilityName: "Blaster",
     }));
   }

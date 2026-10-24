@@ -555,8 +555,8 @@ function spotOf(p: PlayerInfo, e: PlayerEvent): Spot | undefined {
 }
 const offSpot = (s: Spot | undefined) => !!s && (s.r < CENTRE_Y || s.dev > SPOT_DEG);
 const spotText = (p: PlayerInfo, s: Spot) => s.r < CENTRE_Y
-  ? `${p.name} stood ~${s.r.toFixed(1)} yalms from the boss, inside every line`
-  : `${p.name} stood ~${s.dev.toFixed(0)} degrees off ${p.role === "DPS" ? "the DPS intercardinals" : "the support cardinals"}`;
+  ? `${p.name} was ~${s.r.toFixed(1)}y from the boss, in every line`
+  : `${p.name} was ~${s.dev.toFixed(0)}° off ${p.role === "DPS" ? "DPS intercardinals" : "support cardinals"}`;
 
 /**
  * Each Wave Cannon set: four lines, each aimed at its target from the boss.
@@ -630,13 +630,13 @@ function detectSpreads(players: PlayerInfo[], life: Life, casts: EnemyEvent[], f
       const dead = victimsHit.filter((p) => hits.some((h) => h.p === p && life.diedFrom(p, h.e.timestamp)));
       const doubled = involved.filter((p) => hits.filter((h) => h.p === p).length >= 2);
       const why = off.length
-        ? off.map((p) => { const s = spot.get(p); return s ? spotText(p, s) : `${p.name}'s position isn't logged`; }).join("; ") + " (read at the hit, so a player still on their way to their spot reads as off it)"
-        : `nobody was clearly off their clock (${involved.map((p) => { const s = spot.get(p); return s ? `${p.name} ${s.dev.toFixed(0)} degrees, ${s.r.toFixed(1)}y out` : p.name; }).join("; ")}), so all are named`;
-      const what = `Wave Cannon's spread lines overlapped on ${names(involved.map((p) => p.name))}${doubled.length ? ` (${names(doubled.map((p) => p.name))} took two lines)` : ""}: ${why}.`;
+        ? off.map((p) => { const s = spot.get(p); return s ? spotText(p, s) : `${p.name}'s position isn't logged`; }).join("; ") + " (read at the hit)"
+        : `nobody was clearly off their spot (${involved.map((p) => { const s = spot.get(p); return s ? `${p.name} ${s.dev.toFixed(0)}°, ${s.r.toFixed(1)}y out` : p.name; }).join("; ")}), so all are named`;
+      const what = `Wave Cannon overlap on ${names(involved.map((p) => doubled.includes(p) ? `${p.name} ×2` : p.name))}: ${why}.`;
       for (const p of named) {
         errors.push(playerError(p, {
           ruleId: TOP6_SPREAD_RULE_ID, severity: dead.length ? "Major" : "Minor", name: "Wave Cannon Spread Overlap",
-          description: `${what}${dead.length ? ` ${names(dead.map((d) => d.name))} died.` : ""} Each line runs from the boss through its target: supports spread to the cardinals and DPS to the intercardinals, well out from the boss, so no line crosses another player.`,
+          description: `${what}${dead.length ? ` ${names(dead.map((d) => d.name))} died.` : ""}${off.length ? "" : " Supports spread to the cardinals, DPS to the intercardinals, well out from the boss."}`,
           timestamp: t, abilityId: SPREAD, abilityName: "Wave Cannon",
         }));
       }
@@ -715,8 +715,8 @@ function detectGales(players: PlayerInfo[], life: Life, casts: EnemyEvent[], fro
     if (others.length < 2) continue;
     const missed = tanks.filter((p) => !hits.some((h) => h.p === p));
     const dead = others.filter((p) => hits.some((h) => h.p === p && life.diedFrom(p, h.e.timestamp)));
-    const what = `Flash Gale's circle landed on the party (${others.length} non-tanks hit${dead.length ? `; ${names(dead.map((p) => p.name))} died` : ""}).`;
-    const fix = "One tank holds the boss close and the other stands farthest from it, both clear of the party, through both volleys.";
+    const what = `Flash Gale hit the party (${others.length} non-tanks${dead.length ? `; ${names(dead.map((p) => p.name))} died` : ""}).`;
+    const fix = "One tank holds the boss close, the other stays farthest, both clear of the party.";
     const dist = new Map(players.filter((p) => life.alive(p, t)).map((p) => {
       const q = interpolatePlayerPosition(p, t, { windowMs: 2000 });
       return [p, q ? yalms(q.x, q.y) : undefined] as const;
@@ -726,11 +726,11 @@ function detectGales(players: PlayerInfo[], life: Life, casts: EnemyEvent[], fro
     if (owed.length) {
       for (const p of owed) errors.push(playerError(p, {
         ruleId: TOP6_GALE_RULE_ID, severity: dead.length ? "Major" : "Minor", name: "Flash Gale on the Party",
-        description: `${what} ${p.name} took neither gale: they stood ~${dist.get(p)?.toFixed(1) ?? "?"} yalms from the boss while ${farthest[0].name} was farthest at ~${farthest[1]!.toFixed(1)}, so the far gale went to the party. ${fix}`,
+        description: `${what} ${p.name} took neither gale: ~${dist.get(p)?.toFixed(1) ?? "?"}y from the boss, but ${farthest[0].name} was farthest (~${farthest[1]!.toFixed(1)}y). ${fix}`,
         timestamp: t, abilityId: FLASH_GALE, abilityName: "Flash Gale",
       }));
     } else {
-      errors.push(playerlessMinor(TOP6_GALE_RULE_ID, "Flash Gale on the Party", `${what} ${missed.length ? "The far tank was still the farthest player" : "Both tanks were hit too"}, so the log can't say who stood wrong. ${fix}`, t, FLASH_GALE, "Flash Gale"));
+      errors.push(playerlessMinor(TOP6_GALE_RULE_ID, "Flash Gale on the Party", `${what} ${missed.length ? "The far tank was still the farthest player" : "Both tanks were hit too"}, so who stood wrong can't be told. ${fix}`, t, FLASH_GALE, "Flash Gale"));
     }
   }
   return errors;
@@ -756,7 +756,7 @@ function numberExpiry(players: PlayerInfo[], life: Life, deaths: DeathEvent[], c
     const healed = healers.filter((p) => lbs.some((l) => l.p === p && HEALER_LB3.has(l.n)));
     const lost = uniq(deaths.filter((d) => d.timestamp >= start && d.timestamp < c.timestamp).map((d) => d.player));
     return raidMarker(TOP6_MAGIC_NUMBER_RULE_ID, "Magic Number Not Cleansed",
-      `Magic Number's aura ran out on ${names(expired.map((x) => x.p.name))} with no healer Limit Break to clear it, which kills them. Healer LB3s this phase: ${healers.map((p) => `${p.name} ${healed.includes(p) ? "used theirs" : "didn't"}`).join(", ")}. ${lost.length ? `Died earlier in P6 (each death loses Brilliant Dynamis and the LB refund it carries, which breaks the tank and healer LB chain): ${names(lost)}.` : ""} Unresolvable from here; treated as the cutoff point.`.replace(/\s+/g, " "),
+      `Magic Number's aura ran out on ${names(expired.map((x) => x.p.name))} with no healer LB3 to clear it, killing them. Healer LB3s: ${healers.map((p) => `${p.name} ${healed.includes(p) ? "used" : "didn't"}`).join(", ")}. ${lost.length ? `Died earlier in P6 (losing Brilliant Dynamis and its LB refund breaks the LB chain): ${names(lost)}.` : ""} Treated as the cutoff.`.replace(/\s+/g, " "),
       t, NUMBER_AURA, "Magic Number");
   }
   return undefined;
@@ -786,7 +786,7 @@ function firstDeath(players: PlayerInfo[], deaths: DeathEvent[], called: Set<Dea
   const id = d.killingAbilityGameId ?? 0;
   const ability = id ? byName(players, d.player)?.damageTaken.find((e) => e.abilityId === id)?.abilityName ?? `ability ${id}` : undefined;
   return raidMarker(TOP6_DEATH_RULE_ID, "Brilliant Dynamis Lost",
-    `${d.player} died (${ability ?? "no killing blow"}), losing Brilliant Dynamis: its damage reduction and its Limit Break refund are gone, and a raise doesn't bring them back, so the LB chain through both Magic Numbers can't be completed. Treated as the cutoff point.`,
+    `${d.player} died (${ability ?? "no killing blow"}), losing Brilliant Dynamis: its damage reduction and LB refund are gone (a raise doesn't restore them), so the LB chain can't clear both Magic Numbers. Treated as the cutoff.`,
     d.timestamp - DEATH_EVENT_LAG_MS, id, ability ?? "Death");
 }
 

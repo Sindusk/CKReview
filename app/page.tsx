@@ -210,10 +210,10 @@ export default function Home() {
     [pulls]
   );
   // Its Party Synergy order (synergy-order.ts): it names which glitch
-  // partner stood in the wrong row or stack.
+  // partner stood in the wrong row or stack. The conga breaks its ties.
   const synergyOrder = useMemo(
-    () => learnSynergyOrder(pulls.filter((p) => p.name === "The Omega Protocol").map((p) => ({ players: p.players, deathEvents: p.deathEvents, enemyCasts: p.enemyCasts ?? [], headMarkers: p.headMarkers }))),
-    [pulls]
+    () => learnSynergyOrder(pulls.filter((p) => p.name === "The Omega Protocol").map((p) => ({ players: p.players, deathEvents: p.deathEvents, enemyCasts: p.enemyCasts ?? [], headMarkers: p.headMarkers })), pantokratorConga),
+    [pulls, pantokratorConga]
   );
   // Bosses without an encounter module get the fallback model, which learns
   // each ability's normal targets from the pull itself and the report's

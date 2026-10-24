@@ -134,8 +134,12 @@
 //   (both), else the living players no cannon picked, else player-less.
 // ffxiv-top3-hello-world (Raid): empty tower, uncleansed defect, timeout,
 //   missed requirement, an early break that killed 3+, a resolution that
-//   killed 3+. ffxiv-top3-transition (Raid): dead when Hello World handed out
-//   the duties. Only the earliest mechanic Raid is kept.
+//   killed 3+. ffxiv-top3-transition (Raid): dead 3s after Hello World's
+//   cast (when the duties land; the log gives duties to the dead too) or
+//   killed by its raidwide (user, 2026-10-24, LG64YVQy2KZbtpN8 Pull 48:
+//   "any player dead going into Hello World is effectively unresolvable";
+//   B66's MT, raised 0.8s after the cast, was in time). Only the earliest
+//   mechanic Raid is kept.
 // ffxiv-top3-wall, -enrage (Ion Efflux hits that killed), -called-wipe,
 //   -collapse (4 dead, pull over within 20s): the earliest, only before the
 //   mechanic Raid.
@@ -460,6 +464,8 @@ export const TOP3_COLLAPSE_RULE_ID    = "ffxiv-top3-collapse";
 const MERGE          = 31561; // the transition's first cast: Phase 3 starts here
 const P4_START       = 31559; // Phase 4's opening cast, after Omega Reconfigured dies
 const HELLO_WORLD    = 31573;
+// The Code Smells turn into duties this long after the cast.
+const HW_DUTY_MS     = 3000;
 const LATENT_DEFECT  = 31599; // each Hello World cycle's cast, ~1.1s before the towers
 const RINGS          = [31567, 31568, 31569, 31570]; // Wave Repeater's four rings
 const COLOSSAL_BLOW  = 31566; // the arms
@@ -554,13 +560,13 @@ function groupsOf(players: PlayerInfo[], life: Life, ids: number[], from: number
 // ── Transition ──────────────────────────────────────────────────────────────
 
 type Avoidable = { name: string; hit: string; why: string };
-const RING_WHY = "Wave Repeater pulses outward from the centre in two sets of four rings: start outside, step into each ring just after it goes off, and never return to the centre.";
+const RING_WHY = "Rings pulse out from the centre in two sets of four: start outside, step in just after each ring, never return to the centre.";
 const AVOIDABLE: Record<number, Avoidable> = {
   ...Object.fromEntries(RINGS.map((id) => [id, { name: "Wave Repeater", hit: "Hit by a Wave Repeater ring", why: RING_WHY }])),
   [COLOSSAL_BLOW]: { name: "Colossal Blow", hit: "Hit by an arm's Colossal Blow",
-    why: "The six arms explode in two sets of three (11y each): dodge the first set, then move into its cleared area for the second." },
+    why: "Arms explode in two sets of three (11y): dodge the first, then move into its cleared area." },
   [CENTER_BLEED]: { name: "Centre Hazard", hit: "Stepped into the lethal centre",
-    why: "The arena's centre stays lethal through the whole transition, after the rings are done." },
+    why: "The centre stays lethal for the whole transition, after the rings." },
 };
 
 /** Avoidable hits: no Damage Down in Phase 3, so Major only when it killed. */
@@ -584,7 +590,7 @@ function detectAvoidable(players: PlayerInfo[], life: Life, from: number, to: nu
   return errors;
 }
 
-const SNIPER_WHY = "The four Sniper Cannon players spread apart; each High-powered Sniper Cannon is shared by its holder and one unmarked player, away from the spreads and from the other share.";
+const SNIPER_WHY = "Spreads stand apart; each High-powered share takes its holder plus one unmarked player, clear of the spreads and the other share.";
 
 /**
  * Sniper Cannon at the markers' expiry, with all eight alive (a marked
@@ -611,7 +617,7 @@ function detectSniper(players: PlayerInfo[], life: Life, from: number, to: numbe
     for (const p of g.players) {
       errors.push(playerError(p, {
         ruleId: TOP3_SNIPER_RULE_ID, severity: sev, name: "Sniper Cannon Overlap",
-        description: `One Sniper Cannon spread hit ${names(g.players.map((q) => q.name))} together; either could have been off their spot.${outcome} ${SNIPER_WHY}`,
+        description: `One spread hit ${names(g.players.map((q) => q.name))}; either could be off their spot.${outcome} ${SNIPER_WHY}`,
         timestamp: g.hits[0].timestamp, abilityId: SNIPER, abilityName: "Sniper Cannon",
       }));
     }
@@ -622,7 +628,7 @@ function detectSniper(players: PlayerInfo[], life: Life, from: number, to: numbe
     for (const p of together) {
       errors.push(playerError(p, {
         ruleId: TOP3_SNIPER_RULE_ID, severity: sev, name: "Shares Together",
-        description: `Both High-powered Sniper Cannon holders (${names(together.map((q) => q.name))}) stood together, so the two shares landed on the same players.${outcome} ${SNIPER_WHY}`,
+        description: `Both High-powered holders (${names(together.map((q) => q.name))}) stood together, so both shares hit the same players.${outcome} ${SNIPER_WHY}`,
         timestamp: expiry, abilityId: HP_SNIPER, abilityName: "High-Powered Sniper Cannon",
       }));
     }
@@ -631,7 +637,7 @@ function detectSniper(players: PlayerInfo[], life: Life, from: number, to: numbe
     if (!shares.length) break;
     errors.push(playerError(p, {
       ruleId: TOP3_SNIPER_RULE_ID, severity: sev, name: "Missed the Share",
-      description: `Unmarked for Sniper Cannon but in no High-powered share, so a holder took theirs without a partner.${outcome} ${SNIPER_WHY}`,
+      description: `Unmarked but in no High-powered share, so a holder took theirs alone.${outcome} ${SNIPER_WHY}`,
       timestamp: expiry, abilityId: HP_SNIPER, abilityName: "High-Powered Sniper Cannon",
     }));
   }
@@ -678,13 +684,13 @@ function readCycles(players: PlayerInfo[], life: Life, casts: EnemyEvent[], star
   });
 }
 
-const TOWER_WHY = "Each cycle the two rot carriers with a defamation and the two with a stack each take the tower of their rot's color; the tower's 10s defect is cleansed when that same rot runs out on them, alive.";
-const PASS_WHY = "After the towers each defamation hands its rot to its Local partner and each stack to its Remote partner by touching within ~3s; a rot taken over more than ~4.6s after the resolution runs out after the next tower's defect and can't cleanse it.";
-const STACK_WHY = "Each stack takes its Remote-tethered partner: the hit clears that partner's stack requirement and hands them the next cycle's stack.";
-const DEFAM_WHY = "A defamation goes to the outer edge with only its Local partner inside its 20y (in the fourth cycle, nobody); everyone else stays clear of it.";
-const PATCH_WHY = "Cycles 1-3: the Remote pair separates first, once the stacks' Magic Vulnerability Up wears off (~1s after the towers), and the Local pair closes in ~2s later; in the fourth cycle the Local pair goes first. Two tethers breaking within a second stack Patch's vulnerability and Ruin.";
-const CLIP_WHY = "A rot explodes on its holder when it runs out (5y): after a hand-off the two players move apart before the old one expires.";
-const CONTACT_WHY = "Rots jump on contact: outside the planned hand-offs, rot carriers keep their distance from everyone.";
+const TOWER_WHY = "Rot carriers with a defamation or stack take their rot's color tower; the rot expiring on them, alive, cleanses its defect.";
+const PASS_WHY = "Defamations pass rot to their Local partner, stacks to their Remote, within ~3s; one taken over ~4.6s late can't cleanse the next defect.";
+const STACK_WHY = "The stack hit clears the Remote partner's requirement and hands them the next stack; unhit, that stack goes missing.";
+const DEFAM_WHY = "Defamations go to the edge with only their Local partner inside 20y (4th cycle: nobody).";
+const PATCH_WHY = "Remote breaks after the stack vuln, Local ~2s later (cycle 4: Local first).";
+const CLIP_WHY = "An expiring rot explodes on its holder (5y): split apart after a hand-off.";
+const CONTACT_WHY = "Rots jump on contact; carriers keep clear outside planned hand-offs.";
 
 /** The defamation's rot color in this pull, from the first cycle's owners. */
 function defamColor(cycles: Cycle[]): Color | undefined {
@@ -719,7 +725,7 @@ function detectHelloWorld(players: PlayerInfo[], life: Life, deaths: DeathEvent[
     for (const n of uniq([receiver, ...(giver ? [giver] : [])])) {
       errors.push(playerError(P(n), {
         ruleId: TOP3_ROT_PASS_RULE_ID, severity: "Major", name: "Rot Hand-off Failed",
-        description: `${why} The hand-off was between ${giver ? names([giver, receiver]) : receiver}; the log can't say which of them missed it. ${PASS_WHY}`,
+        description: `${why} Hand-off between ${giver ? names([giver, receiver]) : receiver}; either could have missed it. ${PASS_WHY}`,
         timestamp: t, abilityId: COL[color].rot, abilityName: ROT_NAME[color],
       }));
     }
@@ -744,7 +750,7 @@ function detectHelloWorld(players: PlayerInfo[], life: Life, deaths: DeathEvent[
           const other = cy.towers.find((t) => t.color !== c && t.players.some((p) => p.name === n));
           errors.push(playerError(P(n), {
             ruleId: TOP3_TOWER_RULE_ID, severity: "Major", name: `Missed the ${c === "red" ? "Red" : "Blue"} Tower`,
-            description: `Carried the ${c} rot with a ${dutyColor(cy, n) === dColor ? "defamation" : "stack"} in the ${nth} cycle but ${other ? `stood in a ${other.color} tower` : "took no tower"}, so a ${c} tower went empty: its penalty is unresolvable. ${TOWER_WHY}`,
+            description: `Carried the ${c} rot with a ${dutyColor(cy, n) === dColor ? "defamation" : "stack"} in the ${nth} cycle but ${other ? `stood in a ${other.color} tower` : "took no tower"}, so a ${c} tower went empty (unresolvable). ${TOWER_WHY}`,
             timestamp: cy.res, abilityId: COL[c].tower, abilityName: c === "red" ? "Cascading Latent Defect" : "Latent Performance Defect",
           }));
         }
@@ -753,7 +759,7 @@ function detectHelloWorld(players: PlayerInfo[], life: Life, deaths: DeathEvent[
         for (const n of shared) {
           errors.push(playerError(P(n), {
             ruleId: TOP3_TOWER_RULE_ID, severity: "Major", name: "Shared a Tower",
-            description: `Both ${c} carriers (${names(shared)}) stood in the same ${c} tower in the ${nth} cycle, so the other went empty; one of them belonged in it. ${TOWER_WHY}`,
+            description: `Both ${c} carriers (${names(shared)}) took the same ${c} tower in the ${nth} cycle, leaving the other empty. ${TOWER_WHY}`,
             timestamp: cy.res, abilityId: COL[c].tower, abilityName: c === "red" ? "Cascading Latent Defect" : "Latent Performance Defect",
           }));
         }
@@ -774,7 +780,7 @@ function detectHelloWorld(players: PlayerInfo[], life: Life, deaths: DeathEvent[
         if (expected.length + dutyNoRot.length < 2 && !dutyNoRot.length) parts.push("a carrier was missing (dead when Hello World handed out the duties)");
       }
       raids.push(raidMarker(TOP3_HELLO_WORLD_RULE_ID, `${c === "red" ? "Red" : "Blue"} Tower Empty`,
-        `A ${c} tower went empty in Hello World's ${nth} cycle${parts.length ? ` (${parts.join("; ")})` : ""}. Unresolvable from here; treated as the cutoff point.`,
+        `A ${c} tower went empty in Hello World's ${nth} cycle${parts.length ? ` (${parts.join("; ")})` : ""}. Unresolvable; treated as the cutoff.`,
         cy.res, COL[c].empty, c === "red" ? "Cascading Latent Defect" : "Latent Performance Defect"));
     }
 
@@ -787,7 +793,7 @@ function detectHelloWorld(players: PlayerInfo[], life: Life, deaths: DeathEvent[
         const ownerDied = alone.filter((o) => life.diedFrom(P(o), cy.res));
         errors.push(playerError(P(n), {
           ruleId: TOP3_STACK_RULE_ID, severity: "Major", name: "Missed the Stack",
-          description: `Remote-tethered in the ${nth} cycle but in no stack${alone.length ? `: ${names(alone)} took theirs alone${ownerDied.length ? " and died" : ""}` : ""}. Without the hit their stack requirement stays and the next cycle's stack is missing. ${STACK_WHY}`,
+          description: `Remote-tethered in the ${nth} cycle but in no stack${alone.length ? `: ${names(alone)} took theirs alone${ownerDied.length ? " and died" : ""}` : ""}. ${STACK_WHY}`,
           timestamp: cy.res, abilityId: STACK_HIT, abilityName: "Critical Synchronization Bug",
         }));
       }
@@ -835,13 +841,13 @@ function detectHelloWorld(players: PlayerInfo[], life: Life, deaths: DeathEvent[
     if (cy.k <= 3) {
       if (rmT !== undefined && (rmT < cy.res || vulnUp(rmT))) {
         early.push({ pair: cy.remote, t: rmT, what: rmT < cy.res
-          ? `broke the Remote tether ${sec(cy.res - rmT)}s before the ${nth} cycle's towers (they stood apart when it appeared), so Patch went off on top of the resolution`
-          : `broke the Remote tether ${sec(rmT - cy.res)}s after the ${nth} cycle's towers, before the stacks' Magic Vulnerability Up wore off` });
+          ? `broke the Remote tether ${sec(cy.res - rmT)}s before the ${nth} cycle's towers (never together), so Patch hit mid-resolution`
+          : `broke the Remote tether ${sec(rmT - cy.res)}s after the ${nth} cycle's towers, before the stack's vuln wore off` });
       } else if (rmT !== undefined && lT !== undefined && lT - rmT < BREAK_GAP_MS) {
-        early.push({ pair: cy.local, t: lT, what: `closed the Local tether ${lT < rmT ? "before" : `${sec(lT - rmT)}s after`} the Remote pair broke theirs in the ${nth} cycle, inside the first Patch's lockout` });
+        early.push({ pair: cy.local, t: lT, what: `closed the Local tether ${lT < rmT ? "before" : `${sec(lT - rmT)}s after`} the Remote break in the ${nth} cycle, inside the first Patch's lockout` });
       }
     } else if (rmT !== undefined && rmT - cy.res < REMOTE4_EARLY_MS) {
-      early.push({ pair: cy.remote, t: rmT, what: `broke the Remote tether ${rmT < cy.res ? `${sec(cy.res - rmT)}s before` : `${sec(rmT - cy.res)}s after`} the fourth cycle's towers, together with the Local pair (Remote goes second in the fourth cycle)` });
+      early.push({ pair: cy.remote, t: rmT, what: `broke the Remote tether ${rmT < cy.res ? `${sec(cy.res - rmT)}s before` : `${sec(rmT - cy.res)}s after`} the fourth cycle's towers, with the Local pair (Remote goes second here)` });
     }
     for (const x of early) {
       const killed = uniq(players.flatMap((p) => p.damageTaken.filter((e) => !bodyHit(e) && life.diedFrom(p, e.timestamp) && (
@@ -850,13 +856,13 @@ function detectHelloWorld(players: PlayerInfo[], life: Life, deaths: DeathEvent[
       for (const n of x.pair) {
         errors.push(playerError(P(n), {
           ruleId: TOP3_PATCH_RULE_ID, severity: killed.length ? "Major" : "Minor", name: "Tether Broken Too Early",
-          description: `${names(x.pair)} ${x.what}.${killed.length ? ` ${names(killed.map((p) => p.name))} died.` : ""} Either partner could have moved early; the log can't say which. ${PATCH_WHY}`,
+          description: `${names(x.pair)} ${x.what}.${killed.length >= RAID_DEATHS ? ` ${killed.length} died.` : killed.length ? ` Died: ${names(killed.map((p) => p.name))}.` : ""} Either may have moved. ${PATCH_WHY}`,
           timestamp: x.t, abilityId: PATCH, abilityName: "Patch",
         }));
       }
       if (killed.length >= RAID_DEATHS) {
         raids.push(raidMarker(TOP3_HELLO_WORLD_RULE_ID, "Patch Overlapped",
-          `The early tether break in Hello World's ${nth} cycle killed ${killed.length} (${names(killed.map((p) => p.name))}). Unresolvable from here; treated as the cutoff point.`,
+          `The early tether break in Hello World's ${nth} cycle killed ${killed.length} (${names(killed.map((p) => p.name))}). Unresolvable; treated as the cutoff.`,
           x.t, PATCH, "Patch"));
       }
     }
@@ -866,7 +872,7 @@ function detectHelloWorld(players: PlayerInfo[], life: Life, deaths: DeathEvent[
       e.timestamp >= cy.res && e.timestamp <= cy.res + RESOLUTION_MS && !bodyHit(e) && life.diedFrom(p, e.timestamp)).map(() => p)));
     if (resKilled.length >= RAID_DEATHS) {
       raids.push(raidMarker(TOP3_HELLO_WORLD_RULE_ID, "Hello World Resolution Failed",
-        `Hello World's ${nth} cycle killed ${resKilled.length} (${names(resKilled.map((p) => p.name))}) at the towers, defamations and stacks. Unresolvable from here; treated as the cutoff point.`,
+        `Hello World's ${nth} cycle killed ${resKilled.length} (${names(resKilled.map((p) => p.name))}) at the towers, defamations and stacks. Unresolvable; treated as the cutoff.`,
         cy.res + 600, DEFAM_HIT, "Critical Overflow Bug"));
     }
   }
@@ -916,7 +922,7 @@ function detectHelloWorld(players: PlayerInfo[], life: Life, deaths: DeathEvent[
       for (const p of pair) {
         errors.push(playerError(p, {
           ruleId: TOP3_PATCH_RULE_ID, severity: "Major", name: "Tether Timed Out",
-          description: `${names(pair.map((q) => q.name))} never broke their tether, so it ran out into the raid-wide Patch. ${PATCH_WHY}`,
+          description: `${names(pair.map((q) => q.name))} never broke their tether; it ran out into the raid-wide Patch. ${PATCH_WHY}`,
           timestamp: pen.timestamp, abilityId: PATCH_TIMEOUT, abilityName: "Patch",
         }));
       }
@@ -1008,7 +1014,7 @@ function firstPer(errors: PullError[], key: (e: PullError) => string): PullError
 
 // ── Oversampled Wave Cannon ─────────────────────────────────────────────────
 
-const MONITOR_WHY = "Oversampled Wave Cannon picks players on each monitor's side and the boss's: with the layout's two per side everyone takes exactly one, while a player outside it leaves a side short and the spare cannon lands on someone already picked.";
+const MONITOR_WHY = "Two per side gives everyone one cannon; a player off the layout leaves a side short and someone takes two.";
 
 /**
  * A player picked twice, all eight alive. Living players no cannon picked
@@ -1027,7 +1033,7 @@ function detectMonitors(players: PlayerInfo[], life: Life, casts: EnemyEvent[], 
   if (!doubled.length) return [];
   const died = doubled.filter((h) => h.hits.some((e) => life.diedFrom(h.p, e.timestamp))).map((h) => h.p);
   const sev = died.length ? "Major" : "Minor";
-  const outcome = `${names(doubled.map((h) => h.p.name))} took two cannons${died.length ? ` (${names(died.map((p) => p.name))} died)` : ""}`;
+  const outcome = `${names(doubled.map((h) => h.p.name))} took two${died.length === doubled.length ? " and died" : died.length ? ` (${names(died.map((p) => p.name))} died)` : ""}`;
   // One cannon that hit two or more: those players stood inside each
   // other's 7y circle (D30: the tanks 6y apart; E19).
   const byShot = new Map<number, PlayerInfo[]>();
@@ -1039,7 +1045,7 @@ function detectMonitors(players: PlayerInfo[], life: Life, casts: EnemyEvent[], 
     const short = !crossed.some((p) => doubled.some((h) => h.p === p));
     return crossed.map((p) => playerError(p, {
       ruleId: TOP3_MONITOR_RULE_ID, severity: sev, name: "Monitor Circles Overlapped",
-      description: `Stood within 7y of ${names(crossed.filter((x) => x !== p).map((x) => x.name))}, so one Oversampled Wave Cannon circle hit them both${short ? ` and only one of them was picked, leaving a side short` : ""}: ${outcome}. Either could have been off their spot. ${MONITOR_WHY}`,
+      description: `Within 7y of ${names(crossed.filter((x) => x !== p).map((x) => x.name))} (either could be off): one circle hit both${short ? ` and only one was picked` : ""}: ${outcome}. ${MONITOR_WHY}`,
       timestamp: t, abilityId: OWC, abilityName: "Oversampled Wave Cannon",
     }));
   }
@@ -1047,12 +1053,12 @@ function detectMonitors(players: PlayerInfo[], life: Life, casts: EnemyEvent[], 
   if (left.length) {
     return left.map((p) => playerError(p, {
       ruleId: TOP3_MONITOR_RULE_ID, severity: sev, name: "Outside the Monitor Layout",
-      description: `No Oversampled Wave Cannon picked them, so a side came up short: ${outcome}. ${MONITOR_WHY}`,
+      description: `No cannon picked them, so a side came up short: ${outcome}. ${MONITOR_WHY}`,
       timestamp: t, abilityId: OWC, abilityName: "Oversampled Wave Cannon",
     }));
   }
   return [playerlessMinor(TOP3_MONITOR_RULE_ID, "Monitor Picked Twice",
-    `${outcome}, with nobody left out (${shots.length} cannons): someone stood on the wrong side, but the log can't say who. ${MONITOR_WHY}`,
+    `${outcome}, nobody left out (${shots.length} cannons): someone stood on the wrong side; the log can't say who. ${MONITOR_WHY}`,
     t, OWC, "Oversampled Wave Cannon")];
 }
 
@@ -1114,12 +1120,20 @@ export function detectOmegaReconfiguredErrors(
     ...detectAvoidable(players, life, start, end),
     ...detectSniper(players, life, start, transitionEnd),
   ];
-  // A player dead when Hello World hands out the duties leaves a slot empty (C9).
+  // A player dead when Hello World hands out the duties leaves a slot empty
+  // (C9). The log hands duties to the dead too, and one killed by Hello
+  // World's own raidwide is just as gone: "any player dead going into Hello
+  // World is effectively unresolvable" (user, 2026-10-24, LG64YVQy2KZbtpN8
+  // Pull 48: the MNK dead since the cannons, the raised DNC killed by it).
+  // Raised before the duties land 3s after the cast is in time (B66: the
+  // MT raised 0.8s after it, a P3 clear).
   if (hw) {
-    const missing = players.filter((p) => !p.debuffs.some((e) => HW_AURAS.includes(e.abilityId) && Math.abs(e.timestamp - hw.timestamp) <= 1500));
+    const missing = players.filter((p) => !p.debuffs.some((e) => HW_AURAS.includes(e.abilityId) && Math.abs(e.timestamp - hw.timestamp) <= 1500)
+      || !life.alive(p, hw.timestamp + HW_DUTY_MS)
+      || p.damageTaken.some((e) => e.abilityId === HELLO_WORLD && Math.abs(e.timestamp - hw.timestamp) <= 3000 && life.diedFrom(p, e.timestamp)));
     if (missing.length && missing.length < players.length) {
       raids.push(raidMarker(TOP3_TRANSITION_RULE_ID, "Dead at Hello World",
-        `${names(missing.map((p) => p.name))} ${missing.length > 1 ? "were" : "was"} dead when Hello World handed out its duties, so ${missing.length > 1 ? "their slots go" : "a slot goes"} unfilled for the whole rotation. Unresolvable from here; treated as the cutoff point.`,
+        `${names(missing.map((p) => p.name))} ${missing.length > 1 ? "were" : "was"} dead at Hello World's duty handout, leaving ${missing.length > 1 ? "their slots" : "a slot"} empty all rotation. Unresolvable; treated as the cutoff.`,
         hw.timestamp, HELLO_WORLD, "Hello, World"));
     }
     const cycles = readCycles(players, life, enemyCasts, start, end);
