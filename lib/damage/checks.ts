@@ -1116,6 +1116,19 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
       // A consumer with no damage of its own (Horoscope detonates at
       // expiry by design) loses nothing.
       if (value <= 0) return;
+      // Run out at the end of the pull, with the last GCD on something
+      // worth more: no GCD was left to spend it on. gTkMH91DWRmLbNCn pull 8:
+      // Silken Flow ran out at 18:39.0, the last GCD was Last Dance at
+      // 18:38.2 (85k average) over Fountainfall (45k), the right call
+      // (user, 2026-10-24). Only at the end: mid-pull, xivanalysis counts
+      // the same shape as dropped (K6qfMamL7rN8yz2Q Vamp 4:29) and the
+      // user kept that. GCD procs that take a filler's slot only.
+      if (how === "expired unused" && st && replacesId !== undefined) {
+        const damagingGcd = (c: PlayerEvent) => ctx.game.action(c.abilityId)?.onGcd && ctx.values.perUse(c.abilityId) > 0;
+        const after = casts.some((c) => c.timestamp > t && c.timestamp < ctx.endMs && damagingGcd(c));
+        const last = casts.filter((c) => c.timestamp > st.lastAt && c.timestamp < t && damagingGcd(c)).pop();
+        if (!after && last && ctx.values.perUse(last.abilityId) >= consumerValue) return;
+      }
       const forced = inWindows(t, mergeWindows(ctx.forced));
       out.push(finding(ctx, {
         kind: "proc-lost", startMs: t, endMs: t, forced,
