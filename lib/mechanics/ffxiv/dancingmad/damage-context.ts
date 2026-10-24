@@ -88,6 +88,58 @@ const FORSAKEN_AFTER_MS = 1_500;
 // 5.0s), Black Mage and Viper (3:06.6, ~2.5s) held GCDs. The cast's start
 // isn't logged: 6s before the resolution to 1.5s after (turning back).
 const GAZE_NAMES = new Set(["Ave Maria", "Indolent Will"]);
+
+// P4 Kefka Says (user, 2026-10-24): a real Grand Cross's Acceleration Bomb
+// is Stillness (no movement, no actions as it expires: attacking explodes
+// it), its Cursed Shriek a look-away gaze for the whole party (attacking
+// turns the player to face the boss). Fake ones (Motion, look at) cost no
+// GCDs. Real/fake is Neo Exdeath's hidden bit (kefka-says.ts, signal
+// 6-12s before the cast). Measured at every expiry on gTkMH91DWRmLbNCn
+// pulls 3/8, 2T1HzdPKgbhM43am, qjCMx4bRfgNKwX9T: Stillness holders' last
+// action 2.3-6.3s before, next 1.1-5.4s after (Motion holders 0.1-2.5s
+// before); at a real Shriek most of the party stops 2-4s before and is
+// back within ~2s (a fake one: 0-2.7s before).
+const GRAND_CROSS = 47892;
+const ACCELERATION_BOMB = 1005546;
+const CURSED_SHRIEK = 1005543;
+const GC_MATCH_MS = 2_000;
+const GC_SIGNAL_MIN_MS = 6_000;
+const GC_SIGNAL_MAX_MS = 12_000;
+const STILLNESS_BEFORE_MS = 5_000;
+const STILLNESS_AFTER_MS = 2_000;
+const SHRIEK_BEFORE_MS = 5_000;
+const SHRIEK_AFTER_MS = 2_000;
+
+/** Stillness (per holder) and look-away gaze (party) windows in Kefka Says. */
+function kefkaSaysWindows(pull: Parameters<NonNullable<DamageContext["movementWindows"]>>[0]): ForcedWindow[] {
+  const crosses = (pull.enemyCasts ?? []).filter((e) => e.abilityId === GRAND_CROSS).map((e) => e.timestamp);
+  const neo = (pull.kefkaSaysSignals ?? []).filter((s) => /neo exdeath/i.test(s.actorName));
+  if (crosses.length === 0 || neo.length === 0) return [];
+  const realAt = (applied: number) => {
+    const cross = crosses.find((c) => Math.abs(c - applied) <= GC_MATCH_MS);
+    const sig = cross === undefined ? undefined
+      : neo.find((s) => cross - s.timestamp >= GC_SIGNAL_MIN_MS && cross - s.timestamp <= GC_SIGNAL_MAX_MS);
+    return sig !== undefined && sig.value % 2 === 0;
+  };
+  const out: ForcedWindow[] = [];
+  const shrieks = new Set<number>();
+  for (const p of pull.players) {
+    for (const d of p.debuffs) {
+      if (d.debuffStatus !== "applied" || (d.abilityId !== ACCELERATION_BOMB && d.abilityId !== CURSED_SHRIEK)) continue;
+      const end = p.debuffs.find((x) => x.abilityId === d.abilityId && x.debuffStatus === "removed" && x.timestamp > d.timestamp);
+      if (!end || !realAt(d.timestamp)) continue;
+      if (d.abilityId === ACCELERATION_BOMB) {
+        out.push({ startMs: end.timestamp - STILLNESS_BEFORE_MS, endMs: end.timestamp + STILLNESS_AFTER_MS,
+          cause: "Acceleration Bomb (Stillness)", players: [p.name] });
+      } else if (![...shrieks].some((t) => Math.abs(t - end.timestamp) <= GC_MATCH_MS)) {
+        shrieks.add(end.timestamp);
+        out.push({ startMs: end.timestamp - SHRIEK_BEFORE_MS, endMs: end.timestamp + SHRIEK_AFTER_MS,
+          cause: "Cursed Shriek (look away)" });
+      }
+    }
+  }
+  return out;
+}
 const GAZE_BEFORE_MS = 6_000;
 const GAZE_AFTER_MS = 1_500;
 
@@ -186,6 +238,7 @@ export const DANCING_MAD_DAMAGE_CONTEXT: DamageContext = {
     return out;
   },
   movementWindows: (pull) => [
+    ...kefkaSaysWindows(pull),
     ...pull.players
       .filter((p) => p.rangeType === "Melee")
       .flatMap((p) => p.damageTaken

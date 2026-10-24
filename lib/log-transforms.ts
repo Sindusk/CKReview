@@ -1771,6 +1771,7 @@ export function transformFFightToPull(
     enemyCasts:    enemyCastEvents,
     headMarkers:   headMarkers.length ? headMarkers : undefined,
     tethers:       tethers.length ? tethers : undefined,
+    kefkaSaysSignals: kefkaSaysSignals.length ? kefkaSaysSignals : undefined,
     enemyStacks:   fflBuildEnemyStacks(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart),
     bossDebuffs:   data.enemyDebuffEvents
       ? fflBuildBossDebuffs(data.enemyDebuffEvents, actorMap, abilityMap, fightStart)

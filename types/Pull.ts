@@ -89,6 +89,10 @@ export type Pull = {
   // Party Synergy order, lib/mechanics/ffxiv/top/synergy-order.ts).
   // Undefined when the pull had none, and on pulls saved before 2026-10-14.
   headMarkers?: HeadMarker[];
+  // FFXIV Dancing Mad Phase 4 only: the bosses' hidden real/fake bit
+  // (kefka-says.ts), kept for the damage context's Stillness windows.
+  // Undefined when the pull had none, and on pulls saved before 2026-10-24.
+  kefkaSaysSignals?: { timestamp: number; actorName: string; value: number }[];
   // FFXIV only: tethers forming (each take), by actor name. Undefined when
   // the pull had none, and on pulls fetched before 2026-10-23.
   tethers?: Tether[];
