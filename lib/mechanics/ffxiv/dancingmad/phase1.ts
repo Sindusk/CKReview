@@ -433,6 +433,13 @@
 // purposes) — the rule only looks for the first jump among players who did
 // NOT have Damage Down at the time.
 //
+// **What caused the jump** (user, 2026-10-24): when everyone jumps, the
+// first mistake before it was the trigger; a pull that carries on (even
+// with a Damage Down) is analyzed as usual. Errors before the jump already
+// count; the wipe cause is set in lib/static-review-data.ts
+// (JUMP_CALL_RULE_IDS): gTkMH91DWRmLbNCn pull 2 -> the 2:40 arrow, pull 4
+// -> the 0:38 Damage Down.
+//
 // ── WAVE CANNON OUT OF POSITION / MITIGATION ISSUE ─────────────────────────
 //
 // Lives in wave-cannon.ts, NOT here — like Graven Image's spread, which job

@@ -139,6 +139,12 @@ export type StaticReviewPayload = {
 const DEATH_CHAIN_GAP_MS = 10_000;
 const DEATH_CHAIN_END_WINDOW_MS = 15_000;
 
+// Raid errors that mark the raid jumping off to reset. Their trigger is the
+// first Major within the window before the jump: gTkMH91DWRmLbNCn pull 2
+// (wrong arrows 2:40, jump 2:52) and pull 4 (Damage Down 0:38, jump 0:46).
+const JUMP_CALL_RULE_IDS = new Set(["ffxiv-phase1-jumped-off-arena"]);
+const JUMP_TRIGGER_WINDOW_MS = 30_000;
+
 /** StaticRule key for an error: rule id plus name (lib/mechanics/rule-meta.ts). */
 function errorRuleKey(e: PullError): string {
   return staticRuleKey(e.ruleId, e.name);
@@ -148,6 +154,8 @@ function errorRuleKey(e: PullError): string {
  * What ended a wiped pull, or null for a kill or when nothing qualifies.
  * First that applies:
  * 1. The pull's first Raid error (the getPullRaidCutoff error).
+ *    A jump-off reset (JUMP_CALL_RULE_IDS) as that error is "called",
+ *    pointing at the first Major within JUMP_TRIGGER_WINDOW_MS before it.
  * 2. A manual Call Wipe as that first Raid error: "called", pointing at the
  *    nearest Major error or death before the call.
  * 3. No Raid error: the final death chain — walking back from the last
@@ -167,6 +175,18 @@ export function computeWipeCause(pull: Pull): StaticWipeCause | null {
     const firstAt = raidErrors[0].timestamp;
     const atCutoff = raidErrors.filter((e) => e.timestamp === firstAt);
     const detected = atCutoff.find((e) => e.ruleId !== CALL_WIPE_RULE_ID);
+    // The raid jumping off is a call, and the first mistake shortly before
+    // it was the trigger (user, 2026-10-24: "if everyone jumps off the
+    // arena, the first mistake that was made was the trigger"; a pull that
+    // carries on is analyzed as usual).
+    if (detected && JUMP_CALL_RULE_IDS.has(detected.ruleId)) {
+      const trigger = pull.errors
+        .filter((e) => e.severity === "Major" && e.timestamp <= firstAt && firstAt - e.timestamp <= JUMP_TRIGGER_WINDOW_MS)
+        .sort((a, b) => a.timestamp - b.timestamp)[0];
+      if (trigger) {
+        return { kind: "called", ruleKey: errorRuleKey(trigger), ability: trigger.abilityName || null, atMs: trigger.timestamp, phase: phaseOf(trigger.timestamp) };
+      }
+    }
     if (detected) {
       return { kind: "raidError", ruleKey: errorRuleKey(detected), ability: detected.abilityName || null, atMs: detected.timestamp, phase: phaseOf(detected.timestamp) };
     }
