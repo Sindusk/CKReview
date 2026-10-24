@@ -410,9 +410,14 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   // Their negative first-use offsets (Standard Step, Reassemble: used
   // before the pull) become 0 here; Standard Step's pre-pull use is read
   // from a Standard Finish before the first Step (Vamp kill: Finish at
-  // 0:00.8, first Finishing Move at 0:21.8).
+  // 0:00.8, first Finishing Move at 0:21.8). Technical Step danced before
+  // the pull shows the same way, a Technical Finish before the first Step:
+  // gTkMH91DWRmLbNCn pulls 3 and 8 finished at 0:02 with the next Step at
+  // 1:56, and without the evidence the opener's recharge read as "sat
+  // ready", 1 use lost (~450k).
   "Dancer": [
-    { actions: ["TECHNICAL_STEP"], holdMs: 250, partyBuffs: ["TECHNICAL_FINISH"] },
+    { actions: ["TECHNICAL_STEP"], holdMs: 250, partyBuffs: ["TECHNICAL_FINISH"],
+      prePullEvidence: ["TECHNICAL_FINISH", "SINGLE_TECHNICAL_FINISH", "DOUBLE_TECHNICAL_FINISH", "TRIPLE_TECHNICAL_FINISH", "QUADRUPLE_TECHNICAL_FINISH"] },
     { actions: ["STANDARD_STEP", "FINISHING_MOVE"], holdMs: 250,
       prePullEvidence: ["STANDARD_FINISH", "SINGLE_STANDARD_FINISH", "DOUBLE_STANDARD_FINISH"] },
     { actions: ["DEVILMENT"] },

@@ -412,6 +412,10 @@ showed:
   banked to the kill (Living Muse, Phlegma III). checks.ts
   usesLostAtKill; with no margin it was 282 findings across the FF kills,
   most a cooldown back 2-5s before the kill.
+- **Every cooldown a job can press before the pull needs pre-pull
+  evidence** (2026-10-24): the Dancer's Technical Step danced pre-pull
+  read as 116s of drift and a lost use until its Technical Finish counted
+  as evidence (gTkMH91DWRmLbNCn).
 - **A pre-pull use still has a recast** (2026-10-15): it's ready again a
   recast into the pull at the latest, and the hold after that counts
   (Earthly Star placed pre-pull, next cast 1:18).
