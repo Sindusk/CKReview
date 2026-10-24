@@ -278,9 +278,9 @@ read "hit 6, drawn 3" (two stacks compared together).
 4. **13:35.2 and 13:59.2:** violet eyes over the Cursed Shriek holders
    for 5s before their gaze. Do the eyes sit on the holders in game?
 
-## Phase 5: Ultimate Kefka (15:00 to the end)
+## Phase 5: Ultima Kefka (15:00 to the end)
 
-The mechanics from ultimate-kefka.ts (its model is from four guides; both
+The mechanics from ultima-kefka.ts (its model is from four guides; both
 kills here are the first P5 kills on disk).
 
 ### What's drawn

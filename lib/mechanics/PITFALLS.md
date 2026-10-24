@@ -4,7 +4,7 @@ A checklist distilled from every boss built so far: Sszorak, Nek'zali, The
 Lost Explorers, The Twin Fangs, The Coiled Altar, Ula'tek, Red Hot and Deep
 Blue, The Tyrant, Lindwurm, and Futures Rewritten P1-P5 (Fatebreaker,
 Usurper of Frost, Oracle of Darkness, Enter the Dragon, Pandora). It also
-covers Ultimate Kefka. Each item says what goes wrong, what to do instead,
+covers Ultima Kefka. Each item says what goes wrong, what to do instead,
 and where it was learned. The module headers hold the specifics.
 
 The `/build-module` and `/refine-module` skills read this at their
@@ -25,7 +25,7 @@ philosophy and the data semantics this list assumes.
   stay whole, so offsets hold. `validate.js` runs only `lateCapture`
   mechanics on a late-start capture. A capture cut with `--to-minutes`
   still has every death, so bound the module's window by the last damage
-  or cast event, not the last death (Usurper of Frost, Ultimate Kefka,
+  or cast event, not the last death (Usurper of Frost, Ultima Kefka,
   Enter the Dragon).
 - **A sample report used for a late phase is a partial capture.** Before
   a VOD review of it, check each pull's stream windows and refetch the
@@ -68,7 +68,7 @@ philosophy and the data semantics this list assumes.
 - **Status IDs are reused across phases.** Celestriad's Lightning
   Resistance Down II is Exdeath's Thunder III mark. Sweep a new phase's
   IDs against the older modules; `causeAbilityId` separates the uses
-  (Ultimate Kefka).
+  (Ultima Kefka).
 - **A countdown buff can change ID at the enrage.** A removal counts as a
   death only when no successor appears in the same millisecond (Ula'tek's
   Boiling Venom).
@@ -103,7 +103,7 @@ philosophy and the data semantics this list assumes.
   on a non-tank can't be pinned on a tank (Doomtrain).
 - **Test a guide's "stack" or "fixed damage" claim against the damage.**
   Fell Forces split across the group: a lone DPS took 4x the normal hit
-  (Ultimate Kefka).
+  (Ultima Kefka).
 - **Hits on an NPC live in enemyDamageTaken** (`NpcHit[]`). The memory
   crystal's only trace of being struck (Enter the Dragon).
 - **Some debuffs go off at the holder's death.** A Dark Fire holder's
@@ -486,7 +486,7 @@ philosophy and the data semantics this list assumes.
   split into no-bounce, too-late and too-early, and exposed waves where
   nobody bounced (The Lost Explorers).
 - **A raised player drawing a bait from where they were raised is bad
-  luck,** not an overlap (The Tyrant's raise grace; Ultimate Kefka's Holy,
+  luck,** not an overlap (The Tyrant's raise grace; Ultima Kefka's Holy,
   raised the same second the spread landed).
 - **Immunity soaks are strategy.** Skip zero-damage hits unless the player
   died (The Coiled Altar).
@@ -609,8 +609,8 @@ Classify every one before counting a called wipe. Known meanings:
 Related:
 
 - **FFLogs death events land ~2.0s after the fatal hit.** Use the hit for
-  "alive at the mechanic" (Ultimate Kefka).
-- **A later death proves an unseen raise** (Ultimate Kefka).
+  "alive at the mechanic" (Ultima Kefka).
+- **A later death proves an unseen raise** (Ultima Kefka).
 - **"Near the pull end" must not use -Infinity** (Usurper of Frost).
 
 ## Cutoffs (the pull's first Raid error)

@@ -236,7 +236,7 @@ const SPRAY_HOLE = 600;
 const SPRAY_MERGE = 300;
 const SHRIEK_SHOW_MS = 5000;
 
-// ── P5 Ultimate Kefka (ultimate-kefka.ts) ───────────────────────────────────
+// ── P5 Ultima Kefka (ultima-kefka.ts) ───────────────────────────────────────
 
 // Flood (49471): four waves of two lines each. Every line is first cast as
 // a 1.2s telegraph (49539, omen c1401_laser) and lands 4.6s later as 49769
@@ -249,7 +249,7 @@ const FLOOD_TELEGRAPH = 49539, FLOOD_LINE = 49769;
 const FLOOD_DELAY_MS = 4600;
 
 // Maddening Orchestra's delayed resolutions on the Surprise holders
-// (ultimate-kefka.ts): Flare Diffusion (47957, 25y) on Surprise Flare
+// (ultima-kefka.ts): Flare Diffusion (47957, 25y) on Surprise Flare
 // (1005350), Chaotic Holy (47958, a 6y stack) on Surprise Holy (1005351).
 // Their helpers sit at (100, 100), where Diffusion drew over all eight.
 

@@ -556,7 +556,7 @@ const AVOIDABLE: Record<number, Avoidable> = {
 };
 
 // FFLogs logs the death event ~2.0s after the fatal hit (same as Dancing
-// Mad; README "Lessons from Ultimate Kefka").
+// Mad; README "Lessons from Ultima Kefka").
 const DEATH_EVENT_LAG_MS = 2000;
 const DIED_FROM_HIT_MS   = 3000;
 // 5 dead at once ended every pull within 42s (P9); 4 dead was survived for

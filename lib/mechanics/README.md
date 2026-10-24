@@ -38,7 +38,7 @@ lib/mechanics/
       blackhole.ts            — tether/Earthquake mechanic
       stompies.ts             — post-Black-Hole Earthquake baits/towers
       exdeath.ts              — Phase 3 Thunder III / Shockwave
-      ultimate-kefka.ts       — Phase 5 per-pull rules (Flood, Fell Forces stacks,
+      ultima-kefka.ts         — Phase 5 per-pull rules (Flood, Fell Forces stacks,
                                 Maddening Orchestra, Celestriad towers, Stray
                                 Apocalypse, Forsaken ground, Null enrage, collapse)
       blackhole-strategy.ts   — cross-pull strategy auto-detect (DSA/SDA/Double Tether)
@@ -245,7 +245,7 @@ can also hold their own declarative rule tables and run them through
 `evaluateRuleSet()` (midnightfalls.ts does this).
 
 **2. Per-pull correlation modules** (forsaken.ts, blackhole.ts, limitcut.ts,
-stompies.ts, exdeath.ts, phase1.ts, ultimate-kefka.ts, midnightfalls.ts, entombed-sentinels.ts,
+stompies.ts, exdeath.ts, phase1.ts, ultima-kefka.ts, midnightfalls.ts, entombed-sentinels.ts,
 vashnik.ts, sszorak.ts, nekzali.ts, lost-explorers.ts, twin-fangs.ts, coiled-altar.ts, ulatek.ts) exist because they
 correlate *multiple* event streams — e.g. a stack-counter debuff against a
 specific damage tick, or positions against an assignment schedule. FFXIV

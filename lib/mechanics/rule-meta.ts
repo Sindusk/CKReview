@@ -267,12 +267,12 @@ exposure("targeted", [
   "ffxiv-kefka-says-acceleration-bomb",
 ]);
 
-// P5: Ultima Kefka (ultimate-kefka.ts)
+// P5: Ultima Kefka (ultima-kefka.ts)
 mechanic("dm-uk-choice", "Choice", 5, [
   "ffxiv-uk-choice",
   "ffxiv-uk-choice-group",
 ]);
-// Role-only splits (ultimate-kefka.ts reports the instances): the role
+// Role-only splits (ultima-kefka.ts reports the instances): the role
 // stacks test the non-tanks, the tank stack the tanks; an overlap can be
 // anyone's.
 mechanic("dm-uk-fell-forces", "Fell Forces", 5, ["ffxiv-uk-fell-forces-overlap"]);

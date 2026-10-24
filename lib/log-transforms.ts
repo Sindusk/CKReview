@@ -68,7 +68,7 @@ import { detectStompiesErrors } from "./mechanics/ffxiv/dancingmad/stompies";
 import { detectPhase1Errors } from "./mechanics/ffxiv/dancingmad/phase1";
 import { detectKefkaSaysErrors } from "./mechanics/ffxiv/dancingmad/kefka-says";
 import type { KefkaSaysStateSignal } from "./mechanics/ffxiv/dancingmad/kefka-says";
-import { detectUltimateKefkaErrors } from "./mechanics/ffxiv/dancingmad/ultimate-kefka";
+import { detectUltimaKefkaErrors } from "./mechanics/ffxiv/dancingmad/ultima-kefka";
 import { detectVampFataleErrors } from "./mechanics/ffxiv/arcadion/vamp-fatale";
 import { detectRedHotDeepBlueErrors } from "./mechanics/ffxiv/arcadion/red-hot-deep-blue";
 import { detectTyrantErrors } from "./mechanics/ffxiv/arcadion/tyrant";
@@ -1714,7 +1714,7 @@ export function transformFFightToPull(
     ...detectStompiesErrors(players, deathEvents, enemyCastEvents, blackHoleGeometry, stompiesPuddleSamples, playerPositionSamples),
     ...detectPhase1Errors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectKefkaSaysErrors(players, deathEvents, enemyCastEvents, kefkaSaysSignals, reportedOccurrences),
-    ...detectUltimateKefkaErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
+    ...detectUltimaKefkaErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectVampFataleErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectRedHotDeepBlueErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectTyrantErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),

@@ -263,10 +263,10 @@ Where the Lost Explorers model and its logs (nRGxQ1b8LdMvzC4D,
   full health and no killing blow logged. Knowing this signature up front
   saves a round of misattributed tank-death and collapse markers.
 
-## Lessons from Ultimate Kefka (Dancing Mad Phase 5)
+## Lessons from Ultima Kefka (Dancing Mad Phase 5)
 
 The model was checked against 29 Phase 5 pulls from 12 reports (see
-ultimate-kefka.ts's VERIFIED section). Its timeline, volley counts and
+ultima-kefka.ts's VERIFIED section). Its timeline, volley counts and
 nine tower positions were right, and every candidate ID mapped. Those IDs
 came from a local report's ability table, which is worth repeating. Where
 it fell short:

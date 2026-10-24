@@ -1,7 +1,7 @@
-// lib/mechanics/ffxiv/dancingmad/ultimate-kefka.ts
+// lib/mechanics/ffxiv/dancingmad/ultima-kefka.ts
 //
-// Phase 5 (Ultimate Kefka) per-pull rules for Dancing Mad. Entry point:
-// detectUltimateKefkaErrors. Self-gates on Phase 5 IDs (none of them occur
+// Phase 5 (Ultima Kefka) per-pull rules for Dancing Mad. Entry point:
+// detectUltimaKefkaErrors. Self-gates on Phase 5 IDs (none of them occur
 // in any earlier phase), so it is safe to run on every pull.
 //
 // Exposure (docs/archive/exposure-plan.md), role-only targeted: per Fell
@@ -161,9 +161,10 @@
 // to shared Fell Forces, Chaotic Holy, and anything after a tank died that
 // only happened because enmity or bait slots shifted.
 //
-// -- GUIDE-DERIVED MODEL: PHASE 5, ULTIMATE/ULTIMA KEFKA --
+// -- GUIDE-DERIVED MODEL: PHASE 5, ULTIMA KEFKA --
 // Scope: Dancing Mad (Ultimate), patch 7.51, final phase only. The game
-// calls the transformed boss "Kefka"; "Ultima Kefka" is a guide nickname.
+// calls the transformed boss "Kefka"; FFLogs names the phase "P5: Ultima
+// Kefka" (renamed from "Ultimate Kefka", user, 2026-10-24).
 // This is research for later log verification and detection, not a rule set.
 // Sources checked 2026-09-27:
 //   https://thaliak.com/ultimates/umad/ (event timeline; modified 2026-07-04)
@@ -1065,10 +1066,10 @@ function detectForsakenGround(players: PlayerInfo[], life: Life, nullT: number):
 // ── entry point ─────────────────────────────────────────────────────────────
 
 /**
- * Phase 5 (Ultimate Kefka) errors. Returns [] for pulls that never reach
+ * Phase 5 (Ultima Kefka) errors. Returns [] for pulls that never reach
  * Phase 5 (no completed Ultima Repeater cast).
  */
-export function detectUltimateKefkaErrors(
+export function detectUltimaKefkaErrors(
   players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[], occurrences?: ReportedOccurrence[],
 ): PullError[] {
   const anchor = enemyCasts.find((c) => c.abilityId === ULTIMA_REPEATER_CAST);

@@ -163,7 +163,7 @@ and delete them from the header.
 | Dancing Mad Black Hole | `lib/mechanics/ffxiv/dancingmad/blackhole.ts` | |
 | Dancing Mad Exdeath | `lib/mechanics/ffxiv/dancingmad/exdeath.ts` | see the todo above |
 | Dancing Mad Stompies | `lib/mechanics/ffxiv/dancingmad/stompies.ts` | |
-| Dancing Mad P5 Ultimate Kefka | `lib/mechanics/ffxiv/dancingmad/ultimate-kefka.ts` | |
+| Dancing Mad P5 Ultima Kefka | `lib/mechanics/ffxiv/dancingmad/ultima-kefka.ts` | |
 | FFXIV roles | `lib/mechanics/ffxiv/roles.ts` | 1 [STALE?] |
 
 ## Plans in progress or not started

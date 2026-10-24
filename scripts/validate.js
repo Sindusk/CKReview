@@ -274,12 +274,12 @@ const MECHANICS = {
     },
   },
 
-  'ultimate-kefka': {
+  'ultima-kefka': {
     game: 'ff',
     lateCapture: true, // Phase 5 only — safe on --from-minutes captures (see isLateCapture)
-    load: () => requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/ultimate-kefka.ts'),
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/ultima-kefka.ts'),
     run({ mod, ctxs }) {
-      for (const c of ctxs) printPullErrors(c, mod.detectUltimateKefkaErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts()));
+      for (const c of ctxs) printPullErrors(c, mod.detectUltimaKefkaErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts()));
     },
   },
 

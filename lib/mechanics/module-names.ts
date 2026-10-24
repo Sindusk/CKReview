@@ -14,7 +14,7 @@ const DANCING_MAD = [
   "Dancing Mad - P2 - Forsaken Kefka",
   "Dancing Mad - P3 - Exdeath & Chaos",
   "Dancing Mad - P4 - Kefka Says",
-  "Dancing Mad - P5 - Ultimate Kefka",
+  "Dancing Mad - P5 - Ultima Kefka",
 ];
 
 const FRU = [
