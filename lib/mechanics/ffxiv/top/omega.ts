@@ -121,7 +121,7 @@
 // expectations/rulings.json. Findings:
 // - Pulls 20, 21, 32: silent deaths at 0:04-0:19, before the first towers,
 //   were a reset after a cooldown was burned (Pull 21: only four died and
-//   the rest played on into an empty tower). Not pulls.
+//   the rest played on into an empty tower; confirmed). Not pulls.
 // - C28 1:57.8: the GNB died at the wall still holding Flame Thrower's
 //   Damage Down (20.2s after it) and was raised: deliberate, "the correct
 //   thing to do".

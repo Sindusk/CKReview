@@ -113,8 +113,10 @@
 // VOD review 2026-10-23 (user): report D Pulls 66, 72; rulings in
 // expectations/rulings.json.
 // Report E = LG64YVQy2KZbtpN8 (the user's static, day 2; omega.ts's
-// report C). VOD review 2026-10-24 (user): Pulls 11, 29, 31, 40; rulings in
-// expectations/rulings.json.
+// report C). VOD review 2026-10-24 (user): Pulls 11, 29, 31, 40, then 28,
+// 33 (the Fire-sharing partner confirmed both times: E28's DNC toward the
+// wall instead of near the centre line, plus the GNB; E33's DNC overlapping
+// the MNK); rulings in expectations/rulings.json.
 // - The Party Synergy order is the Pantokrator conga (SGE RDM SAM GNB DRK
 //   MNK DNC SCH, user); the 27 clean pairs alone tie 42 orders, so
 //   synergy-order.ts lets the conga pick.
