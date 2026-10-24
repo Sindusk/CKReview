@@ -20,13 +20,25 @@
 // held the Confiteor chain for P2); P4 under 25% at +859.5, 17.35% at the
 // final Upsurge (+868.4).
 //
-// The end of P3 is a hold: groups stop attacking at Stompies, with both
-// bosses low, to time the transition so cooldowns are back for P4 (user,
-// 2026-10-08: "This is common"). The P3 pool is fixed, so the hold costs
-// nothing. Forced from Stompies' start marker (Kefka's Earthquake just
-// before Exdeath's Blizzard III bait, stompies.ts) to the end of P3. On
-// 2T1HzdPKgbhM43am fight 10 the marker is +694.3 and players' last hits
-// fall +691-703, with Chaos at 0.4% and Exdeath at 2%.
+// The end of P3 is a hold: groups slow down with both bosses low, so the
+// transition comes later and cooldowns are back for P4 (user, 2026-10-08:
+// "This is common"). P4 starts 5-6s after the second boss dies (12:05-12:18
+// across 10 pulls), and the deadline is Exdeath's Meteor, the Phase 3
+// enrage (exdeath.ts): cast P3 +302.2s (gTkMH91DWRmLbNCn pull 11; P3 itself
+// starts at 7:08.1-7:09.2). The P3 pool is fixed, so holding costs nothing
+// while the kill stays safe.
+//
+// When it's safe (user, 2026-10-24, measured on gTkMH91DWRmLbNCn,
+// 2T1HzdPKgbhM43am, qjCMx4bRfgNKwX9T, yBKPqGwHparm7Tk4): a moment is a hold
+// when the bosses' combined HP left ÷ seconds to Meteor is at most 35% of
+// the raid's own P3 DPS (their first 200s of P3), never before Kefka's last
+// slam, Look upon Me and Despair (47854, 11:31.4-11:32.4 in every pull),
+// "right before Stompies begins". Re-checked every 0.5s: a raid that holds
+// so long it falls behind is back to counted time. A pull that ends in
+// Meteor has no hold. Thresholds tried: 60% read gTkMH91DWRmLbNCn pull 11
+// (Meteor) as safe from 11:23; 50% and 40% started too early (from 10:42);
+// at 35% the starts fall 11:17-12:03 before the floor. The fixed Stompies
+// marker this replaced counted this group's holds from ~11:32 as losses.
 //
 // Forced downtime: the transitions and untargetable stretches come from
 // the engine's log-inferred raid downtime. Per-player busy windows (tower
@@ -90,9 +102,60 @@ const TRINE_CHAIN_MS = 3_000;
 const TRINE_BEFORE_MS = 1_500;
 const TRINE_AFTER_MS = 1_000;
 
-const EARTHQUAKE = 47866;          // Stompies' start marker when Kefka casts it
+const LAST_SLAM = 47854;           // Look upon Me and Despair, the hold's floor
 const STOMPIES_BAIT = 47887;       // Exdeath's Blizzard III bait, Stompies wave 1
-const MARKER_LOOKBACK_MS = 15_000;
+const SLAM_LOOKBACK_MS = 20_000;   // the slam is ~9s before the bait
+const METEOR = 50718;
+const METEOR_AFTER_P3_MS = 302_200;
+const P3_DPS_SPAN_MS = 200_000;
+const HOLD_SAFE_SHARE = 0.35;
+const HOLD_STEP_MS = 500;
+
+/** Late-P3 hold windows: see the header ("When it's safe"). */
+function p3HoldWindows(pull: Parameters<DamageContext["forcedWindows"]>[0]): ForcedWindow[] {
+  if (pull.players.some((p) => p.damageTaken.some((e) => e.abilityId === METEOR))) return [];
+  const casts = pull.enemyCasts ?? [];
+  const out: ForcedWindow[] = [];
+  for (const span of phaseSpans(pull, 3)) {
+    const bait = casts.find((e) => e.abilityId === STOMPIES_BAIT && e.timestamp >= span.startMs && e.timestamp <= span.endMs);
+    if (!bait) continue;
+    const slam = casts.filter((e) => e.abilityId === LAST_SLAM && e.timestamp <= bait.timestamp
+      && e.timestamp >= bait.timestamp - SLAM_LOOKBACK_MS).pop();
+    const floor = slam?.timestamp ?? bait.timestamp;
+    const hits = pull.players
+      .flatMap((p) => p.damageDone)
+      .filter((e) => (e.target === "Exdeath" || e.target === "Chaos") && e.timestamp >= span.startMs && e.timestamp <= span.endMs)
+      .sort((a, b) => a.timestamp - b.timestamp);
+    const p3Dps = hits.filter((e) => e.timestamp < span.startMs + P3_DPS_SPAN_MS)
+      .reduce((s, e) => s + (e.amount ?? 0), 0) / (P3_DPS_SPAN_MS / 1000);
+    if (p3Dps <= 0) continue;
+    const deadline = span.startMs + METEOR_AFTER_P3_MS;
+    const hp = new Map<string, number>();
+    for (const e of hits) if (e.maxHealth && !hp.has(e.target)) hp.set(e.target, e.maxHealth);
+    let i = 0;
+    let open: number | undefined;
+    for (let t = span.startMs; t <= span.endMs; t += HOLD_STEP_MS) {
+      for (; i < hits.length && hits[i].timestamp <= t; i++) {
+        if (hits[i].healthAfter !== undefined) hp.set(hits[i].target, hits[i].healthAfter!);
+      }
+      const left = [...hp.values()].reduce((s, v) => s + v, 0);
+      const safe = t >= floor && (left === 0 || (deadline > t && left / ((deadline - t) / 1000) <= HOLD_SAFE_SHARE * p3Dps));
+      if (safe && open === undefined) open = t;
+      if (!safe && open !== undefined) { out.push({ startMs: open, endMs: t, cause: HOLD_CAUSE }); open = undefined; }
+    }
+    if (open !== undefined) out.push({ startMs: open, endMs: span.endMs, cause: HOLD_CAUSE });
+  }
+  // A dip under a few seconds is one hit's HP step, not the raid falling
+  // behind (2T1HzdPKgbhM43am pull 1 12:07.1-12:07.6).
+  return out.reduce<ForcedWindow[]>((merged, w) => {
+    const last = merged[merged.length - 1];
+    if (last && w.startMs - last.endMs < HOLD_GAP_MERGE_MS) last.endMs = w.endMs;
+    else merged.push({ ...w });
+    return merged;
+  }, []);
+}
+const HOLD_GAP_MERGE_MS = 3_000;
+const HOLD_CAUSE = "end-of-P3 hold for P4 timing (bosses safe to kill before Meteor)";
 
 export const DANCING_MAD_DAMAGE_CONTEXT: DamageContext = {
   encounter: "Dancing Mad",
@@ -119,15 +182,7 @@ export const DANCING_MAD_DAMAGE_CONTEXT: DamageContext = {
         if (crossed !== undefined) out.push({ startMs: crossed, endMs: span.endMs, cause: `P${phase} check passed: Kefka ${reached}` });
       }
     }
-    // The end-of-P3 hold, from Stompies' start to the end of the phase.
-    const casts = pull.enemyCasts ?? [];
-    for (const span of phaseSpans(pull, 3)) {
-      const bait = casts.find((e) => e.abilityId === STOMPIES_BAIT && e.timestamp >= span.startMs && e.timestamp <= span.endMs);
-      if (!bait) continue;
-      const marker = casts.filter((e) => e.abilityId === EARTHQUAKE && e.actorName === "Kefka"
-        && e.timestamp <= bait.timestamp && e.timestamp >= bait.timestamp - MARKER_LOOKBACK_MS).pop();
-      out.push({ startMs: marker?.timestamp ?? bait.timestamp, endMs: span.endMs, cause: "end-of-P3 hold for P4 timing (Stompies)" });
-    }
+    out.push(...p3HoldWindows(pull));
     return out;
   },
   movementWindows: (pull) => [
