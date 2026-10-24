@@ -10,7 +10,11 @@
 //   - Dance of the Dawn, Finishing Move, Starfall Dance and Tillana once
 //     each, and four Last Dance / Saber Dance (three when the window has
 //     no filler: out of Esprit, one Fountainfall is allowed). A missing
-//     one is its average minus the GCD used instead.
+//     one is its average minus the GCD used instead. The opener's window
+//     expects only the Last Dances its pre-pull dance allows plus the
+//     Saber Dances pressed, and allows fillers for the rest (openerSabers;
+//     user, 2026-10-24, gTkMH91DWRmLbNCn: the party's Esprit and the
+//     pre-pull Technical Step cap it). xivanalysis expects 3-4 there.
 //   - one Fan Dance IV, valued at its average × 5% (used outside instead).
 //   - no combo or proc fillers (Cascade, Fountain, Reverse Cascade,
 //     Windmill, Bladeshower, Rising Windmill; Fountainfall and Bloodshower
@@ -190,7 +194,31 @@ const SABERS_EXPECTED = 4;
 // likely ran out of Esprit, so it is allowed one Fountainfall in place of
 // the fourth Saber Dance. qjCMx4bRfgNKwX9T kill: 0:02, 4:03, 8:03, 10:03
 // each had 3 Sabers and a Fountainfall (its 3/3).
-const sabersExpected = (casts: PlayerEvent[]) => {
+// The opener's window (it opens with the pull, Esprit at 0) can't hold
+// four (user, 2026-10-24): Saber Dances are capped by the Esprit the party
+// builds in its first 20s, a gauge the log doesn't show, and the Last
+// Dances by the pre-pull dance: one from the first Finishing Move, a
+// second only after a pre-pull Standard Step (a Standard Finish before the
+// first Standard Step). So it expects those Last Dances plus the Saber
+// Dances pressed, and the slots left are fillers it allows. Openers on
+// disk (Technical Finish in the first 8s, level 100): pre-pull Technical
+// and no pre-pull Standard, gTkMH91DWRmLbNCn: 1 Last Dance in all 13 pulls,
+// Saber Dances 2 in 11, 3 in pull 3, 1 in pulls 8 and 12; Technical in the
+// pull with no pre-pull Standard (AYQm, jN3X): 1 Last Dance, 1-2 Saber
+// Dances; with a pre-pull Standard (9d6Q, xydW, L9Bz, Xk2D): 2 Last Dances.
+const OPENER_WINDOW_MS = 8_000;
+const STANDARD_FINISH_IDS = new Set(ids("STANDARD_FINISH", "SINGLE_STANDARD_FINISH", "DOUBLE_STANDARD_FINISH"));
+const openerSabers = (casts: PlayerEvent[], all: PlayerEvent[]): number | undefined => {
+  if (casts.length === 0 || casts[0].timestamp > OPENER_WINDOW_MS) return undefined;
+  const firstStep = all.find((c) => c.abilityId === A.STANDARD_STEP?.id);
+  const preStandard = all.some((c) => STANDARD_FINISH_IDS.has(c.abilityId) && c.timestamp <= OPENER_WINDOW_MS &&
+    (firstStep === undefined || c.timestamp < firstStep.timestamp));
+  const saberDances = casts.filter((c) => c.abilityId === A.SABER_DANCE.id).length;
+  return Math.min(SABERS_EXPECTED, (preStandard ? 2 : 1) + saberDances);
+};
+const sabersExpected = (casts: PlayerEvent[], all: PlayerEvent[]) => {
+  const opener = openerSabers(casts, all);
+  if (opener !== undefined) return opener;
   const fillers = new Set(ids(...TECH_FILLERS)), sabers = new Set(ids(...SABERS));
   const got = casts.filter((c) => sabers.has(c.abilityId)).length;
   return got < SABERS_EXPECTED && !casts.some((c) => fillers.has(c.abilityId)) ? SABERS_EXPECTED - 1 : SABERS_EXPECTED;
@@ -273,7 +301,7 @@ const technical: JobCheck = (ctx) => burstWindowFindings(ctx, {
   expected: (c, casts): ExpectedAction[] => [
     ...TECH_EXPECTED.map(([key, count]) => ({ ids: ids(key), count, name: A[key].name, value: replacedGcd(key) })),
     ...(c.level === undefined
-      ? [{ ids: ids(...SABERS), count: sabersExpected(casts), name: "Last Dance / Saber Dance", value: replacedGcd("SABER_DANCE") }] : []),
+      ? [{ ids: ids(...SABERS), count: sabersExpected(casts, c.player.casts), name: "Last Dance / Saber Dance", value: replacedGcd("SABER_DANCE") }] : []),
     { ids: ids("FAN_DANCE_IV"), count: 1, name: "Fan Dance IV" },
   ],
 });
@@ -288,10 +316,13 @@ const technicalFillers: JobCheck = (ctx): DamageFinding[] => {
   for (const w of statusWindows(ctx, S.TECHNICAL_FINISH.id)) {
     if (w.endMs > ctx.endMs || w.startMs + TECH_SPAN_MS > ctx.endMs) continue;
     const casts = ctx.player.casts.filter((c) => c.timestamp >= w.startMs && c.timestamp <= w.endMs);
-    const shortfall = Math.max(0, sabersExpected(casts) - casts.filter((c) => sabers.has(c.abilityId)).length);
+    const expectedSabers = sabersExpected(casts, ctx.player.casts);
+    const shortfall = Math.max(0, expectedSabers - casts.filter((c) => sabers.has(c.abilityId)).length);
+    // The opener's slots its Esprit and pre-pull dance couldn't fill.
+    const openerAllowance = openerSabers(casts, ctx.player.casts) !== undefined ? SABERS_EXPECTED - expectedSabers : 0;
     const used = ctx.uses.filter((u) => u.startMs >= w.startMs && u.startMs <= w.endMs + 100 && fillers.has(u.action.id))
       .sort((a, b) => ctx.values.perUse(b.action.id) - ctx.values.perUse(a.action.id))
-      .slice(shortfall);
+      .slice(shortfall + openerAllowance);
     if (used.length === 0) continue;
     const lost = used.reduce((a, u) => a + Math.max(0, saber - ctx.values.perUse(u.action.id)), 0);
     const during = forcedPart(w.startMs, w.endMs, ctx.forced);
