@@ -136,6 +136,24 @@
 //   last (0.5s before), while the GNB kept theirs: the DNC should have
 //   flexed to the GNB's.
 // - C23 0:56.1: both holders together, both at an intercardinal: both named.
+// Report D = hjgk42MDf81arFVY (the user's static, day 3, 47 pulls, same
+// roster and conga). VOD review 2026-10-28 (user): Pulls 1, 2, 8, 36 here
+// (5, 6, 15, 17, 18, 22, 32, 33, 37, 42, 45 in omega-mf.ts); rulings in
+// expectations/rulings.json. Findings:
+// - Diffuse is now taken by both tanks under invulns (the GNB's Superbolide
+//   ~0.9s before the first cone lands, the DRK's Living Dead): D1 1:47.6 and
+//   D8 1:48.0 the Superbolide went up 0.5s before and didn't apply, and the
+//   GNB died (LG64YVQy2KZbtpN8 Pull 17: 0.4s).
+// - Pantokrator deaths: a player dead at set 1, 2 or 3 leaves their group
+//   short, and the later lines kill the two sharing (or a dead carrier's
+//   missile lands on someone; both of D47's set-3 missiles went to the
+//   DRK). "If it's on the fourth one, it's recoverable" (user, D2). With a
+//   raise in time, or the short sets killing nobody, raids carried on (D26,
+//   D45, C26, C42, C46 all cleared P1).
+// - Tether hand-offs pair by the conga: the earlier new holder takes the
+//   earlier previous holder's tether (247 of 254 clean hand-offs over B, C
+//   and D). D36 0:38.1: the MNK took the DNC's, the SCH's by the pairing,
+//   leaving the RDM's; the SCH then took it from the MNK. User: the MNK.
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-top1-avoidable (Major on Damage Down or death, else Minor): Flame
@@ -167,13 +185,19 @@
 //   B4, B6, B12, B15). A holder who kept last round's tether isn't named.
 //   Both In Line players in one Blaster while another stayed on last
 //   round's holder (no take): the later taker ("Took Another's Tether";
-//   user, C45). "Died From a Blaster Clip" (Major): a player named for
+//   user, C45); pantokrator-conga.ts moves it to the first taker when the
+//   conga pairing gave them the tether left behind (user, D36). "Died From a Blaster Clip" (Major): a player named for
 //   standing in a Blaster who died at their own next tower/tether within
 //   Ruin's 11s, unless that round already names them (user, C34, C38).
 // ffxiv-top1-tower "Tower Out of Turn" skips a player with no duty that
 //   round who covered for a tower owner stuck in a Blaster (user, B44).
 // ffxiv-top1-missile (Major on death, else Minor): a missile hitting
 //   others (the carrier; with one other, both), or the carrier in a line.
+//   One per carrier and set (a dead carrier's missile can land on the other).
+// ffxiv-top1-line "Pantokrator One Short" (Raid, player-less): a player
+//   alive at Pantokrator but dead at set 1, 2 or 3, when a later set's line
+//   or missile then killed someone, not in a P1 clear; at their fatal hit
+//   (user, D2).
 // ffxiv-top1-line, groups broken: a group holding both players of an In
 //   Line number (Major, both named; the conga keeps the one who didn't
 //   flex) plus a Raid cutoff at the first set, and no line errors after
@@ -189,7 +213,8 @@
 // ffxiv-top1-diffuse (Major on death, else Minor), both tanks alive: the
 //   farthest non-tank a cone hit, and a tank no cone reached. A tank the
 //   cones killed had no invuln ("Tank Cones Without Invuln", Major; Raid
-//   when the next cones killed 3+; user, B51).
+//   when the next cones killed 3+; user, B51); an invuln cast up to 3s
+//   before their first cone is named as too late (user, D1).
 // ffxiv-top1-wave-cannon: a line hitting 2+ players, all six non-tanks
 //   alive (everyone it hit named: the log can't say who moved).
 // ffxiv-top1-wall (Major): a silent death no Doom, missile, reset or own
@@ -423,7 +448,7 @@ import type { PullError, EnemyEvent } from "@/types/PullError";
 import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
 import type { Tether } from "@/types/Pull";
 import { interpolatePlayerPosition } from "@/lib/mechanics/player-position";
-import { kFmt, yd, joinNames, playerError, raidMarker, clusterByGap } from "@/lib/mechanics/wow/common";
+import { kFmt, yd, joinNames, playerError, raidMarker, clusterByGap, RAID_MARKER_SORT_OFFSET_MS } from "@/lib/mechanics/wow/common";
 import {
   DAMAGE_DOWN, DEATH_EVENT_LAG_MS, PREVIEW_AMOUNT, type Hit, type Life,
   bodyHit, buildLife, castsOf, gotAura, uniq, namesOf, isTank, realAmount, allAlive, resetCluster,
@@ -464,6 +489,9 @@ const MISSILE      = 31502; // Guided Missile Kyrios (cast target = its carrier)
 const LINE         = 31503; // Condensed Wave Cannon Kyrios, a three-player shared line
 const LINE_MARKS   = [1003507, 1003508, 1003509, 1003510]; // the line's aimed player, per set
 const DIFFUSE      = 31504;
+// Tank invulns, for when one went up too late for the first cone
+// (Superbolide, Living Dead, Holmgang, Hallowed Ground).
+const INVULNS: Record<number, string> = { 16152: "Superbolide", 3638: "Living Dead", 43: "Holmgang", 30: "Hallowed Ground" };
 const WAVE_CANNON  = 31505;
 const ATOMIC_RAY   = 31480;
 // Phase 2's opening casts (Party Synergy, Firewall, Solar Ray). Every
@@ -520,6 +548,13 @@ function numbersIn(players: PlayerInfo[], from: number, to: number): Map<PlayerI
     }
   }
   return out;
+}
+
+/** Program Loop's In Line numbers by name, for the cross-pull tether pairing (pantokrator-conga.ts). */
+export function readLoopNumbers(players: PlayerInfo[], enemyCasts: EnemyEvent[]): Map<string, number> | undefined {
+  const loop = castsOf(enemyCasts, PROGRAM_LOOP, Infinity)[0];
+  if (!loop) return undefined;
+  return new Map([...numbersIn(players, loop.timestamp, loop.timestamp + 10_000)].map(([p, n]) => [p.name, n]));
 }
 
 /** Living players hit by this cast's own instance (casts reuse instances across rounds). */
@@ -825,9 +860,11 @@ function blasterClips(
     if (both && left) {
       const [first, later] = [...hPlayers].sort((a, b) => lastTake(a) - lastTake(b));
       const stuckOn = left.hit.find((p) => num.get(p) === hPrev)!;
+      // pantokrator-conga.ts moves it to the first taker when the conga
+      // says theirs was the tether left behind (user, Pull 36).
       errors.push(playerError(later, {
-        ruleId: TOP1_BLASTER_RULE_ID, severity: roundDoomed ? "Major" : "Minor", name: "Took Another's Tether",
-        description: `Round ${rd.r}: took ${first.name}'s tether ${((rd.t - lastTake(later)) / 1000).toFixed(1)}s before the Blaster instead of ${stuckOn.name}'s, which stayed put.${roundDoomed ? " Doom followed." : ""} ${BLASTER_WHY}`,
+        ruleId: TOP1_BLASTER_RULE_ID, severity: roundDoomed ? "Major" : "Minor", name: TOOK_ANOTHERS_NAME,
+        description: `Round ${rd.r}: took ${first.name}'s tether ${((rd.t - lastTake(later)) / 1000).toFixed(1)}s before the Blaster instead of ${stuckOn.name}'s, which ${STAYED_PUT}.${roundDoomed ? " Doom followed." : ""} ${BLASTER_WHY}`,
         timestamp: rd.t, abilityId: BLASTER, abilityName: "Blaster",
       }));
       flexed.add(both);
@@ -1092,6 +1129,10 @@ export function readProgramLoop(players: PlayerInfo[], deathEvents: DeathEvent[]
   });
 }
 
+/** Both holders on one tether, the other left behind (pantokrator-conga.ts picks who by the conga). */
+export const TOOK_ANOTHERS_NAME = "Took Another's Tether";
+export const STAYED_PUT = "stayed put";
+
 /** The error both players of a same-number pair get (pantokrator-conga.ts narrows it to one). */
 export const SAME_SIDE_NAME = "Same Number, Same Side";
 
@@ -1127,9 +1168,14 @@ function detectPantokrator(players: PlayerInfo[], life: Life, deaths: DeathEvent
     const inLine = (p: PlayerInfo) => s.lines.some((l) => l.hit.includes(p));
     const carriers = players.filter((p) => num.get(p) === s.k);
 
+    // A dead carrier's missile goes off on someone else, sometimes the other
+    // carrier (hjgk42MDf81arFVY Pull 47 1:33.4: both cast at the DRK): one
+    // error per carrier and set.
+    const named = new Set<PlayerInfo>();
     for (const m of s.missiles) {
       const carrier = m.hit.find((p) => p.name === m.c.target) ?? carriers.find((p) => m.hit.includes(p));
-      if (!carrier || !life.alive(carrier, s.t - 500)) continue;
+      if (!carrier || !life.alive(carrier, s.t - 500) || named.has(carrier)) continue;
+      named.add(carrier);
       const others = m.hit.filter((p) => p !== carrier);
       const stayed = inLine(carrier);
       // Still in the line stack with the missile: a share of the line plus
@@ -1237,7 +1283,45 @@ function detectPantokrator(players: PlayerInfo[], life: Life, deaths: DeathEvent
     }
     errors.push(...firstPer(lineErrors, (e) => `${e.player}`));
   }
+
+  // A player dead at any set but the fourth leaves their group short for
+  // the rest: the lines then kill the two left sharing them, or a dead
+  // carrier's missile lands on someone (user, 2026-10-28, hjgk42MDf81arFVY
+  // Pull 2 1:25.8: "it depends on what set it's on. If it's on the fourth
+  // one, it's recoverable"). Gated on the outcome: a later set killed
+  // someone. Raised in time, or the short sets killing nobody, the raid
+  // carried on (Pulls 26 and 45 there, LG64YVQy2KZbtpN8 Pulls 26, 42 and 46
+  // all reached P2). The death is the cutoff. Not in a P1 clear
+  // (LG64YVQy2KZbtpN8 Pull 42: the RDM missed sets 3-4, the set-4 line
+  // killed the SGE, both were raised and P1 cleared).
+  const pantoT = castsOf(casts, PANTOKRATOR, end)[0]?.timestamp;
+  const present = pantoT === undefined ? [] : players.filter((p) => life.alive(p, pantoT));
+  const cleared = casts.some((c) => P2_CASTS.includes(c.abilityId));
+  if (present.length === players.length && !doubled.length && !cleared) {
+    for (const [k, s] of sets.slice(0, 3).entries()) {
+      const missing = present.filter((p) => !life.alive(p, s.t - 500));
+      if (!missing.length) continue;
+      const victims = uniq(sets.slice(k).flatMap((x) => [...x.lines, ...x.missiles]
+        .flatMap((l) => l.hit.filter((p) => !missing.includes(p) && life.diedFrom(p, x.t)))));
+      if (victims.length) {
+        const fatal = Math.min(...missing.map((p) => fatalHitT(p, life, s.t)));
+        errors.push(raidMarker(TOP1_LINE_RULE_ID, "Pantokrator One Short",
+          `${namesOf(missing)} died before set ${s.k}, so their group was short for the rest of Pantokrator; ${namesOf(victims)} died to the later sets. A set short before the fourth is unrecoverable; treated as the cutoff.`,
+          fatal + RAID_MARKER_SORT_OFFSET_MS, LINE, "Condensed Wave Cannon Kyrios"));
+      }
+      break;
+    }
+  }
   return errors;
+}
+
+/** When the hit that killed `p` (dead at `t`) landed: their last real hit before that death, else the death minus the log's lag. */
+function fatalHitT(p: PlayerInfo, life: Life, t: number): number {
+  const w = life.outIntervals.find((x) => x.p === p && t >= x.start && t < x.end);
+  const deathT = w ? w.start + 100 + DEATH_EVENT_LAG_MS : t;
+  const hit = p.damageTaken.filter((e) => !bodyHit(e) && e.timestamp <= deathT && deathT - e.timestamp <= DEATH_EVENT_LAG_MS + 1500)
+    .sort((a, b) => b.timestamp - a.timestamp)[0];
+  return hit?.timestamp ?? deathT - DEATH_EVENT_LAG_MS;
 }
 
 // ── the final volley: Diffuse and Wave Cannon Kyrios ────────────────────────
@@ -1269,9 +1353,18 @@ function detectDiffuse(players: PlayerInfo[], life: Life, deaths: DeathEvent[], 
       const later = volleys.filter((w) => w[0].timestamp > t).flatMap((w) => w.flatMap((c) => instanceHits(players, life, c, 1000)));
       const victims = uniq(later.filter((x) => !fallen.includes(x.p) && life.diedFrom(x.p, x.e.timestamp)).map((x) => x.p));
       for (const p of fallen) {
+        // An invuln pressed just before the cone didn't apply in time
+        // (user, 2026-10-28, hjgk42MDf81arFVY Pull 1 1:47.6: the GNB's
+        // Superbolide 0.5s before the first cone landed; Pull 8 the same;
+        // 0.9s before in the clean pulls, which took 0).
+        const firstHit = hits.filter((x) => x.p === p).reduce((m, x) => Math.min(m, x.e.timestamp), Infinity);
+        const late = p.casts.filter((c) => INVULNS[c.abilityId] && c.timestamp <= firstHit && firstHit - c.timestamp <= 3000).pop();
+        const why = late
+          ? `${INVULNS[late.abilityId]} went up ${((firstHit - late.timestamp) / 1000).toFixed(1)}s before the first cone landed, too late to apply.`
+          : "Died to Diffuse Wave Cannon Kyrios with no invuln up.";
         errors.push(playerError(p, {
           ruleId: TOP1_DIFFUSE_RULE_ID, severity: victims.length >= 3 ? "Raid" : "Major", name: "Tank Cones Without Invuln",
-          description: `Died to Diffuse Wave Cannon Kyrios with no invuln up.${victims.length ? ` The later cones went to the party and killed ${namesOf(victims)}.` : ""}`,
+          description: `${why}${victims.length ? ` The later cones went to the party and killed ${namesOf(victims)}.` : ""}`,
           timestamp: t, abilityId: DIFFUSE, abilityName: "Diffuse Wave Cannon Kyrios",
         }));
       }

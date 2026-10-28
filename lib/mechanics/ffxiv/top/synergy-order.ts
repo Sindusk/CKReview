@@ -23,7 +23,9 @@
 // the best fits are kept. omega-mf.ts names both partners; here the one
 // in the wrong row or stack keeps the error and the other is dropped. Left
 // as is when the report gives no order, the best orders disagree on the
-// pair, or the pull's rows don't place the pair.
+// pair, or the pull's rows don't place the pair. The order also places the
+// raid's own Fire spots (learnSlots), which name who moved into a Fire
+// overlap.
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
@@ -39,7 +41,11 @@ export type SynergyOrder = {
   /** Clean pairs seen with a known eye side, and how many the orders fit. */
   pairs: number;
   fits: number;
+  /** The raid's own Fire spots in the eye's frame, learned from clean players (see learnSlots). */
+  slots?: Map<string, Pt>;
 };
+
+type Pt = { lat: number; al: number };
 
 type PullLike = { players: PlayerInfo[]; deathEvents: DeathEvent[]; enemyCasts: EnemyEvent[]; headMarkers?: HeadMarker[] };
 
@@ -161,7 +167,88 @@ export function learnSynergyOrder(pulls: PullLike[], conga?: PantokratorConga): 
     const fit = best.filter((o) => same(o, line) || same(o, [...line].reverse()));
     if (fit.length) best = fit;
   }
-  return { orders: best, byName, pairs: obs.length, fits: bestFit };
+  const so: SynergyOrder = { orders: best, byName, pairs: obs.length, fits: bestFit };
+  so.slots = learnSlots(reads.map(({ p, read }) => ({ read, expRow: expectedRows(read, p.players, so) })));
+  return so;
+}
+
+// ── the raid's own Fire spots ───────────────────────────────────────────────
+//
+// Each player's Fire position in the eye's frame: `lat` the distance off
+// the laser's line toward their own row's side, `al` along it with the eye
+// end positive. Each spot is keyed by glitch and rank from the eye (Mid:
+// X S O T on both rows; Remote: the late row T S O X). The user's static
+// (hjgk42MDf81arFVY, LG64YVQy2KZbtpN8; the user's cheat sheet, 2026-10-28):
+// Mid ~12y off the line at +-5y (square, circle) and +-14y (cross,
+// triangle); Remote's square and circle at the wall (~18y off, +-5y),
+// cross and triangle 12-15y off at +-13-15y. Clean players stood within
+// 3.6y of theirs (90th percentile, 91 players).
+
+const SLOT_MIN_CLEAN = 5;
+// A pull whose clean players sit further than this from the learned spots
+// (median) has its frame wrong: no verdict (hjgk42MDf81arFVY Pull 6: ~10y;
+// Pull 33's 3.1y read right).
+const FRAME_FIT = 400;
+// A Fire overlap: the member who moved this far toward the other from their
+// own spot crowded them; one who moved less than OVERLAP_STILL stayed put
+// (user, 2026-10-28, hjgk42MDf81arFVY: Pull 15 the DNC 4.4y toward, the SCH
+// -0.4y; Pull 18 the SAM 1.9y and the MNK 3.8y toward the SCH, who moved
+// 0.5y; Pull 33 the DRK 3.3y toward the SCH, 0.3y).
+const OVERLAP_MOVED = 150;
+const OVERLAP_STILL = 100;
+
+const slotKey = (read: SynergyRead, rank: number) => `${read.remote ? "R" : "M"}${rank}`;
+
+/** The expected row (0 = early) of every pair member, by the order. */
+function expectedRows(read: SynergyRead, players: PlayerInfo[], so: SynergyOrder): Map<string, 0 | 1> {
+  const key = keyer(players, so.byName);
+  const exp = new Map<string, 0 | 1>();
+  for (const [a, b] of read.pairs) {
+    const e = earlier(so, key(a), key(b));
+    if (e === undefined) continue;
+    exp.set(a, e ? 0 : 1);
+    exp.set(b, e ? 1 : 0);
+  }
+  return exp;
+}
+
+/** The pull's eye frame: each player's point and spot rank, oriented by the clean players' sides and ranks. */
+function eyeFrame(read: SynergyRead, exp: Map<string, 0 | 1>): { pt: (n: string) => Pt; rank: (n: string) => number; names: string[] } | undefined {
+  const u = read.axis;
+  if (!u) return undefined;
+  const lat = (q: { x: number; y: number }) => u.x * (q.y - 10000) - u.y * (q.x - 10000);
+  const al = (q: { x: number; y: number }) => u.x * (q.x - 10000) + u.y * (q.y - 10000);
+  const names = [...read.firePos.keys()].filter((n) => exp.has(n) && read.symbol.has(n));
+  const rank = (n: string) => (read.remote && exp.get(n) === 1 ? RANK_REVERSED : RANK_FROM_EYE)[read.symbol.get(n)!];
+  const clean = names.filter((n) => read.clean.has(n));
+  const voters = clean.length >= 4 ? clean : names;
+  const side = Math.sign(voters.reduce((a, n) => a + (exp.get(n) === 0 ? 1 : -1) * Math.sign(lat(read.firePos.get(n)!)), 0));
+  if (!side) return undefined;
+  const misfit = (end: number) => voters.reduce((a, n) => a + Math.abs(al(read.firePos.get(n)!) * end - (1.5 - rank(n)) * SPOT_SPACING), 0);
+  const end = misfit(1) <= misfit(-1) ? 1 : -1;
+  return {
+    names, rank,
+    pt: (n) => {
+      const q = read.firePos.get(n)!;
+      return { lat: lat(q) * (exp.get(n) === 0 ? side : -side), al: al(q) * end };
+    },
+  };
+}
+
+function learnSlots(reads: { read: SynergyRead; expRow: Map<string, 0 | 1> }[]): Map<string, Pt> | undefined {
+  const seen = new Map<string, Pt[]>();
+  for (const { read, expRow } of reads) {
+    const f = eyeFrame(read, expRow);
+    if (!f) continue;
+    for (const n of f.names.filter((x) => read.clean.has(x))) {
+      const k = slotKey(read, f.rank(n));
+      seen.set(k, [...(seen.get(k) ?? []), f.pt(n)]);
+    }
+  }
+  const med = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
+  const slots = new Map<string, Pt>();
+  for (const [k, ps] of seen) if (ps.length >= SLOT_MIN_CLEAN) slots.set(k, { lat: med(ps.map((p) => p.lat)), al: med(ps.map((p) => p.al)) });
+  return slots.size ? slots : undefined;
 }
 
 /** True when every best order puts `a` before `b`, false when every one puts it after. */
@@ -267,14 +354,44 @@ export function applySynergyOrder(
       }
     }
   }
+  // Fire overlaps inside one row: whoever moved toward the other from
+  // their own spot (the raid's learned spots) crowded them; the one who
+  // stayed put is dropped.
+  const moved = new Map<string, string>();
+  const frame = so.slots && eyeFrame(read, expRow);
+  const slotOf = (n: string) => frame && so.slots!.get(slotKey(read, frame.rank(n)));
+  const devOf = (n: string) => { const s = slotOf(n), q = frame!.pt(n); return s ? Math.hypot(q.lat - s.lat, q.al - s.al) : NaN; };
+  const cleanDevs = frame ? frame.names.filter((n) => read.clean.has(n)).map(devOf).filter((d) => !Number.isNaN(d)).sort((a, b) => a - b) : [];
+  if (frame && cleanDevs.length >= 3 && cleanDevs[Math.floor(cleanDevs.length / 2)] <= FRAME_FIT) {
+    const fireErr = (n: string) => errors.find((e) => e.ruleId === TOP2_FIRE_RULE_ID && e.name === "Fire Overlap" && e.player === n && !drop.has(e) && !narrowed.has(e));
+    for (const g of fireGroups(players, read.fireT)) {
+      const named = g.map((p) => p.name).filter((n) => fireErr(n) && slotOf(n));
+      if (named.length < 2) continue;
+      // How far n moved from their spot toward each other member's spot.
+      const toward = (n: string, m: string) => {
+        const s = slotOf(n)!, t = slotOf(m)!, q = frame.pt(n);
+        const d = Math.hypot(t.lat - s.lat, t.al - s.al);
+        return d ? ((q.lat - s.lat) * (t.lat - s.lat) + (q.al - s.al) * (t.al - s.al)) / d : 0;
+      };
+      const most = new Map(named.map((n) => [n, Math.max(...named.filter((m) => m !== n).map((m) => toward(n, m)))]));
+      const crowders = named.filter((n) => most.get(n)! >= OVERLAP_MOVED);
+      const still = named.filter((n) => most.get(n)! < OVERLAP_STILL);
+      if (!crowders.length || crowders.length + still.length !== named.length || !still.length) continue;
+      for (const n of named) {
+        if (crowders.includes(n)) { narrowed.set(fireErr(n)!, n); moved.set(n, `~${(most.get(n)! / 100).toFixed(1)}y toward ${still.join(" and ")} from their spot`); }
+        else drop.add(fireErr(n)!);
+      }
+    }
+  }
   return errors.filter((e) => !drop.has(e)).map((e) => {
     if (!narrowed.has(e)) return e;
     const off = offBy.get(e.player ?? "");
+    const toward = moved.get(e.player ?? "");
     return {
       ...e,
       description: e.description.replace("Either could have moved.", `By the raid's order, ${e.player} was ~${off?.toFixed(1) ?? "?"}y off their spot.`)
         .replace("Either belonged in the other stack.", `By the raid's order and swap, ${e.player} belonged in the other stack.`)
-        .replace("Either could have been off their spot.", `By the raid's order, ${e.player} was on the wrong side of the eye.`),
+        .replace("Either could have been off their spot.", toward ? `${e.player} moved ${toward}.` : `By the raid's order, ${e.player} was on the wrong side of the eye.`),
     };
   });
 }

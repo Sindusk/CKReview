@@ -37,7 +37,10 @@
 // a north clockwise scan fits 154 (no other start comes within 38). omega.ts
 // names both holders of a Blaster that hit both (HOLDERS_TOGETHER_NAME);
 // here the one off their assigned cardinal (> HOLDER_SPOT_DEG) keeps it
-// when the other stood on theirs.
+// when the other stood on theirs. The same line pairs the hand-offs: the
+// earlier new holder takes the earlier previous holder's tether, so when
+// both took one tether, the one whose tether stayed put is named
+// (applyTetherPairing).
 //
 // ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
 //   - Two players with the same line number on one side (report
@@ -49,8 +52,10 @@ import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import {
-  readPantokrator, readProgramLoop, offCardinal, SAME_SIDE_NAME, HOLDERS_TOGETHER_NAME, TOP1_LINE_RULE_ID, TOP1_BLASTER_RULE_ID,
+  readPantokrator, readProgramLoop, readLoopNumbers, offCardinal, SAME_SIDE_NAME, HOLDERS_TOGETHER_NAME, TOOK_ANOTHERS_NAME, STAYED_PUT,
+  TOP1_LINE_RULE_ID, TOP1_BLASTER_RULE_ID,
 } from "./omega";
+import { playerError } from "@/lib/mechanics/wow/common";
 
 export type PantokratorConga = {
   /** Every best-fitting order of player names (a mirror counts as the same order); empty when unknown. */
@@ -169,7 +174,8 @@ export function applyPantokratorConga(
   errors: PullError[], players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[], conga: PantokratorConga | undefined,
 ): PullError[] {
   if (!conga) return errors;
-  return applyLoopPriority(applySplits(errors, players, deathEvents, enemyCasts, conga), players, deathEvents, enemyCasts, conga.loop);
+  const split = applyTetherPairing(applySplits(errors, players, deathEvents, enemyCasts, conga), players, enemyCasts, conga);
+  return applyLoopPriority(split, players, deathEvents, enemyCasts, conga.loop);
 }
 
 function applySplits(
@@ -270,4 +276,51 @@ function applyLoopPriority(
   }
   if (!drop.size && !rewrite.size) return errors;
   return errors.filter((e) => !drop.has(e)).map((e) => rewrite.get(e) ?? e);
+}
+
+/**
+ * Both of a round's holders took one tether while the other stayed on its
+ * previous holder: omega.ts names the later taker. The hand-off pairs by
+ * the conga: the earlier new holder takes the earlier previous holder's
+ * tether (247 of 254 clean hand-offs over hjgk42MDf81arFVY,
+ * LG64YVQy2KZbtpN8 and 2qgaAkxVypGWv9CN). So the one whose tether stayed
+ * put is at fault, whoever took last (user, 2026-10-28, hjgk42MDf81arFVY
+ * Pull 36 0:38.1: "The MNK took the wrong tether, leaving the SCH without
+ * one", the MNK first; LG64YVQy2KZbtpN8 Pull 45 0:46.9, the DNC last).
+ */
+function applyTetherPairing(
+  errors: PullError[], players: PlayerInfo[], enemyCasts: EnemyEvent[], conga: PantokratorConga,
+): PullError[] {
+  const shared = errors.filter((e) => e.ruleId === TOP1_BLASTER_RULE_ID && e.name === TOOK_ANOTHERS_NAME && e.description.includes(STAYED_PUT));
+  if (!conga.orders.length || !shared.length) return errors;
+  const num = readLoopNumbers(players, enemyCasts);
+  if (!num) return errors;
+  const rewrite = new Map<PullError, PullError>();
+  for (const e of shared) {
+    const later = e.player!;
+    const first = players.find((p) => p.name !== later && e.description.includes(`took ${p.name}'s tether`))?.name;
+    const stuck = players.find((p) => e.description.includes(`instead of ${p.name}'s`))?.name;
+    const other = stuck && [...num].find(([n, k]) => n !== stuck && k === num.get(stuck))?.[0];
+    if (!first || !stuck || !other) continue;
+    const verdicts = new Set<string>();
+    for (const order of conga.orders) {
+      const rank = new Map(order.map((n, i) => [n, i]));
+      if ([first, later, stuck, other].some((n) => !rank.has(n))) { verdicts.add("?"); continue; }
+      const stuckEarlier = rank.get(stuck)! < rank.get(other)!;
+      const firstEarlier = rank.get(first)! < rank.get(later)!;
+      verdicts.add(stuckEarlier === firstEarlier ? first : later);
+    }
+    if (verdicts.size !== 1 || verdicts.has("?")) continue;
+    const wrong = [...verdicts][0];
+    const right = wrong === first ? later : first;
+    rewrite.set(e, wrong === later
+      ? { ...e, description: `${e.description} By the conga, ${stuck}'s was theirs and ${other}'s was ${right}'s.` }
+      : playerError(players.find((x) => x.name === wrong)!, {
+        ruleId: e.ruleId, severity: e.severity, name: e.name,
+        description: e.description.replace(/ took .*?, which stayed put\./, ` took ${other}'s tether, which by the conga was ${right}'s, while ${stuck}'s, theirs, ${STAYED_PUT}; ${right} took it from them.`),
+        timestamp: e.timestamp, abilityId: e.abilityId, abilityName: e.abilityName,
+      }));
+  }
+  if (!rewrite.size) return errors;
+  return errors.map((e) => rewrite.get(e) ?? e);
 }

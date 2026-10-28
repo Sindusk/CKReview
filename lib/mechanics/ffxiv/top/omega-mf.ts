@@ -129,12 +129,36 @@
 //   it are fallout.
 // - E40 3:58.6: Pile Pitch hit only the unjumped GNB (clean: all seven
 //   share it, E44, E48): the GNB should have brought it into the party.
+// Report F = hjgk42MDf81arFVY (the user's static, day 3; omega.ts's report
+// D). VOD review 2026-10-28 (user): Pulls 5, 6, 15, 18, 22, 32, 33, 37, 42,
+// 45; rulings in expectations/rulings.json. The user's cheat sheet puts
+// Mid's square and circle inside, ~12y off the line, and the crosses and
+// triangles 1.5 crystals from the intercards; Remote's square and circle at
+// the wall, 3.5 crystals from the cardinal. The clean Fires agree
+// (synergy-order.ts learns the spots). Findings:
+// - Glitch pairs: distance from the eye's line doesn't separate the
+//   partner at fault. F5 the GNB 15.3y and SGE 11.4y (both wrong, the GNB
+//   more); F22 the DNC 8.7y, the SCH 11.0y "probably fine"; F37 the DNC
+//   7.9y; F18 the DNC 17.4y; F42 13.3/13.7y (27.1y apart, both slightly
+//   wrong). Both stay named, with the distances in the description.
+// - Fire overlaps: whoever moved toward the other from their own spot
+//   (F15 the DNC, F18 the SAM and MNK with the SCH fine, F33 the DRK; the
+//   DNC there also off, crowding the DRK, but in no error).
+// - F6 2:53.9: the DRK west of the line, in the laser (2:54.4), left the
+//   east row three, and the RDM and SGE overlapped there.
+// - F45 3:42.6: the DRK walked into the wall before Bladedance; its
+//   untaken cone killed all six (fallout, user).
+// - F32 3:04.9: the user calls the MNK's swap wrong ("neither had to
+//   swap"); the log shows the DNC at the MNK's row's stack: DNC unruled.
+// - F17 2:52.9 (GNB/SAM pair, 26.9y apart): the user's answer named the
+//   DRK and DNC; unruled, asked again.
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-top2-avoidable (Major on death, else Minor: no Damage Down in P2):
-//   Optical Laser, the clones (Efficient Bladework, Beyond Strength,
-//   Optimized Blizzard III, Superliminal Steel), Sagittarius Arrow, a lone
-//   non-tank in a Bladedance cone.
+//   Optical Laser (timed at the Fire it snapshots with, F6), the clones
+//   (Efficient Bladework, Beyond Strength, Optimized Blizzard III,
+//   Superliminal Steel), Sagittarius Arrow, a lone non-tank in a Bladedance
+//   cone (none with a tank already dead: fallout, F45).
 // ffxiv-top2-solar-ray (targeted: both tanks): both Solar Rays on one tank,
 //   both alive: the tank with none didn't hold their Omega.
 // ffxiv-top2-glitch: at the Fire, all eight alive, a pair under the glitch
@@ -142,10 +166,13 @@
 //   that's theirs; or only one shared a Fire with a player outside the
 //   glitch: they stood on someone else's spot, user, E11, E29; not with
 //   another vulnerable player, D72). synergy-order.ts keeps the partner off their Fire slot
-//   (>= 9y, partner <= 7y; the slot model from the learned order).
+//   (>= 9y, partner <= 7y; the slot model from the learned order). The
+//   description gives both partners' distance from the eye's line (F5).
 // ffxiv-top2-fire: one Fire that hit 2+ players names them all (not the
 //   glitch-vulnerable ones); synergy-order.ts keeps the ones on the wrong
-//   side of the eye for their row when the rest weren't (user, E11).
+//   side of the eye for their row when the rest weren't (user, E11), else
+//   the ones who moved 1.5y+ toward the others from their learned spot when
+//   the rest moved under 1.0y (user, F15, F18, F33).
 // ffxiv-top2-stack: at Spotlight, all eight alive: a pair in one stack
 //   (both; synergy-order.ts keeps the one outside their expected stack),
 //   both marks together (3+ in both stacks: the two marked players), else
@@ -156,14 +183,17 @@
 // ffxiv-top2-bladedance (targeted: both tanks): a tank in both cones held
 //   both tethers, so the other tank took none; a cone no tank took names
 //   the tank no cone reached; a tank's cone that hit 2+ non-tanks names
-//   that tank. Raid when it killed 3+ non-tanks.
+//   that tank. Raid when it killed 3+ non-tanks. A tank already dead: no
+//   errors but a Raid when the cone killed 3+ (F45: the DRK's wall death
+//   is the error).
 // ffxiv-top2-beyond-defense (targeted: both tanks): it jumped only
 //   non-tanks (both tanks named). Raid when 3+ died.
 // ffxiv-top2-pile-pitch (targeted: the jumped player): Pile Pitch on the
 //   player Beyond Defense jumped, with Doom (Major). "Pile Pitch Not
 //   Shared" (Major on death, else Minor): its target, not the jumped one,
 //   hit with at most one other, all eight alive (user, E40).
-// ffxiv-top2-wall (Major): a silent death no knockback, reset or hit explains.
+// ffxiv-top2-wall (Major): a silent death no knockback, reset or hit explains,
+//   including one near the end when mechanic deaths followed it (F45).
 // ffxiv-top2-enrage (Laser Shower hits that killed) / -called-wipe (3+
 //   silent deaths within 10s, or within 12s of the end, Beyond Defense
 //   knockbacks excluded) / -collapse (4 dead, pull over within 20s): Raid,
@@ -395,7 +425,7 @@ import type { PullError, EnemyEvent } from "@/types/PullError";
 import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
 import type { HeadMarker } from "../fru/usurper-of-frost";
 import { interpolatePlayerPosition } from "@/lib/mechanics/player-position";
-import { kFmt, joinNames, playerError, raidMarker, clusterByGap, RAID_MARKER_SORT_OFFSET_MS } from "@/lib/mechanics/wow/common";
+import { kFmt, yd, joinNames, playerError, raidMarker, clusterByGap, RAID_MARKER_SORT_OFFSET_MS } from "@/lib/mechanics/wow/common";
 import {
   DEATH_EVENT_LAG_MS, PREVIEW_AMOUNT, type Life,
   bodyHit, buildLife, castsOf, gotAura, uniq, namesOf, isTank, realAmount, allAlive, resetCluster,
@@ -549,6 +579,8 @@ export type SynergyRead = {
   left?: 0 | 1;
   /** The rows' axis (unit vector through the center; row 0 has positive lateral) and everyone's Fire position. */
   axis?: { x: number; y: number };
+  /** The eye's laser line through the center, from its cast even when the rows don't split; else `axis`. */
+  lineAxis?: { x: number; y: number };
   firePos: Map<string, { x: number; y: number }>;
   clean: Set<string>;
   /** Each Fire's owner (its cast target), keyed by fireKey(actor, instance). */
@@ -623,9 +655,11 @@ export function readSynergy(
   let rows: Map<string, 0 | 1> | undefined;
   let left: 0 | 1 | undefined;
   let axis: { x: number; y: number } | undefined;
+  let lineAxis: { x: number; y: number } | undefined;
   if (laser) {
     const n = Math.hypot(ARENA_CENTER.x - laser.x!, ARENA_CENTER.y - laser.y!);
     const u = { x: (ARENA_CENTER.x - laser.x!) / n, y: (ARENA_CENTER.y - laser.y!) / n };
+    lineAxis = u;
     const s = splitBy(u);
     // Row 0 is left of the eye looking along u (lateral > 0).
     if (s) { rows = s.side; left = 0; axis = u; }
@@ -660,7 +694,7 @@ export function readSynergy(
       if (inst.length && holdsAt(p, GLITCH_VULN, spot.timestamp + 500)) vulnAtSpot.add(p.name);
     }
   }
-  return { remote, fireT: fire.timestamp, spotT: spot?.timestamp, pairs, symbol, marks, rows, left, axis, firePos: pos, clean, fireOwner: owner, stacks, vulnAtFire, vulnAtSpot };
+  return { remote, fireT: fire.timestamp, spotT: spot?.timestamp, pairs, symbol, marks, rows, left, axis, lineAxis: lineAxis ?? axis, firePos: pos, clean, fireOwner: owner, stacks, vulnAtFire, vulnAtSpot };
 }
 
 const fireKey = (actor: string | undefined, instance: number) => `${actor ?? "?"}#${instance}`;
@@ -812,11 +846,17 @@ function detectSynergy(players: PlayerInfo[], life: Life, read: SynergyRead | un
       // and the user named the MNK's partner.
       const crowded = pair.filter((p) => fires.some((g) => g.includes(p) && g.some((q) => q !== p && !read.vulnAtFire.has(q.name))));
       const named = crowded.length === 1 ? crowded : pair;
+      // How far each stood from the eye's line, to gauge who was off (user,
+      // 2026-10-28, hjgk42MDf81arFVY Pull 5 2:54.9: the GNB 15.3y, the SGE
+      // 11.4y; this static's clean Mid spots sit ~12y off it).
+      const qa = read.firePos.get(a), qb = read.firePos.get(b), u = read.lineAxis;
+      const off = (q: { x: number; y: number }) => yd(Math.abs(u!.x * (q.y - ARENA_CENTER.y) - u!.y * (q.x - ARENA_CENTER.x)));
+      const gauge = qa && qb && u ? ` ${a} ${off(qa)}y and ${b} ${off(qb)}y from the eye's line, ${yd(Math.hypot(qa.x - qb.x, qa.y - qb.y))}y apart.` : "";
       for (const p of named) {
         const other = pair.find((x) => x !== p)!;
         errors.push(playerError(p, {
           ruleId: TOP2_GLITCH_RULE_ID, severity: died.length ? "Major" : "Minor", name: "Out of Glitch Range",
-          description: `${kind} (${read.symbol.get(a) ?? "?"} pair with ${other.name}) at Fire: out of range${sameRow ? " (same row)" : ""}, both had Vulnerability Up${died.length ? `; ${namesOf(died)} died` : ""}. ${named.length === 1 ? "Their Fire also hit a third player: wrong spot." : "Either could have moved."} ${GLITCH_WHY}`,
+          description: `${kind} (${read.symbol.get(a) ?? "?"} pair with ${other.name}) at Fire: out of range${sameRow ? " (same row)" : ""}, both had Vulnerability Up${died.length ? `; ${namesOf(died)} died` : ""}.${gauge} ${named.length === 1 ? "Their Fire also hit a third player: wrong spot." : "Either could have moved."} ${GLITCH_WHY}`,
           timestamp: read.fireT, abilityId: FIRE, abilityName: "Optimized Fire III",
         }));
       }
@@ -924,8 +964,23 @@ function detectBladedance(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
   if (!cones.length || tanks.length !== 2) return { errors: [], owned };
   const t = cones[0].timestamp;
   occurrences?.push({ mechanicKey: TOP2_BLADEDANCE_RULE_ID, timestamp: t, players: tanks.map((p) => p.name) });
-  if (!tanks.every((p) => life.alive(p, t - 500))) return { errors: [], owned };
   const hits = hitsNear(players, life, [BLADEDANCE], t + 600, 2000);
+  // A tank already dead leaves a tether nobody takes, and its cone goes
+  // through the party: fallout of that death, not each victim's
+  // (user, 2026-10-28, hjgk42MDf81arFVY Pull 45 3:42.6: the DRK walked into
+  // the wall; the cone killed all six).
+  const gone = tanks.filter((p) => !life.alive(p, t - 500));
+  if (gone.length) {
+    const party = hits.filter((h) => !isTank(h.p));
+    party.forEach((h) => owned.add(h.e));
+    const killed = uniq(party.filter((h) => life.diedFrom(h.p, h.e.timestamp)).map((h) => h.p));
+    return {
+      errors: killed.length >= SYNERGY_RAID_DEATHS ? [raidMarker(TOP2_BLADEDANCE_RULE_ID, "Bladedance Through the Party",
+        `${namesOf(gone)} ${gone.length > 1 ? "were" : "was"} dead, so a Bladedance tether went untaken and its cone killed ${killed.length} (${namesOf(killed)}); treated as the cutoff.`,
+        t + RAID_MARKER_SORT_OFFSET_MS, BLADEDANCE, "Optimized Bladedance")] : [],
+      owned,
+    };
+  }
   const errors: PullError[] = [];
   // Both bosses cast them, with colliding instance numbers (A38: Omega-M#2
   // and Omega-F#2): a cone is its actor and instance.
@@ -1053,7 +1108,11 @@ function calledWipeDeaths(players: PlayerInfo[], deaths: DeathEvent[], pullEnd: 
   const silent = deaths.filter((d) => !d.killingAbilityGameId && !mechanicSilentDeath(players, d));
   const out = new Set<DeathEvent>();
   for (const d of silent) {
-    if (pullEnd - d.timestamp <= CALLED_WIPE_END_MS) out.add(d);
+    // Near the end, but not when mechanic deaths followed: then it was a
+    // mistake the pull died of (hjgk42MDf81arFVY Pull 45 3:42.6: the DRK
+    // into the wall, then Bladedance killed the party; user, 2026-10-28).
+    const followed = deaths.some((x) => x.killingAbilityGameId && x.player !== d.player && x.timestamp > d.timestamp);
+    if (pullEnd - d.timestamp <= CALLED_WIPE_END_MS && !followed) out.add(d);
     const near = resetCluster(silent.filter((x) => Math.abs(x.timestamp - d.timestamp) <= CALLED_WIPE_WINDOW), deaths);
     if (near.length >= CALLED_WIPE_COUNT) near.forEach((x) => out.add(x));
   }
@@ -1103,8 +1162,12 @@ export function detectOmegaMFErrors(
   const called = calledWipeDeaths(players, p2Deaths, p3 === Infinity ? lastEvent : Infinity);
 
   const blade = detectBladedance(players, life, enemyCasts, start, end, occurrences);
-  const avoidable = detectAvoidable(players, life, start, end, blade.owned);
   const read = readSynergy(players, deathEvents, enemyCasts, headMarkers);
+  // The laser lands ~0.5s after the Fires but snapshots with them: it's at
+  // the Fire, ahead of that resolution's cutoff (hjgk42MDf81arFVY Pull 6
+  // 2:54.4: the DRK on the wrong side, in the laser; user, 2026-10-28).
+  const avoidable = detectAvoidable(players, life, start, end, blade.owned).map((e) =>
+    read && e.abilityId === OPTICAL_LASER && e.timestamp > read.fireT && e.timestamp - read.fireT <= RESOLUTION_MS ? { ...e, timestamp: read.fireT } : e);
   const errors = [
     ...avoidable,
     ...cloneCollapse(players, life, avoidable),

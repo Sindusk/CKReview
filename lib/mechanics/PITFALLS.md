@@ -533,6 +533,21 @@ philosophy and the data semantics this list assumes.
 - **A whole-raid failure is a call, not eight errors.** Everyone alive in
   one wrong safe spot followed a wrong call: one player-less Raid marker,
   with the per-player hits as fallout (Fatebreaker's Blasting Zone).
+- **A death that leaves later shares short is a cutoff only if the
+  shortfall killed.** Omega P1's Pantokrator: a player dead before the
+  fourth set left their group short, and the later lines killed the two
+  sharing; with a raise in time, or the short sets killing nobody, five
+  pulls still cleared the phase (user: "on the fourth one, it's
+  recoverable"). Gate on the outcome, and never in a phase clear.
+- **A hand-off order can be the raid's priority line.** Omega P1's
+  Blaster tethers: the earlier new holder in the conga takes the earlier
+  previous holder's tether (247 of 254). When two take one tether, the one
+  whose tether stayed put is wrong, whoever took last.
+- **A spread overlap names whoever moved toward the other.** Learn the
+  raid's own spots from the clean spreads; the member displaced toward the
+  other's spot (1.5y+) crowded them, and one within 1.0y stayed put
+  (Omega P2's Fire, user rulings). Distance off a line didn't separate
+  glitch partners the same way.
 - **A clean-looking overlap can be a group's plan.** Ask before flagging a
   doubled hit that recurs every pull with nobody dying: one static stacks
   both tanks for the second Burn Mark on purpose (Fatebreaker).

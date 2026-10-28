@@ -45,7 +45,7 @@ function* pulls({ game, reports, boss, only }) {
       for (const k of STREAM_KEYS) for (const e of r[k].data) if (e.timestamp > dur) dur = e.timestamp;
       const base = { label: `${L}${p.pullNumber}`, L, n: p.pullNumber, dur, raw: r };
       if (ff) {
-        yield { ...base, players: ffb.buildFFPlayers(r, am, getFFJobByName, ab), deaths: ffb.buildFFDeaths(r, am, getFFJobByName), casts: ffb.buildFFEnemyCastEvents(r, am, ab) };
+        yield { ...base, players: ffb.buildFFPlayers(r, am, getFFJobByName, ab), deaths: ffb.buildFFDeaths(r, am, getFFJobByName), casts: ffb.buildFFEnemyCastEvents(r, am, ab), headMarkers: ffb.buildFFHeadMarkers(r, am), tethers: ffb.buildFFTethers(r, am) };
       } else {
         const w = wb.buildWowPull(p.rep, am, ab, getSpecInfo);
         yield { ...base, players: w.players, deaths: w.deaths, casts: w.enemyCasts, enemyBuffs: w.enemyBuffs, enemyBuffRemovals: w.enemyBuffRemovals, friendlyNpcDamage: w.friendlyNpcDamage };
