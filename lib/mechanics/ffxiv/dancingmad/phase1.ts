@@ -440,6 +440,35 @@
 // (JUMP_CALL_RULE_IDS): gTkMH91DWRmLbNCn pull 2 -> the 2:40 arrow, pull 4
 // -> the 0:38 Damage Down.
 //
+// **Called reset moves the cutoff to its trigger** (user, 2026-10-28,
+// BpAdkacQh63VCrRM Pull 2 2:40 "the arrow already ended the pull", Pull 7
+// 0:55 "the WHM had a damage down so the group decided to reset", Pull 8
+// 0:38 "the errors were fallout from everyone aiming to jump off the
+// arena"). When at least WALK_OFF_MIN_JUMPERS (4) qualifying jumps fall
+// within WALK_OFF_WINDOW_MS (10s) of the first, a second marker of this rule,
+// "Called Reset", goes 1ms after the trigger: the FIRST Major within 20s
+// before the walk-off starts (first jump's death event minus the ~2s fall),
+// from this module's own Majors or a Damage Down application. It is the
+// pull's first Raid error, so the trigger counts and everything after is
+// fallout; the jump keeps its own marker (ruled at its own time, gTkMH91DWRm
+// LbNCn pull 2). No trigger is taken across a mechanic death (incl. a
+// Confetti knock-off), whose own marker is the cutoff. Measured on every
+// Phase 1 walk-off on disk:
+//   - walk-offs: 4-7 jumpers within 2.4-9.3s; lone jumps after a death: 3
+//     (BpAdkacQh63VCrRM pull 9, yBKPqGwHparm7Tk4 pull 1), never backdated.
+//   - trigger to walk-off start: 3.3s (BpAdkacQh63VCrRM Pull 8) to 13.9s
+//     (Pull 2's arrow 2:40.8 vs walk-off ~2:54.7). Pull 2's bait-position
+//     flags at 2:54.9 are the DNC already walking out, after the start.
+//   - cutoffs moved: BpAdkacQh63VCrRM Pull 2 2:56.7 -> 2:40.8 (PLD arrow),
+//     Pull 7 1:00.7 (healers dead) -> 0:55.1 (WHM Damage Down), Pull 8
+//     0:43.4 (Graven 1) -> 0:38.8 (DRG Damage Down); gTkMH91DWRmLbNCn pull 2
+//     2:52.3 -> 2:40.3 (DRG arrow), pull 4 0:46.0 -> 0:39.0 (PCT Damage
+//     Down). Not moved: gTkMH91DWRmLbNCn pull 12 (the SGE's knock-off death
+//     between), BpAdkacQh63VCrRM pulls 11/12 (no Major before the walk-off).
+// The cross-pull Majors (graven-image.ts, wave-cannon.ts) can't be seen
+// here; a walk-off only they prompted keeps the cutoff at the jump. Moving
+// getPullRaidCutoff (lib/report-data.ts) itself would cover them.
+//
 // ── WAVE CANNON OUT OF POSITION / MITIGATION ISSUE ─────────────────────────
 //
 // Lives in wave-cannon.ts, NOT here — like Graven Image's spread, which job
@@ -1215,6 +1244,12 @@
 // sample exists yet to validate the other side of the threshold. See
 // detectEnrageCheckError.
 //
+// **Phase 1 only** (2026-10-28): the same Light of Judgment (47803) recurs
+// at the Phase 4 HP check (BpAdkacQh63VCrRM pull 3 14:21.5 at 28.2%, pull 6
+// 14:18.9 at 26.7%), which needs 25% (kefka-says.ts PHASE END), so casts
+// after PHASE_1_END_MS are ignored. No Phase 4 HP-check rule exists yet:
+// pull 6's cutoff falls to Both Healers Dead 14:19.0, 0.1s later.
+//
 // Graven Image's spread mechanic (~0:38, cast "Graven Image", 48370) lives
 // in its own file, graven-image.ts, NOT here — unlike everything else in
 // this module, its "ideal position" can't be hardcoded: which specific job
@@ -1257,6 +1292,14 @@
 //   - Pull 4: a Blizzard III Blowout Damage Down at 0:38 ended the pull
 //     (the group walked off); the DNC's double Wave Cannon death after it
 //     is fallout and stays unflagged.
+// VOD review 2026-10-28 (user): report BpAdkacQh63VCrRM:
+//   - Pull 2 2:40: the PLD's E arrow (2.8y, line 1.95y) was wrong and ended
+//     the pull; the 2:54 bait flags are walk-off fallout. Pulls 7 0:55 and
+//     8 0:38: a Damage Down prompted the reset. -> CALLED RESET above.
+//   - Pull 11: the Graven 1 marker now sits at the spread deaths (0:42.0),
+//     not the walk-offs after them (GRAVEN 1 cluster comment in code).
+//   - Pull 9 0:44 (Wave Cannon on SGE and DRK) and Pull 11 0:40 (Graven
+//     Image overlap): see wave-cannon.ts and graven-image.ts.
 // Not built:
 //   - [STALE?] the second Confetti resolution (its holder/victim geometry is
 //     still unbuilt, but CONFETTI GROUP MISPLACED above already checks the
@@ -2205,7 +2248,67 @@ function knockedOffByConfetti(players: PlayerInfo[], death: DeathEvent): boolean
     e.timestamp <= death.timestamp && death.timestamp - e.timestamp <= CONFETTI_KNOCKOFF_WINDOW_MS) ?? false;
 }
 
-function detectJumpedOffArenaError(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
+// CALLED RESET (user, 2026-10-28, BpAdkacQh63VCrRM Pull 2 2:40, Pull 7 0:55,
+// Pull 8 0:38): when most of the raid walks off together, the mistake that
+// prompted the call is the cutoff and everything after it is fallout ("the
+// arrow already ended the pull"; "the WHM had a damage down so the group
+// decided to reset"). A walk-off is WALK_OFF_MIN_JUMPERS qualifying jumps
+// (no Damage Down, not a Confetti knock-off) within WALK_OFF_WINDOW_MS of the
+// first. Measured on every Phase 1 walk-off on disk: walk-offs have 4-7
+// jumpers inside 2.4-9.3s (gTkMH91DWRmLbNCn pull 2: 4 in 4.2s; BpAdkacQh63VCrRM
+// pull 2: 5 in 9.3s); lone jumps after a death have 3 (BpAdkacQh63VCrRM pull 9,
+// yBKPqGwHparm7Tk4 pull 1).
+const WALK_OFF_MIN_JUMPERS = 4;
+const WALK_OFF_WINDOW_MS = 10_000;
+// A fall's death event trails the step off the edge by ~2s (module notes
+// above), so the walk-off starts this long before the first jump's event.
+const WALK_OFF_FALL_LAG_MS = 2000;
+// The trigger is the FIRST Major within this window before the walk-off
+// starts (user, 2026-10-24: "the first mistake that was made was the
+// trigger"; the same rule lib/static-review-data.ts uses for the wipe cause).
+// Measured trigger-to-walk-off gaps: 3.3s (BpAdkacQh63VCrRM pull 8) to 13.9s
+// (BpAdkacQh63VCrRM pull 2, arrow 2:40.8, walk-off ~2:54.7). The bait-position
+// flags at 2:54.9 that pull are the DNC already walking out (user: "not worth
+// analyzing"), after the walk-off start, so they don't qualify.
+const WALK_OFF_TRIGGER_WINDOW_MS = 20_000;
+
+/**
+ * The mistake that prompted a called reset: the first Major within
+ * WALK_OFF_TRIGGER_WINDOW_MS before the walk-off starts. Candidates are this
+ * module's own Majors plus Damage Down applications (the generic
+ * `ffxiv-damage-down` Major, same timestamp); the cross-pull Majors
+ * (graven-image.ts, wave-cannon.ts) aren't visible here, so a walk-off they
+ * alone prompted keeps its cutoff at the jump. A mechanic death between the
+ * trigger and the walk-off carries its own cutoff, so no trigger is taken
+ * across one (gTkMH91DWRmLbNCn pull 12: the SGE's Confetti knock-off death).
+ */
+function findWalkOffTrigger(
+  players:           PlayerInfo[],
+  deathEvents:       DeathEvent[],
+  otherPhase1Errors: PullError[],
+  walkOffStart:      number,
+): { timestamp: number; label: string } | null {
+  const candidates: { timestamp: number; label: string }[] = [
+    ...otherPhase1Errors
+      .filter((e) => e.severity === "Major" && e.player)
+      .map((e) => ({ timestamp: e.timestamp, label: `${e.player}'s ${e.name}` })),
+    ...players.flatMap((p) =>
+      p.debuffs
+        .filter((d) => d.abilityId === DAMAGE_DOWN_ABILITY_ID && d.debuffStatus === "applied")
+        .map((d) => ({ timestamp: d.timestamp, label: `${p.name}'s Damage Down` }))),
+  ].filter((c) => c.timestamp < walkOffStart && walkOffStart - c.timestamp <= WALK_OFF_TRIGGER_WINDOW_MS)
+    .sort((a, b) => a.timestamp - b.timestamp);
+  const trigger = candidates[0];
+  if (!trigger) return null;
+  // A jump (no killing blow, not knocked off) doesn't count: the Damage-Down
+  // clearing jumps of BpAdkacQh63VCrRM pulls 7 and 8 fall in between.
+  const deathBetween = deathEvents.some((d) =>
+    (d.cause !== "Environmental" || knockedOffByConfetti(players, d)) &&
+    d.timestamp > trigger.timestamp && d.timestamp < walkOffStart);
+  return deathBetween ? null : trigger;
+}
+
+function detectJumpedOffArenaError(players: PlayerInfo[], deathEvents: DeathEvent[], otherPhase1Errors: PullError[]): PullError[] {
   const hadDamageDownAt = (playerName: string, timestamp: number) => {
     const player = players.find((p) => p.name === playerName);
     if (!player) return false;
@@ -2217,14 +2320,38 @@ function detectJumpedOffArenaError(players: PlayerInfo[], deathEvents: DeathEven
     );
   };
 
-  const jump = deathEvents
+  const jumps = deathEvents
     .filter((d) => d.timestamp <= PHASE_1_END_MS && d.cause === "Environmental")
     .filter((d) => !hadDamageDownAt(d.player, d.timestamp))
     .filter((d) => !knockedOffByConfetti(players, d))
-    .sort((a, b) => a.timestamp - b.timestamp)[0];
+    .sort((a, b) => a.timestamp - b.timestamp);
+  const jump = jumps[0];
   if (!jump) return [];
 
+  // See CALLED RESET above. The jump itself stays flagged at its own time
+  // (ruled: gTkMH91DWRmLbNCn pull 2, the DRG's jump at 2:52.3); a second
+  // marker of the same rule, "Called Reset", sits 1ms after the trigger and
+  // becomes the pull's first Raid error, so lib/static-review-data.ts still
+  // reads the wipe as called (JUMP_CALL_RULE_IDS keys on the rule id).
+  const calledReset: PullError[] = [];
+  const walkers = jumps.filter((d) => d.timestamp - jump.timestamp <= WALK_OFF_WINDOW_MS);
+  if (walkers.length >= WALK_OFF_MIN_JUMPERS) {
+    const trigger = findWalkOffTrigger(players, deathEvents, otherPhase1Errors, jump.timestamp - WALK_OFF_FALL_LAG_MS);
+    if (trigger) {
+      calledReset.push({
+        ruleId:      JUMPED_OFF_ARENA_RULE_ID,
+        severity:    "Raid",
+        name:        "Called Reset",
+        description: `The raid walked off the arena to reset shortly after this (${walkers.map((d) => d.player).join(", ")}); ${trigger.label} is taken as what prompted the call. Treated as the cutoff point — what follows is fallout of the reset.`,
+        timestamp:   trigger.timestamp + 1,
+        abilityId:   0,
+        abilityName: "Jumped Off The Arena",
+      });
+    }
+  }
+
   return [
+    ...calledReset,
     {
       ruleId:      JUMPED_OFF_ARENA_RULE_ID,
       severity:    "Raid",
@@ -3597,8 +3724,13 @@ function detectGraven1DeathWipeError(
   // jump should have triggered the Graven 1 Death raid error".
   const jumpAnchored = graven1Deaths.some((d) => d.timestamp === firstDeathTime && d.cause === "Environmental");
 
+  // A mechanic-death cluster ends at its own deaths: walk-offs right after
+  // (no killing blow) aren't volley deaths and carry no Majors to keep
+  // (2026-10-28, BpAdkacQh63VCrRM Pull 11: PLD and SGE died to the spread at
+  // 0:40, death events 0:42.0; the WHM's and RPR's walk-offs, death events
+  // 0:44.5/0:44.6, had stretched the cutoff past the healers-dead marker).
   const clusterDeaths = graven1Deaths.filter(
-    (d) => d.timestamp <= clusterEnd && (!jumpAnchored || d.cause === "Environmental")
+    (d) => d.timestamp <= clusterEnd && (jumpAnchored ? d.cause === "Environmental" : d.cause !== "Environmental")
   );
   const clusterMajors = otherPhase1Errors.filter(
     (e) => e.severity === "Major" && e.timestamp >= firstDeathTime - MYSTERY_MAGIC_VOLLEY_CLUSTER_MS && e.timestamp <= clusterEnd
@@ -4486,8 +4618,12 @@ const LIGHT_OF_JUDGMENT_ENRAGE_CHECK_ABILITY_ID = 47803;
 const ENRAGE_CHECK_MAX_HP_PERCENT = 15;
 
 function detectEnrageCheckError(enemyCasts: EnemyEvent[]): PullError[] {
+  // Phase 1 only: Light of Judgment (47803) recurs at the Phase 4 HP check
+  // (BpAdkacQh63VCrRM pull 3 14:21.5, pull 6 14:18.9), which needs 25%, not
+  // 15% (kefka-says.ts PHASE END). Phase 1's cast lands ~203-204s.
   const checkCasts = enemyCasts.filter(
-    (e) => e.abilityId === LIGHT_OF_JUDGMENT_ENRAGE_CHECK_ABILITY_ID && e.hitPoints !== undefined && e.maxHitPoints
+    (e) => e.abilityId === LIGHT_OF_JUDGMENT_ENRAGE_CHECK_ABILITY_ID && e.hitPoints !== undefined && e.maxHitPoints &&
+      e.timestamp <= PHASE_1_END_MS
   );
   if (checkCasts.length === 0) return [];
   const finalCast = checkCasts[checkCasts.length - 1];
@@ -4744,13 +4880,12 @@ export function detectPhase1Errors(
   const graven2PuddleSoakMissedErrors = detectGraven2PuddleSoakMissedErrors(players, deathEvents);
   const waveCannonTowerOverlapErrors = detectWaveCannonTowerOverlapErrors(players, deathEvents);
 
-  return [
+  const rest = [
     ...revoltingRuinThreatLossErrors,
     ...detectRevoltingRuinNonTankDeathError(players, deathEvents, revoltingRuinThreatLossErrors),
     ...detectRevoltingRuinOutOfPositionErrors(players, deathEvents),
     ...detectHyperdriveOutOfPositionErrors(players, deathEvents),
     ...blizzardIIISilentKillErrors,
-    ...detectJumpedOffArenaError(players, deathEvents),
     ...waveCannonTowerOverlapErrors,
     ...detectWaveCannonTowerMissedErrors(players, deathEvents, enemyCasts),
     ...detectWaveCannonSupportPriorityErrors(players, deathEvents, enemyCasts),
@@ -4774,5 +4909,7 @@ export function detectPhase1Errors(
     ...detectTeleTrouncingDeathWipeError(deathEvents, enemyCasts),
     ...detectGraven3StackErrors(players, deathEvents, enemyCasts),
     ...detectEnrageCheckError(enemyCasts),
-  ].sort((a, b) => a.timestamp - b.timestamp);
+  ];
+  // The jump rule reads the other rules' Majors for a called reset's trigger.
+  return [...rest, ...detectJumpedOffArenaError(players, deathEvents, rest)].sort((a, b) => a.timestamp - b.timestamp);
 }

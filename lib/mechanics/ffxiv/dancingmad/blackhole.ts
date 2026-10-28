@@ -113,6 +113,25 @@
 // out-of-schedule hit, a multi-player tether hit, or an early Primordial
 // Crust loss, which are what's detected here.
 //
+// ── RULES IMPLEMENTED ───────────────────────────────────────────────────
+//   blackhole.ts: soaked-incorrect-tether, stole-assigned-tether,
+//   tether-cleaved-party (Major on the holder; Raid marker when one cleave
+//   kills 4+, see LETHAL_CLEAVE_DEATHS), lost-primordial-crust, the three
+//   Earthquake overlap rules. A tether nobody took that cleaves the group
+//   names nobody here (isUntakenCleave); blackhole-strategy.ts's
+//   missed-assigned-tether names the player due it and lists who it hit.
+//   blackhole-strategy.ts: missed-assigned-tether, clipped-by-neighboring-
+//   tether, incorrect-direction.
+//
+// ── VERIFIED ────────────────────────────────────────────────────────────
+//   - user, 2026-10-28, BpAdkacQh63VCrRM Pull 13 10:51 (set 3, moment 6):
+//     instance 7 went untaken and hit the centre stack plus the WHM, who
+//     was carrying her own instance 8; four died. "This is mostly on [the
+//     PCT], the WHM took their tether and was positioned properly." The
+//     PCT (Second Lane B, due #6) is flagged, the WHM is not, and the
+//     cleave is the cutoff. The only untaken cleave in the nine reports on
+//     disk: the rule rests on this one pull.
+//
 // ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
 //   - Incorrect Direction (blackhole-strategy.ts) is gated to the SDA
 //     strategy until the Support vs DPS convention for DSA/Double Tether is
@@ -462,6 +481,81 @@ export function buildTetherLaneMap(players: PlayerInfo[], burstTimestamp: number
 function cleavedInstancesAt(lanes: TetherLaneMap, moment: number): [number, PlayerInfo[]][] {
   return [...(lanes.byMoment.get(moment) ?? new Map()).entries()].filter(([, hit]) => hit.length >= 2);
 }
+
+// ── Untaken tether cleaves (user, 2026-10-28, BpAdkacQh63VCrRM Pull 13
+//    10:51) ───────────────────────────────────────────────────────────────
+//
+// A cleaved instance is pinned on the caught player whose role band covers
+// the moment. That misfires when the band player is there only because the
+// tether's real taker never came: in Pull 13 at moment 6 the WHM carried her
+// own instance 8 (hers at moment 5 too, hit by it alone), while instance 7,
+// which the PCT was due (Second Lane B), went untaken and hit the centre
+// stack (DRK, DRG, RPR, PLD, DNC) and the WHM standing beside it. The user:
+// "This is mostly on [the PCT], the WHM took their tether and was positioned
+// properly." So a band candidate who, at the same moment, was hit ALONE by
+// a different instance (their own tether) isn't the cleaving tether's
+// owner. When every band candidate is like that, the tether had no taker:
+// nobody here is flagged (everyone caught is fallout) and
+// blackhole-strategy.ts's Missed Assigned Tether names whoever the
+// schedule owed it to.
+//
+// Instance numbers restart with each tether set (Pull 13: set 2 used 4-6,
+// set 3 used 7-9), so "their own lane" can't be read as the instance they
+// held a moment earlier. Moments 2 and 9 are skipped instead: there Double
+// Tether's double holder legitimately takes two tethers at once.
+const DOUBLE_TETHER_MOMENTS: ReadonlySet<number> = new Set([2, 9]);
+
+function isUntakenCleave(
+  lanes: TetherLaneMap,
+  assignments: Map<number, BlackHoleAssignment> | undefined,
+  moment: number,
+  instance: number,
+  caught: PlayerInfo[]
+): boolean {
+  const perInstance = lanes.byMoment.get(moment);
+  if (!perInstance || !assignments || DOUBLE_TETHER_MOMENTS.has(moment)) return false;
+  const bandCandidates = caught.filter((p) => assignments.get(p.actorId)?.allowedMoments.has(moment));
+  if (bandCandidates.length === 0) return false;
+  return bandCandidates.every((p) =>
+    [...perInstance.entries()].some(([other, holders]) =>
+      other !== instance && holders.length === 1 && holders[0].actorId === p.actorId
+    )
+  );
+}
+
+/**
+ * moment -> players caught by a tether nobody took that cleaved the group
+ * (see isUntakenCleave). Exported for blackhole-strategy.ts's Missed
+ * Assigned Tether description.
+ */
+export function untakenTetherCleaves(players: PlayerInfo[], burstTimestamp: number): Map<number, PlayerInfo[]> {
+  const lanes = buildTetherLaneMap(players, burstTimestamp);
+  const assignments = buildAssignments(players, burstTimestamp);
+  const out = new Map<number, PlayerInfo[]>();
+  for (const moment of lanes.byMoment.keys()) {
+    for (const [instance, caught] of cleavedInstancesAt(lanes, moment)) {
+      if (isUntakenCleave(lanes, assignments, moment, instance, caught)) {
+        out.set(moment, [...(out.get(moment) ?? []), ...caught]);
+      }
+    }
+  }
+  return out;
+}
+
+// ── A lethal cleave is the cutoff (user, 2026-10-28, Pull 13 10:51) ────────
+//
+// One tether that kills several of the players it caught leaves the conga
+// unresolvable: a Raid marker goes 1ms after the cleave's own error.
+// Threshold from PITFALLS "One mechanic killing 4+ at once is its own
+// cutoff". Measured over all nine Dancing Mad reports on disk: only two
+// cleaves fall outside wipe suppression; failure 4 deaths (BpAdkacQh63VCrRM
+// Pull 13 moment 6: WHM, DRK, RPR, DNC to Nothingness 2.2-2.5s after the
+// moment; the pull ended 6s later), the other 1 death (gTkMH91DWRmLbNCn
+// Pull 5 moment 7, the DRK; the pull went on until both healers died 17s
+// later). No cleave killing 2-3 has been seen, so that range is untested.
+const LETHAL_CLEAVE_DEATHS = 4;
+const LETHAL_CLEAVE_DEATH_WINDOW_MS = 4000; // deaths seen 2.2-2.5s after the moment; the next moment is 5.0s away
+const RAID_MARKER_SORT_OFFSET_MS = 1;
 
 /**
  * Lanes stolen at `moment`: an instance whose previous-moment holder still
@@ -832,7 +926,30 @@ export function detectBlackHoleErrors(
       }
     }
 
-    for (const [, caught] of cleavedInstancesAt(lanes, moment)) {
+    for (const [instance, caught] of cleavedInstancesAt(lanes, moment)) {
+      const lethal = caught.filter((p) => deathEvents.some((d) =>
+        d.player === p.name && d.killingAbilityGameId === NOTHINGNESS_ABILITY_ID &&
+        d.timestamp >= momentTimestamp && d.timestamp - momentTimestamp <= LETHAL_CLEAVE_DEATH_WINDOW_MS
+      ));
+      if (lethal.length >= LETHAL_CLEAVE_DEATHS) {
+        errors.push({
+          ruleId:      BLACKHOLE_TETHER_CLEAVED_RULE_ID,
+          severity:    "Raid",
+          name:        "Black Hole Tether Cleave Killed Several",
+          description: `Black Hole tether #${moment} hit ${caught.length} players and killed ${lethal.length} (${lethal.map((p) => p.name).join(", ")}) — the conga is unresolvable from here, so this is treated as the cutoff point.`,
+          timestamp:   momentTimestamp + RAID_MARKER_SORT_OFFSET_MS,
+          abilityId:   NOTHINGNESS_ABILITY_ID,
+          abilityName: "Nothingness",
+        });
+      }
+
+      // A tether nobody took (see isUntakenCleave): everyone it caught is
+      // fallout; the schedule's owner is named by blackhole-strategy.ts.
+      if (isUntakenCleave(lanes, assignments, moment, instance, caught)) {
+        for (const p of caught) laneVictims.add(`${moment}:${p.actorId}`);
+        continue;
+      }
+
       // The tether belongs to whoever's own role band covers this moment;
       // everyone else it touched was standing where they were supposed to be
       // and is pure fallout.

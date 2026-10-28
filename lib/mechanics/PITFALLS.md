@@ -240,6 +240,10 @@ Topic (when it applies):
 - **A helper's cast position can be stale.** Omega P1's tower helpers
   logged round 1's spots again for round 2's towers (2qgaAkxVypGWv9CN Pull
   12); the soaker's own hit is where the tower stood.
+- **A ghost caster's position is its spawn point, not the bait.** Dancing
+  Mad's Stompies wave-1 Blizzard III "puddles" sit on the same fixed spots
+  every pull (several at centre); matching baiters to them flagged 9
+  players who stood 6–8y out. Read the baiter's own samples at the drop.
 - **A priority between two holders can be learned as order + scan.** Omega
   P1's Blaster holders take the two free cardinals by a clockwise scan from
   north, earlier conga slot first: one order and start fit 170 of 175 clean
@@ -711,6 +715,11 @@ Related:
   recount the same deaths (Lindwurm).
 - **After an enrage buff, drop per-player errors,** but keep the Raid
   marker (Nek'zali).
+- **A called reset's cutoff is the mistake that prompted it.** When most
+  of the raid walks off within seconds, the cutoff is the first Major
+  (often a Damage Down) shortly before, not the first jump; a lone jump to
+  clear a Damage Down is neither an error nor a cutoff (Dancing Mad, user
+  2026-10-28).
 - **A group failure still blames each player when each could have
   avoided it** (Lindwurm, all eight knocked off: user ruling). Add the
   player-less Raid marker as well.

@@ -136,6 +136,26 @@
 // Dango's read relative to his (~4.90y vs Sonder's 1.80y, a decisive 2.72x)
 // so the existing CULPRIT_MARGIN_RATIO catches it with NO threshold change
 // at all. A capability gap, not a miscalibrated constant.
+//
+// ── OPEN: LATE CARRIER CLIPS A NEIGHBOUR (2026-10-28, BpAdkacQh63VCrRM ────
+// ── Pull 9 0:44; not built) ─────────────────────────────────────────────
+//
+// User: the SGE "was slow to move on this one causing [the DRK] to get
+// clipped by the beam". Beam #1 (cast 0:43.5, its cast lost its target) hit
+// the SGE and the DRK at 0:44.1; the DRK then took a tower with the beam's
+// vulnerability and died. Log: the DRK stood still on its spot (0.1y off
+// from 2s before the hit on). The SGE walked from her Graven spot north
+// past the DRK (1.2y apart at 0:41.6, ~2.5s before the hit), then west to
+// her beam spot: 5.4 / 5.2 / 2.3 / 0.2 / 1.1 / 1.2y off it at 2.0 / 1.5 /
+// 1.0 / 0.65 / 0.3 / 0s before the hit, i.e. she arrived just as the beam
+// aimed (cast ≈ hit - 0.6s). At the snapshot both read on their spots, so
+// the culprit-margin test names nobody. Not encoded: it is the only
+// compromised volley on disk that isn't already fallout (the others are
+// BpAdkacQh63VCrRM Pull 8, after the called reset, and gTkMH91DWRmLbNCn
+// pull 4), so "still moving onto the spot within 1s of the hit" has no
+// clean/failure range. The beam casts' facing (all ~194-210° from the
+// statue at 10000,6500) doesn't match the carriers' bearings, so it can't
+// name the carrier either.
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerInfo } from "@/types/PlayerInfo";

@@ -78,13 +78,15 @@
 // (2026-07-24 session: ~7s to the first drop, ~3s more to the second) —
 // not yet confirmed against a second pull.
 //
-// The two waves need DIFFERENT position sources at that drop-time, though:
-// - Wave 1's ghost puddle data (fflBuildStompiesPuddleSamples) is clean —
-//   8 genuinely distinct positions, one per player, still usable even
-//   though the logged event carrying them fires at detonation, not drop
-//   (see matchPuddlesToPlayers: a ground puddle doesn't move after being
-//   placed, so its position value is identical whether read at drop or
-//   detonation — only the identity match needs a timestamp near the drop).
+// Neither wave's ghost "puddle" data is usable as a player position:
+// - Wave 1's (fflBuildStompiesPuddleSamples) was first read as 8 distinct
+//   per-player positions. It isn't (VERIFIED 2026-10-28, all 16 Stompies
+//   attempts in the 9 Dancing Mad reports on disk): the wave-1 Blizzard III
+//   "cast" (47885) positions are the ghost casters' fixed spawn points, the
+//   same set every pull — (9010,9010), a pair 20-115 units from centre,
+//   two or three at exactly (10000,10000), (10000,10400) and a pair ~1400
+//   out — while the players stand 6-10y out. Wave 1 now reads the players'
+//   own positions instead (see BAIT_TOO_CLOSE_DISTANCE).
 // - Wave 2's ghost puddle data is DEGENERATE — confirmed on this pull: all
 //   8 simultaneous "cast" entries carry the IDENTICAL position (10000,
 //   9000), Exdeath's own body snapshot rather than 8 personal ground
@@ -135,10 +137,14 @@
 // ── ERRORS DETECTED ──────────────────────────────────────────────────────
 //
 // 1. "Bait Positioned Too Close To Center" (Major) — wave 1: a player whose
-//    position is within BAIT_TOO_CLOSE_DISTANCE of arena center. Confirmed
-//    on Ayumi Emi, Archidel Del'archi, and Azura Salus this pull — the user
+//    own position samples within ±1s of the estimated drop are ALL within
+//    BAIT_TOO_CLOSE_DISTANCE (3y) of arena center (no sample: no call).
+//    Confirmed on Ayumi Emi, Archidel Del'archi, and Azura Salus this pull — the user
 //    was explicit this is a pure distance failure (direction not checked),
-//    unlike every other check in this module.
+//    unlike every other check in this module. Until 2026-10-28 the position
+//    was the nearest wave-1 ghost "puddle", which proved to be fixed spawn
+//    points (above); the user called one of the resulting flags wrong
+//    (BpAdkacQh63VCrRM Pull 1 11:40). See BAIT_TOO_CLOSE_DISTANCE.
 //
 // 2. "Wrong Tower" (Major) — wave 2: a player whose position bearing is more
 //    than WRONG_TOWER_ANGLE_TOLERANCE off their own expected tower bearing
@@ -152,21 +158,26 @@
 //    complete pair, while their own partner was alive, is flagged. See
 //    detectMolePartnerErrors for the evidence.
 //
+// 4. "Stompies Unresolvable After Death" (Raid, ffxiv-stompies-death-
+//    unresolvable) — a player still dead (not raised) at the first drop,
+//    when a Stomp-a-Mole tower hit then kills someone: their partner soaked
+//    alone. Anchored on the dead player's lethal hit; this module's own
+//    errors after it are dropped as fallout. See
+//    detectDeadAtStartUnresolvable (user, 2026-10-28, BpAdkacQh63VCrRM Pull 4).
+//
 // VOD review 2026-10-24 (user): report gTkMH91DWRmLbNCn pull 1, ruling in
-// expectations/rulings.json.
+// expectations/rulings.json. VOD review 2026-10-28 (user): report
+// BpAdkacQh63VCrRM Pull 1 11:40 (rule 1) and Pull 4 11:36-11:50 (rule 4).
 //
 // ── KNOWN LIMITATIONS (first pass, single-pull validation) ─────────────────
 //
-// - Wave 1's bait-too-close check still doesn't recover Archidel Del'archi
-//   on this pull even with all three position sources — his best available
-//   sample is 3.5s stale and sits almost exactly equidistant (587 vs 547
-//   units) between the correct puddle and a wrong one, a genuine coin-flip
-//   this module declines to force either way. Two of the three confirmed
-//   players are correctly flagged; the third is a false negative (silent),
-//   not a false positive.
-// - MATCH_DISTANCE_CEILING (wave 1's identity matching) and
-//   MAX_POSITION_SAMPLE_AGE_MS are both first-pass estimates from this one
-//   pull's data, not yet cross-validated against a second report.
+// - Wave 1's bait-too-close check has no VOD-confirmed true positive on
+//   disk: the confirmed ones (LF2yJZabVprjXYvm pull 1, PM8HY9nJ7kTR4tdQ
+//   pull 3) aren't fetched, and were found with the old puddle match, so
+//   whether the own-position check still catches them is unverified. Many
+//   players have no own sample within ±1s of the drop and get no call.
+// - MAX_POSITION_SAMPLE_AGE_MS is a first-pass estimate from one pull's
+//   data, not yet cross-validated against a second report.
 // - Only wave 1 (bait) and wave 2 (tower) are covered, per explicit user
 //   scope ("if we can just get these first 2 steps detected, that would be
 //   sufficient") — this pull never survived long enough to reach the later
@@ -177,8 +188,15 @@
 //   single pull's data, not yet cross-validated against a second report.
 //
 // ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
-//   - Bait-too-close is unfixable on report PM8HY9nJ7kTR4tdQ pull 3: the
-//     puddle positions are duplicated and grid-snapped.
+//   - Bait-too-close on report PM8HY9nJ7kTR4tdQ pull 3: the puddle
+//     positions were the ghosts' spawn points (fixed 2026-10-28 by reading
+//     own positions). Re-check against the user's call there (two players
+//     too close, per that pull's ruling note) if that report is refetched.
+//   - qjCMx4bRfgNKwX9T pull 1 11:40: the RPR is flagged (all own samples
+//     0.6y at -0.7s); not VOD-reviewed.
+//   - Rule 4 rests on one firing pull (BpAdkacQh63VCrRM 4) plus the pair
+//     structure; it isn't limited to tanks. A dead DPS or healer at the
+//     drop with a lethal solo soak fires it too.
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { PullError } from "@/types/PullError";
@@ -189,6 +207,7 @@ import { detectFFRoles, type FFRoleSlot } from "@/lib/mechanics/ffxiv/roles";
 import { findPlayerPosition } from "@/lib/mechanics/player-position";
 import { compassBearingOf, angularDistance, distanceFromCenter } from "@/lib/mechanics/geometry";
 import { kefkaPositionBearing } from "@/lib/mechanics/ffxiv/dancingmad/blackhole-strategy";
+import { aliveAt } from "@/lib/mechanics/wow/common";
 
 export const STOMPIES_BAIT_TOO_CLOSE_RULE_ID = "ffxiv-stompies-bait-too-close-to-center";
 export const STOMPIES_WRONG_TOWER_RULE_ID    = "ffxiv-stompies-wrong-tower";
@@ -206,8 +225,44 @@ const WAVE_CLUSTER_TOLERANCE_MS = 500;
 // is not trusted — see module header.
 const MAX_POSITION_SAMPLE_AGE_MS = 4000;
 
-// First-pass thresholds — see module header's "Known limitations."
+// BAIT TOO CLOSE: THE BAITER'S OWN POSITION, NOT THE "PUDDLE" (user,
+// 2026-10-28, report BpAdkacQh63VCrRM Pull 1 11:40: "Detection is incorrect
+// here. [The PCT] places the puddle reasonably in this pull. It's fairly well
+// aligned with the rest of the group.").
+//
+// The wave-1 Blizzard III "cast" positions this check used to match players
+// to are not the baits at all: they are the ghost casters' own spawn points,
+// the SAME set in every pull on disk — (9010,9010), a pair 20-115 units from
+// centre, two or three at exactly (10000,10000), (10000,10400) and a pair at
+// ~1400 out (e.g. BpAdkacQh63VCrRM pull 1: (9010,9010) x2, (9982,10050) x2,
+// (10000,10000) x3, (10000,10400)). Matching a player to the nearest one
+// within 700 units flagged whoever stood closest to a centre ghost: 7 flags
+// in BpAdkacQh63VCrRM (pulls 1, 3, 4, 5, 10), every one 6.0-8.3y out by the
+// player's own samples. Same root cause as PM8HY9nJ7kTR4tdQ pull 3's
+// unreconcilable flags (ruling note, 2026-08-10).
+//
+// So the check reads the player's own positions within
+// ±BAIT_POSITION_WINDOW_MS of the estimated drop and compares the FARTHEST of
+// them to the line. The window is tight because the raid is running out from
+// centre right at the drop, ~200-400 units/s (qjCMx4bRfgNKwX9T pull 1 RPR
+// 64 -> 681 units across 3.0s; its WAR MT 320 -> 600 across 0.7s): one
+// second either side already moves a player most of the 300-unit line.
+// Measured on all 16 Stompies attempts in the 9 Dancing Mad reports on disk:
+//   clean extreme: the farthest own sample in the window is >= 597 units
+//     (6.0y; BpAdkacQh63VCrRM pull 10 PCT) for every player who has one,
+//     bar one; the pull 1 PCT the user called fine reads 6.95y. Many
+//     players have no sample in the window and are skipped (fail closed).
+//   flagged: qjCMx4bRfgNKwX9T pull 1 11:40, the RPR: three samples, all
+//     64 units (0.6y) at -0.7s, then 681 at +2.3s. The old puddle match
+//     flagged the same player; not yet VOD-reviewed.
+//   no longer flagged (unreviewed, same root cause): qjCMx4bRfgNKwX9T pull 6
+//     11:40 WAR (farthest 6.0y; 3.2y at -0.3s, 6.0y at +0.4s) and
+//     yBKPqGwHparm7Tk4 pull 5 DRK (farthest 8.3y).
+// No VOD-confirmed too-close bait is on disk (the confirmed ones, report
+// LF2yJZabVprjXYvm pull 1 and PM8HY9nJ7kTR4tdQ pull 3, are not fetched), so
+// the 300-unit line itself is still the first-pass value.
 const BAIT_TOO_CLOSE_DISTANCE       = 300;
+const BAIT_POSITION_WINDOW_MS       = 1000;
 // 45 degrees (halfway to a neighboring tower) is the theoretical boundary,
 // but real players don't land on the mathematical point — confirmed-correct
 // positions on this pull landed up to ~57 degrees off (Ayumi Emi, Archidel
@@ -379,58 +434,23 @@ function isDeadBefore(deathEvents: DeathEvent[], playerName: string, timestamp: 
 }
 
 /**
- * Assigns each player to their nearest ghost puddle sample at the wave's
- * timestamp — precise ground-truth position (see fflBuildStompiesPuddle
- * Samples), just missing a player label. Identity only needs to survive a
- * rough approximate match here (the ghosts are typically hundreds to
- * thousands of units apart in practice — a much easier bar than getting a
- * bearing exactly right), via each player's own best-available damageTaken/
- * healing sample. Greedy nearest-first so a clearly-best pairing is locked
- * in before weaker ones compete for what's left; unmatched players (no
- * player-side sample, or more players than ghosts found) are simply
- * skipped — same fail-closed posture as the rest of this module.
- *
- * A match distance beyond MATCH_DISTANCE_CEILING is rejected outright
- * rather than accepted as "best available." Without this, a pull where
- * only some players have a usable approximate sample (e.g. a healer who
- * rarely lands hits on the boss, the only source dense enough for this
- * quiet mechanic-transition window — see nearestPosition) forces the
- * REMAINING players into whichever leftover puddle slots are still open,
- * even when none of them are actually a good fit — confirmed on report
- * LF2yJZabVprjXYvm pull 1: with only 6 of 8 players having a fresh-enough
- * sample, Kade Kansado and Chauzey Solstice got force-matched to puddles
- * 790/1177 units from their real approximate position (both wrong), while
- * every genuinely good match on the same pull landed under 590.
+ * Every position this player's own events carry within ±BAIT_POSITION_WINDOW_MS
+ * of `timestamp` — the same streams findPlayerPosition pools (damage taken,
+ * self-heals, self-targeted casts, heals received, boss-hit samples), but all
+ * of them rather than the single nearest.
  */
-const MATCH_DISTANCE_CEILING = 700;
-
-function matchPuddlesToPlayers(
-  players: PlayerInfo[],
-  puddleSamples: Position[],
-  waveTimestamp: number,
-  playerPositionSamples: PlayerPositionSample[]
-): Map<string, Position> {
-  type Candidate = { playerName: string; puddleIndex: number; distance: number };
-  const candidates: Candidate[] = [];
-
-  for (const player of players) {
-    const approx = nearestPosition(player, waveTimestamp, playerPositionSamples);
-    if (!approx) continue;
-    puddleSamples.forEach((puddle, puddleIndex) => {
-      const distance = Math.hypot(puddle.x - approx.x, puddle.y - approx.y);
-      if (distance <= MATCH_DISTANCE_CEILING) candidates.push({ playerName: player.name, puddleIndex, distance });
-    });
-  }
-  candidates.sort((a, b) => a.distance - b.distance);
-
-  const result = new Map<string, Position>();
-  const usedPuddles = new Set<number>();
-  for (const c of candidates) {
-    if (result.has(c.playerName) || usedPuddles.has(c.puddleIndex)) continue;
-    result.set(c.playerName, puddleSamples[c.puddleIndex]);
-    usedPuddles.add(c.puddleIndex);
-  }
-  return result;
+function ownPositionsNear(player: PlayerInfo, timestamp: number, playerPositionSamples: PlayerPositionSample[]): Position[] {
+  const near = (t: number) => Math.abs(t - timestamp) <= BAIT_POSITION_WINDOW_MS;
+  const out: Position[] = [];
+  const add = (t: number, x: number | undefined, y: number | undefined) => {
+    if (x !== undefined && y !== undefined && near(t)) out.push({ x, y });
+  };
+  for (const e of player.damageTaken) add(e.timestamp, e.x, e.y);
+  for (const e of player.healing) if (e.target === player.name || e.source === player.name) add(e.timestamp, e.x, e.y);
+  for (const e of player.casts) if (e.target === player.name) add(e.timestamp, e.x, e.y);
+  for (const e of player.healingReceived) add(e.timestamp, e.x, e.y);
+  for (const s of playerPositionSamples) if (s.playerName === player.name) add(s.timestamp, s.x, s.y);
+  return out;
 }
 
 function detectBaitTooCloseErrors(
@@ -438,28 +458,29 @@ function detectBaitTooCloseErrors(
   deathEvents: DeathEvent[],
   dropTimestamp: number,
   slotByName: Map<string, FFRoleSlot>,
-  puddleSamples: Position[],
   playerPositionSamples: PlayerPositionSample[]
 ): PullError[] {
   const errors: PullError[] = [];
-  const positionByPlayer = matchPuddlesToPlayers(players, puddleSamples, dropTimestamp, playerPositionSamples);
 
   for (const player of players) {
     if (isDeadBefore(deathEvents, player.name, dropTimestamp)) continue;
     const slot = slotByName.get(player.name);
     if (!slot) continue;
 
-    const pos = positionByPlayer.get(player.name);
-    if (!pos) continue;
-
-    const distance = distanceFromCenter(pos.x, pos.y);
+    // Fail closed: no own sample near the drop, no call. Flag only when
+    // EVERY sample in the window is inside the line (the farthest one is
+    // what's compared), so a player caught mid-run-out isn't read as
+    // standing at centre.
+    const positions = ownPositionsNear(player, dropTimestamp, playerPositionSamples);
+    if (positions.length === 0) continue;
+    const distance = Math.max(...positions.map((p) => distanceFromCenter(p.x, p.y)));
     if (distance >= BAIT_TOO_CLOSE_DISTANCE) continue;
 
     errors.push({
       ruleId:      STOMPIES_BAIT_TOO_CLOSE_RULE_ID,
       severity:    "Major",
       name:        "Bait Positioned Too Close To Center",
-      description: "Didn't move far enough from center when baiting the first Blizzard III puddle — standing too close to the middle strains the rest of the raid's spread.",
+      description: `Was ~${(distance / 100).toFixed(1)} yalms from center when the first Blizzard III puddle dropped — baits go out to the intercardinals, and standing in the middle strains the rest of the raid's spread.`,
       timestamp:   dropTimestamp,
       player:      player.name,
       class:       player.className,
@@ -592,6 +613,57 @@ function detectMolePartnerErrors(players: PlayerInfo[], deathEvents: DeathEvent[
   return errors;
 }
 
+// ── DEAD AT THE FIRST DROP -> UNRESOLVABLE (2026-10-28, BpAdkacQh63VCrRM) ──
+// Stomp-a-Mole's four towers are soaked in pairs (above), so a player still
+// dead when the Blizzard III baits drop leaves a partner to soak alone, and
+// a solo soak kills: 149-271k solo (BpAdkacQh63VCrRM pull 4 DRG and PLD;
+// gTkMH91DWRmLbNCn pull 1 WHM 205k, all three died) against 56-188k for
+// the pairs in every clean resolution. User, 2026-10-28, Pull 4 11:36-11:50
+// (the DRK died to a boss auto at 11:36, 4s before the first drop, and was
+// raised only for the last tower): "[The DRK] being dead makes this mostly
+// unrecoverable. The pull isn't really recoverable after that death. I
+// think [the PCT] tried to help with the stack to prevent more deaths." So
+// the death is the cutoff, and the PCT's wrong tower (11:43) and the solo
+// soak deaths after it are its fallout.
+//
+// Gated on the outcome, as PITFALLS' "A death that leaves later shares
+// short is a cutoff only if the shortfall killed": it fires only when a
+// Stomp-a-Mole tower hit then kills someone. Checked on every Stompies
+// attempt on disk (16, 9 reports): the only player dead at the drop is that
+// DRK. gTkMH91DWRmLbNCn pull 11 had its DRK (6:19) and PCT (~11:18) die
+// before Stompies and both raised in time: everyone alive at the drop, all
+// four towers paired, and the pull went on to the Phase 3 enrage — so
+// "alive at the drop" (lib/mechanics/wow/common.ts aliveAt: a hit or cast
+// after the death) is what separates the two, not "died this phase".
+export const STOMPIES_DEATH_UNRESOLVABLE_RULE_ID = "ffxiv-stompies-death-unresolvable";
+const DEATH_EVENT_LAG_MS = 2000; // FFLogs' death event lands ~2s after the lethal hit
+const RAID_MARKER_SORT_OFFSET_MS = 1;
+
+function detectDeadAtStartUnresolvable(players: PlayerInfo[], deathEvents: DeathEvent[], dropTimestamp: number): PullError | null {
+  const deadAtDrop = players.filter((p) => !aliveAt(p, deathEvents, dropTimestamp));
+  if (deadAtDrop.length === 0) return null;
+  const moleKill = deathEvents.some((d) => d.killingAbilityGameId === STOMP_A_MOLE_TOWER_ABILITY_ID && d.timestamp > dropTimestamp);
+  if (!moleKill) return null;
+
+  // The latest unraised death before the drop is the one that left the pair short.
+  const deaths = deadAtDrop
+    .map((p) => deathEvents.filter((d) => d.player === p.name && d.timestamp <= dropTimestamp).sort((a, b) => b.timestamp - a.timestamp)[0])
+    .filter((d): d is DeathEvent => d !== undefined)
+    .sort((a, b) => b.timestamp - a.timestamp);
+  const death = deaths[0];
+  if (!death) return null;
+  const names = deadAtDrop.map((p) => p.name).join(" and ");
+  return {
+    ruleId:      STOMPIES_DEATH_UNRESOLVABLE_RULE_ID,
+    severity:    "Raid",
+    name:        "Stompies Unresolvable After Death",
+    description: `${names} ${deadAtDrop.length > 1 ? "were" : "was"} dead when the first Blizzard III puddles dropped. Stomp-a-Mole's towers are soaked in pairs, so a partner had to soak alone and the solo soak killed — unresolvable from here; treated as a cutoff point for further per-player analysis this pull.`,
+    timestamp:   Math.max(0, death.timestamp - DEATH_EVENT_LAG_MS) + RAID_MARKER_SORT_OFFSET_MS,
+    abilityId:   death.killingAbilityGameId,
+    abilityName: death.cause,
+  };
+}
+
 /**
  * Returns [] for any pull that never reaches this mechanic (no "Earthquake"
  * cast from the real Kefka, or fewer than 2 Blizzard III waves), or where
@@ -620,17 +692,27 @@ export function detectStompiesErrors(
     if (assignment.player) slotByName.set(assignment.player.name, assignment.slot);
   }
 
-  const wave1Puddles: Position[] = (puddleSamples ?? []).filter((p) => p.timestamp === dataWave1);
+  // puddleSamples is no longer read: the wave-1 "puddle" positions are the
+  // ghost casters' fixed spawn points, not the baits (see BAIT_TOO_CLOSE_DISTANCE).
+  void puddleSamples;
   const positionSamples = playerPositionSamples ?? [];
 
   const errors: PullError[] = [
-    ...detectBaitTooCloseErrors(players, deathEvents, dropTime1, slotByName, wave1Puddles, positionSamples),
+    ...detectBaitTooCloseErrors(players, deathEvents, dropTime1, slotByName, positionSamples),
   ];
   if (dataWave2 !== null) {
     errors.push(...detectWrongTowerErrors(players, deathEvents, kefkaBearing, dropTime2, dataWave2, slotByName, positionSamples));
   }
   const wrongTower = new Set(errors.filter((e) => e.ruleId === STOMPIES_WRONG_TOWER_RULE_ID).map((e) => e.player));
   errors.push(...detectMolePartnerErrors(players, deathEvents, slotByName).filter((e) => !wrongTower.has(e.player)));
+
+  // A player dead at the first drop: the pull's cutoff, and everything this
+  // module would flag after it is that death's fallout (README rule 2).
+  const unresolvable = detectDeadAtStartUnresolvable(players, deathEvents, dropTime1);
+  if (unresolvable) {
+    return [...errors.filter((e) => e.timestamp < unresolvable.timestamp), unresolvable]
+      .sort((a, b) => a.timestamp - b.timestamp);
+  }
 
   return errors.sort((a, b) => a.timestamp - b.timestamp);
 }

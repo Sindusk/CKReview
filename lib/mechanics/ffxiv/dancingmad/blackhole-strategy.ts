@@ -64,6 +64,7 @@ import {
   momentIndexFor,
   isCompromisedMoment,
   robbedTetherMoments,
+  untakenTetherCleaves,
   NOTHINGNESS_ABILITY_ID,
   TETHER_MOMENT_OFFSETS_MS,
   type LineNumber,
@@ -433,6 +434,11 @@ export function detectMissedAssignedTetherErrors(pull: Pull, strategy: BlackHole
   // Confirmed 2026-08-10 (report PM8HY9nJ7kTR4tdQ pulls 1 and 25, moment 8).
   const robbed = robbedTetherMoments(pull.players, burstTimestamp);
 
+  // A tether that went untaken and cleaved the group (blackhole.ts's
+  // untakenTetherCleaves): blackhole.ts names nobody, so the player due it
+  // carries the cleave (user, 2026-10-28, BpAdkacQh63VCrRM Pull 13 10:51).
+  const untaken = untakenTetherCleaves(pull.players, burstTimestamp);
+
   for (const [named, moments] of schedule) {
     const player = pull.players.find((p) => p.name === named.name);
     if (!player) continue;
@@ -450,11 +456,14 @@ export function detectMissedAssignedTetherErrors(pull: Pull, strategy: BlackHole
       if (isDeadAtMoment(pull, player.name, momentTimestamp)) continue;
       if (robbed.has(`${moment}:${player.name}`)) continue; // taken off them — see robbedTetherMoments
 
+      const cleaved = untaken.get(moment);
       errors.push({
         ruleId:      BLACKHOLE_MISSED_ASSIGNED_RULE_ID,
         severity:    "Major",
         name:        "Missed Assigned Black Hole Tether",
-        description: `Assigned tether #${moment} (${slotLabel}) but wasn't hit by it — either out of position when it fired, or it retargeted onto someone else, straining the raid's soak schedule.`,
+        description: cleaved
+          ? `Assigned tether #${moment} (${slotLabel}) but wasn't hit by it — the tether went off without its taker and cleaved ${cleaved.map((p) => p.name).join(", ")} instead. Take your own tether and walk it clear of the stack and the neighbouring holders.`
+          : `Assigned tether #${moment} (${slotLabel}) but wasn't hit by it — either out of position when it fired, or it retargeted onto someone else, straining the raid's soak schedule.`,
         timestamp:   momentTimestamp,
         player:      player.name,
         class:       player.className,

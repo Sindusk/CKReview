@@ -60,7 +60,9 @@
 // a two-player tower swap (same-debuff pairs on both towers), and a
 // 1005086 holder soaking too far in so their proximity cone latched onto
 // the wrong bait and cleaved half the raid. See the Phase-2 section below
-// for the full geometry model and attribution rules.
+// for the full geometry model and attribution rules. Rule (2) is reported
+// only when the resolution's follow-ups went wrong (user, 2026-10-28; see
+// FOLLOWUP_DESIGN_HEADCOUNT).
 //
 // ── PHASE 3: WHEN THE MECHANIC IS OVER (see DEATH DURING FORSAKEN below) ────
 //
@@ -104,6 +106,19 @@
 //     the partner was late; the holder was right).
 //   - Cone Bait Too Far skips a candidate within 50 units (half a yalm) of
 //     the victim's distance: too close to call (pull 13: 648 vs 633).
+// VOD review 2026-10-28 (user): report BpAdkacQh63VCrRM Pull 6 5:13 (tower
+// 7, Circle holder measured toward centre; their circle hit only
+// themselves, no extra hit, no death): "Everyone survived ... Hard to
+// detect from logs alone." Rule change:
+//   - Wrong Spot In Tower (both the pair check and the 3+1 lone soaker)
+//     now needs a consequence in that resolution: a follow-up volley off
+//     its design headcount (Circle 1, Cone 1, Stack 3), anyone in two
+//     volleys, or a death within 6s. VERIFIED 2026-10-28 on all 9 reports
+//     on disk: 161 of 166 resolutions are exactly the design shape with no
+//     double hit and no death (Pull 6 5:13 among them); all 5 others had a
+//     death. The precedent gTkMH91DWRmLbNCn pull 9 tower 7 (PLD late) had a
+//     cone on two players, two double hits and five deaths: still flagged.
+//     Only those two Wrong Spot calls existed on disk.
 // Not modeled:
 //   - the 47807 failed-tower kill
 //   - clone-overlap positioning geometry (the rule is outcome-gated only)
@@ -1053,6 +1068,27 @@ const STACK_ASSIGNMENT_DEBUFF_ID = 1005084; // "Stack" — see ASSIGNMENT_DEBUFF
 const STACK_CLIP_DEATH_WINDOW_MS = 3000;    // fatal hit → death event lag (matches CONE_DEATH_WINDOW_MS)
 const STACK_VOLLEY_GAP_MS        = 200;     // one volley's hits land within ~130ms of each other
 
+// Wrong Spot In Tower needs a CONSEQUENCE (user, 2026-10-28, report
+// BpAdkacQh63VCrRM Pull 6 5:13: a Circle holder measured toward centre in
+// tower 7, but their circle hit only themselves, nobody took an extra hit,
+// nobody died — "probably just a snapshot and quick movement ... Hard to
+// detect from logs alone"). The planted follow-ups have a fixed design
+// headcount: Circle (47809) 1, Cone (47810) 1, Stack (47808) 3. Across all
+// 166 resolutions on the 9 Dancing Mad reports on disk (2026-10-28), 161
+// are exactly that shape with nobody in two volleys and no death within 6s;
+// all 5 others had a death (the precedent gTkMH91DWRmLbNCn pull 9 tower 7:
+// a cone on two players, two players double-hit, five deaths). A spot that
+// measures wrong while every follow-up resolved to design is not flagged.
+const CIRCLE_FOLLOWUP_ABILITY_ID = 47809;
+const FOLLOWUP_DESIGN_HEADCOUNT: ReadonlyMap<number, number> = new Map([
+  [STACK_FOLLOWUP_ABILITY_ID, 3],
+  [CIRCLE_FOLLOWUP_ABILITY_ID, 1],
+  [CONE_FOLLOWUP_ABILITY_ID, 1],
+]);
+// Death events lag the fatal hit ~2s; follow-ups land ≤ ~1.3s after the
+// soak. 6s from the resolution covers both without reaching the next one.
+const FOLLOWUP_DEATH_WINDOW_MS = 6000;
+
 
 // The 8 fixed tower spawn points: 4 diagonal + 4 cardinal, all on the
 // r=800 ring around arena center. Identical across every log observed.
@@ -1499,6 +1535,17 @@ function detectWrongTowerPositionErrors(
     }
   }
 
+  // Every planted follow-up hit (Stack / Circle / Cone), for the Wrong Spot
+  // consequence gate (see FOLLOWUP_DESIGN_HEADCOUNT).
+  type FollowUpHit = { timestamp: number; abilityId: number; instance: number | undefined; actorId: number };
+  const followUpHits: FollowUpHit[] = [];
+  for (const player of players) {
+    for (const e of player.damageTaken) {
+      if (!FOLLOWUP_DESIGN_HEADCOUNT.has(e.abilityId)) continue;
+      followUpHits.push({ timestamp: e.timestamp, abilityId: e.abilityId, instance: e.sourceInstance, actorId: player.actorId });
+    }
+  }
+
   // Group into resolution moments, keeping only each player's FIRST hit per
   // moment (the earliest event is the closest snapshot to the actual soak —
   // a "damage" record landing ~700ms later may already show them moving away).
@@ -1600,6 +1647,31 @@ function detectWrongTowerPositionErrors(
       conePlantCount > 0 &&
       (windowConeHits.length > conePlantCount ||
         windowConeHits.some((h) => h.victimCenterDist < 800));
+
+    // Did this resolution's planted follow-ups go wrong at all? A volley
+    // off its design headcount, anyone caught by two volleys, or a death
+    // shortly after. Wrong Spot In Tower is only reported when this holds
+    // (user, 2026-10-28, BpAdkacQh63VCrRM Pull 6 5:13; see
+    // FOLLOWUP_DESIGN_HEADCOUNT).
+    const followUpConsequence = (() => {
+      if (coneOutcomeBad) return true;
+      const volleys = new Map<string, Set<number>>();
+      const volleysByActor = new Map<number, Set<string>>();
+      for (const h of followUpHits) {
+        if (h.timestamp < clusterTime || h.timestamp > clusterTime + CONE_FIRE_WINDOW_MS) continue;
+        const key = `${h.abilityId}#${h.instance}`;
+        (volleys.get(key) ?? volleys.set(key, new Set()).get(key)!).add(h.actorId);
+        (volleysByActor.get(h.actorId) ?? volleysByActor.set(h.actorId, new Set()).get(h.actorId)!).add(key);
+      }
+      for (const [key, victims] of volleys) {
+        const abilityId = Number(key.split("#")[0]);
+        if (victims.size !== FOLLOWUP_DESIGN_HEADCOUNT.get(abilityId)) return true;
+      }
+      if ([...volleysByActor.values()].some((v) => v.size > 1)) return true;
+      return deathEvents.some(
+        (d) => d.timestamp >= clusterTime && d.timestamp <= clusterTime + FOLLOWUP_DEATH_WINDOW_MS
+      );
+    })();
 
     // ── Stack overlapped the cone bait: the plant sat too far OUT ───────────
     //
@@ -1854,7 +1926,7 @@ function detectWrongTowerPositionErrors(
 
             const intruderDebuffId = trio.assignments[intruders[0]].abilityId;
             const expected = expectedSpotFor(loneDebuff.abilityId, intruderDebuffId);
-            if (expected !== undefined && lone.tower !== undefined &&
+            if (expected !== undefined && lone.tower !== undefined && followUpConsequence &&
                 !isAtSpot(lone.soaks[0], expected, lone.tower, undefined)) {
               errors.push({
                 ruleId:      FORSAKEN_WRONG_SPOT_RULE_ID,
@@ -2004,6 +2076,10 @@ function detectWrongTowerPositionErrors(
         // (r 894) and the cone still hit only its far bait (see the
         // flare-outcome comment above the spot table).
         if (expected === "flare" && !coneOutcomeBad) return;
+        // Any other wrong spot likewise needs a consequence (user,
+        // 2026-10-28, Pull 6 5:13: "Everyone survived, so it's probably
+        // just a snapshot and quick movement").
+        if (!followUpConsequence) return;
 
         wrongSpotPlayers.add(soak.player.actorId);
         errors.push({

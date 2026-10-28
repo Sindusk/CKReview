@@ -52,9 +52,17 @@
 // sits 45° from clone N's, with the starting slot and rotation direction
 // varying per pull. The instance IS the player's strategy number
 // (confirmed: a pull's #1/#7/#8 assignments matched instances 1/7/8).
-// Clean baits deviate ≤ ~13° from their slot. EVERY living player gets
-// hit — a full shield absorb still logs a 0-damage hit — so "nobody was
-// hit by dash N" is never a thing to detect on a player.
+// Clean baits deviate ≤ ~13° from their slot. Living players normally
+// all get hit — a full shield absorb still logs a 0-damage hit — but a
+// dash CAN be dodged: VERIFIED 2026-10-28, BpAdkacQh63VCrRM Pull 4 8:51,
+// the DRG (head marker 440 = number 8) stood on his slot (r≈17.7y), cast
+// Winged Glide into the boss at 8:51.3 and dash 8 hit nobody; dashes 1-7
+// hit seven distinct players once each, nobody died. The user ruled it
+// not an error ("He dodged the mechanic"), so an un-hit player whose own
+// clone hit nobody is not flagged (see "dashesDodged"). Of the 19 dash
+// sets on the 9 Dancing Mad reports on disk, it is the only one with a
+// living un-hit player; the other 18 hit every living player once (or
+// re-targeted around a player dead before the set).
 //
 // The dash itself is a straight chord across the arena: the clones sit ON
 // the rim (r=2000, at the k*45° angles between bait slots — both facts
@@ -106,6 +114,15 @@
 // The numbers are head markers on the players (2026-10-18, for the
 // replay): 336-339 = 1-4, 437-440 = 5-8, 12.5-14s before their dash
 // (2T1HzdPKgbhM43am fight 10: dash k hit marker k's player, all eight).
+//
+// ── RULES IMPLEMENTED (changes) ─────────────────────────────────────────
+//   - ffxiv-limitcut-wrong-dash-position, missing-player form (2026-10-28,
+//     user, BpAdkacQh63VCrRM Pull 4 8:51): skipped when the dash was
+//     dodged — every un-hit living player's clone hit nobody, every other
+//     dash hit one player, nobody was hit twice, and nobody died from the
+//     first dash to 10s after the last. The slot check then runs on the
+//     remaining dashes as usual. A clone that lands on someone else (the
+//     G7kTFVxjcAC6p1MN pull 12 retarget) is still flagged.
 //
 // ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
 // Not built:
@@ -557,8 +574,34 @@ function detectDashErrors(
     }
   }
 
-  if (missingPlayers.length > 0) {
-    for (const p of missingPlayers) {
+  // A dodged dash is not an error (user, 2026-10-28, BpAdkacQh63VCrRM Pull
+  // 4 8:51: the DRG, number 8, was on his slot, dashed in to the boss with
+  // Winged Glide as dash 8 fired, and dash 8 hit nobody — "He dodged the
+  // mechanic. Not a mechanical failure, as he lived and so did everyone
+  // else."). The signature: each un-hit living player's clone hit NOBODY
+  // (as many instances with no victim as un-hit players), every other dash
+  // hit exactly one player, nobody was hit twice, and nobody died during
+  // the set or the 10s after. A real retarget is the opposite shape — the
+  // missing player's clone lands on someone else (G7kTFVxjcAC6p1MN pull
+  // 12: two victims on one dash) — and stays flagged below.
+  const emptyInstanceCount = [1, 2, 3, 4, 5, 6, 7, 8].filter((i) => !victimsByInstance.has(i)).length;
+  const everyDashSingleVictim = [...victimsByInstance.values()].every((g) => g.length === 1);
+  const nobodyHitTwice = [...hitsByActor.values()].every(
+    (hs) => new Set(hs.map((h) => h.instance)).size === 1
+  );
+  const deathDuringSet = deathEvents.some(
+    (d) => d.timestamp >= firstDashTime && d.timestamp <= lastDashTime + FALL_GRACE_WINDOW_MS
+  );
+  const dashesDodged =
+    missingPlayers.length > 0 &&
+    emptyInstanceCount === missingPlayers.length &&
+    everyDashSingleVictim &&
+    nobodyHitTwice &&
+    !deathDuringSet;
+  const flaggedMissingPlayers = dashesDodged ? [] : missingPlayers;
+
+  if (flaggedMissingPlayers.length > 0) {
+    for (const p of flaggedMissingPlayers) {
       const assignedNumber = assignedNumberByActor.get(p.actorId);
       const ownPos = findOwnPositionNear(p, lastDashTime);
 

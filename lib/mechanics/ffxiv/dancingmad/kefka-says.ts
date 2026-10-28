@@ -728,6 +728,22 @@ function detectFloodOfNaughtErrors(players: PlayerInfo[]): PullError[] {
 // Vmbf p20 the lethal Death Wave lands at +809.38s and the Petrification
 // Damage Downs at +809.56s, so anchoring on the hit puts the marker where
 // it belongs: before its own fallout.
+//
+// RULES IMPLEMENTED (change, 2026-10-28): ffxiv-kefka-says-death-unresolvable
+// and the phase cutoff skip a deliberate Damage Down walk-off (user,
+// BpAdkacQh63VCrRM Pull 5 14:15: the DRK, holding the Death Bomb Damage
+// Down from 13:51, died with no killing blow and was raised at 14:22; "The
+// DRK had a damage down, so they were resetting the buff. No error here.").
+// The death must have no killing ability and no 0-HP hit, the victim must
+// still hold Damage Down 1002911 at it, and the raid must reach Phase 5
+// (an Ultima Repeater 47936 cast after the death). The next death, if any,
+// is then the phase's first. The acceleration-bomb error that gave the
+// Damage Down stays. VERIFIED 2026-10-28 (9 reports on disk): the Death
+// Bomb Damage Down's removal lands exactly at the walk-off (14:15.6, death
+// event 14:17.6); the only other no-killing-blow Damage Down deaths in
+// Phase 4 (BpAdkacQh63VCrRM pull 3 PLD 14:11 and DRK 14:19, pull 6 DRK
+// 14:17) were in pulls that failed the Phase 4 HP check (no Ultima
+// Repeater) and are untouched — pull 6's starts the called wipe.
 
 
 /**
@@ -816,6 +832,11 @@ const DEATH_ATTRIBUTION_WINDOW_MS = 30_000;
 // pull 20: marker +809.381s, shriek Damage Downs from +809.957s).
 const DEATH_MARKER_SORT_OFFSET_MS = 1;
 
+// Damage Down (the Death Bomb / shriek penalty) and Phase 5's first cast,
+// for the Damage Down walk-off exception (see isDamageDownWalkOff).
+const DAMAGE_DOWN_ABILITY_ID     = 1002911;
+const ULTIMA_REPEATER_ABILITY_ID = 47936;
+
 // FFLogs positions are centi-yalms.
 const CENTI_YALMS_PER_YALM = 100;
 
@@ -896,21 +917,65 @@ function grandCrossStates(
  * p17 Sayacissa dies to an unresolved Beyond Death expiring, which carries
  * no damage event and no killing ability id, so the fallback applies).
  */
+/**
+ * A deliberate walk-off to clear a Damage Down (user, 2026-10-28,
+ * BpAdkacQh63VCrRM Pull 5 14:15: "The DRK had a damage down, so they were
+ * resetting the buff. No error here. The error occurred earlier when they
+ * got the damage down. The DPS check was met so no harm was done. The body
+ * checks were complete by the time that this happened."). phase1.ts makes
+ * the same exception for its jump rule. The signature: no killing ability
+ * and no 0-HP hit in the lookback, Damage Down (1002911) still held at the
+ * death (its removal is the death itself, ~2.0s before the event), and the
+ * raid went on to pass Phase 4 (Phase 5's first Ultima Repeater, 47936, is
+ * cast after the death). VERIFIED 2026-10-28 on the 9 reports on disk: the
+ * only other no-killing-blow Damage Down deaths in Phase 4 (BpAdkacQh63VCrRM
+ * pulls 3 and 6, the DRK and PLD) were in pulls that failed the Phase 4 HP
+ * check, so they are untouched.
+ */
+function isDamageDownWalkOff(
+  victim:          PlayerInfo | undefined,
+  death:           DeathEvent,
+  lethalHitFound:  boolean,
+  enemyCastEvents: EnemyEvent[]
+): boolean {
+  if (!victim || death.killingAbilityGameId || lethalHitFound) return false;
+  const dd = victim.debuffs
+    .filter((d) => d.abilityId === DAMAGE_DOWN_ABILITY_ID && d.timestamp <= death.timestamp)
+    .sort((a, b) => a.timestamp - b.timestamp);
+  const lastApply = [...dd].reverse().find((d) => d.debuffStatus === "applied");
+  if (!lastApply) return false;
+  const removedBefore = dd.some(
+    (d) =>
+      d.debuffStatus === "removed" &&
+      d.timestamp >= lastApply.timestamp &&
+      d.timestamp < death.timestamp - DEATH_HIT_LOOKBACK_MS
+  );
+  if (removedBefore) return false;
+  return enemyCastEvents.some((e) => e.abilityId === ULTIMA_REPEATER_ABILITY_ID && e.timestamp > death.timestamp);
+}
+
 function firstPhaseDeath(
-  players:     PlayerInfo[],
-  deathEvents: DeathEvent[],
-  from:        number
+  players:         PlayerInfo[],
+  deathEvents:     DeathEvent[],
+  from:            number,
+  enemyCastEvents: EnemyEvent[] = []
 ): { timestamp: number; playerName: string; abilityId: number; abilityName: string } | null {
   const deaths = deathEvents
     .filter((d) => d.timestamp >= from)
     .sort((a, b) => a.timestamp - b.timestamp);
-  const death = deaths[0];
+
+  const lethalHitFor = (death: DeathEvent) =>
+    players.find((p) => p.name === death.player)?.damageTaken
+      .filter((e) => e.healthAfter === 0 && e.timestamp <= death.timestamp && e.timestamp >= death.timestamp - DEATH_HIT_LOOKBACK_MS)
+      .sort((a, b) => b.timestamp - a.timestamp)[0];
+
+  // Skip deliberate Damage Down walk-offs: not the death that ends the phase.
+  const death = deaths.find(
+    (d) => !isDamageDownWalkOff(players.find((p) => p.name === d.player), d, lethalHitFor(d) !== undefined, enemyCastEvents)
+  );
   if (!death) return null;
 
-  const victim = players.find((p) => p.name === death.player);
-  const lethal = victim?.damageTaken
-    .filter((e) => e.healthAfter === 0 && e.timestamp <= death.timestamp && e.timestamp >= death.timestamp - DEATH_HIT_LOOKBACK_MS)
-    .sort((a, b) => b.timestamp - a.timestamp)[0];
+  const lethal = lethalHitFor(death);
 
   return {
     timestamp:   lethal?.timestamp ?? death.timestamp,
@@ -1254,7 +1319,7 @@ export function detectKefkaSaysErrors(
     .sort((a, b) => a - b)[0];
   const phaseStart = kefkaSays ?? crosses[0]?.timestamp;
 
-  const death  = phaseStart === undefined ? null : firstPhaseDeath(players, deathEvents, phaseStart);
+  const death  = phaseStart === undefined ? null : firstPhaseDeath(players, deathEvents, phaseStart, enemyCastEvents);
   const cutoff = death ? death.timestamp : Number.POSITIVE_INFINITY;
 
   // Every check is cut off at the first death, Flood included — an earlier

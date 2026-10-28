@@ -87,6 +87,25 @@
 //   (Quake 47946 / Tornado 47947). No tower priority was needed: when a
 //   tower was under-filled with everyone alive, exactly the idle player(s)
 //   soaked nothing (ZADQ#7 +71.6, KZXy#7 +77.6, q4K9#3 +71.6, rWVf#16). (Q4)
+// - Celestriad tower convention (2026-10-28, all 9 reports on disk, both
+//   statics): the four pairs are fixed by INITIAL resistance debuff (Fire,
+//   Ice, Lightning, none) and soak together in all three waves. Tower spots
+//   are nine compass bearings 20, 60, ... 340. When two towers of one element
+//   are lit, the no-debuff pair takes the clockwise-second (the right one,
+//   looking out from center) and a debuffed pair the clockwise-first (left);
+//   "first CW" is where the short arc between the two starts. Held in every
+//   duplicate the right pairs soaked: 2T1H#1 w1-3, BpAd#10 w1-3, gTkM#8
+//   w1-3, gTkM#3 w1-3 (debuffed side), qjCM#1-4 all waves, yBKP#2 w1-3
+//   (~30 waves), and the idle players of gTkM#3 w1 (PCT) and qjCM#3 w2 (VPR)
+//   were each the no-debuff member owed the empty right-hand slot. The user's
+//   image (2026-10-28): "yes debuff = first CW, no debuff = first CCW".
+//   BpAd#1 w1 (Fire 180/220): WHM went right with the SGE, the DRK covered
+//   left with the PLD, and both towers held two — no error (user). w2 (Ice
+//   300/340): WHM went right again and the PLD soaked left alone and died.
+// - A Celestriad tower death does not always end the pull: gTkM#3 (PLD solo
+//   in wave 1, 16:02.8) ran on to Forsaken (17:43); qjCM#3 (SMN solo in wave
+//   2, 16:02.7) ran on to Orchestra 2 (17:02). BpAd#1 (16:09) collapsed at
+//   16:35, qjCM#2 cascaded into a collapse at 16:11.
 // - Stray Apocalypse hits (47933) are ~80-220k and apply Damage Down. Stray
 //   Entropy never overlapped (always one hit per player); every Entropy
 //   death followed an earlier exaflare hit on the same player. (Q2, Q5)
@@ -112,6 +131,10 @@
 // missed tower confirmed; the Orchestra 2 Holy overlap was fallout of a
 // raise landing at 17:04.9 with the spread at 17:04.9), rulings in
 // expectations/rulings.json.
+// VOD review 2026-10-28 (user): report BpAdkacQh63VCrRM pull 1 (Celestriad
+// wave 2 wrong tower is the WHM's, by the duplicate convention; wave 1
+// salvaged by the DRK, no error), pull 5 (Orchestra 1 enmity on the DRK is
+// right: stance off).
 //
 // -- RULES IMPLEMENTED --
 // Major unless noted; a hit that neither killed nor applied Damage Down is
@@ -144,7 +167,16 @@
 //   ffxiv-uk-tower-vulnerable      soaked a tower of an element they were
 //                                   vulnerable to
 //   ffxiv-uk-tower-missed          with all 8 alive, a tower got <2 soakers;
-//                                   flags the player(s) who soaked nothing
+//                                   flags the player(s) who soaked nothing.
+//                                   When everyone soaked something, flags who
+//                                   stood in the wrong one of two same-element
+//                                   towers by the duplicate convention
+//                                   (VERIFIED; user, 2026-10-28, BpAd Pull 1
+//                                   16:09: the WHM, "should have been in the
+//                                   first ice tower clockwise"); player-less
+//                                   Minor only when the convention can't name
+//                                   anyone. A set that still resolved (both
+//                                   towers held two) is no error.
 //   ffxiv-uk-choice                hit by Quake/Tornado (wrong tower half)
 //   ffxiv-uk-choice-group          3+ in one Quake/Tornado (player-less;
 //                                   Raid if 3+ died, else Minor)
@@ -910,11 +942,67 @@ function detectOrchestra(players: PlayerInfo[], deaths: DeathEvent[], life: Life
 
 // ── Celestriad towers + Catastrophic Choice ─────────────────────────────────
 
+// The initial resistance debuffs land with the Celestriad cast; tower hits
+// first add one ~9s later (wave 1), so anything starting in this window is
+// the initial one.
+const INITIAL_RESIST_WINDOW_MS = 5000;
+
+type TowerSoak = { cast: EnemyEvent; soakers: Hit[] };
+
+/**
+ * The duplicate-tower convention (see header, VERIFIED): when two towers of
+ * one element are lit, the pair with no initial resistance debuff takes the
+ * clockwise-second (right, looking out) and a debuffed pair the
+ * clockwise-first (left). The debuffed pair is the one not already together
+ * in a single-element tower. Returns the players standing in the other
+ * duplicate tower than their own; [] when the wave has no duplicate, the
+ * pairs aren't four clean pairs, or the left pair can't be told apart.
+ */
+function misplacedInDuplicate(players: PlayerInfo[], towers: TowerSoak[], initialResist: Map<PlayerInfo, number>): { p: PlayerInfo; cast: EnemyEvent; expected: EnemyEvent }[] {
+  const byElement = new Map<number, TowerSoak[]>();
+  for (const t of towers) byElement.set(t.cast.abilityId, [...(byElement.get(t.cast.abilityId) ?? []), t]);
+  const dup = [...byElement.values()].find((ts) => ts.length === 2);
+  if (!dup || dup.some((t) => t.cast.x === undefined || t.cast.y === undefined)) return [];
+  const [a, b] = dup.map((t) => compassBearingOf(t.cast.x!, t.cast.y!));
+  // Compass bearings grow clockwise; the clockwise-first tower is the one the
+  // short arc starts from.
+  const [left, right] = (b - a + 360) % 360 < 180 ? dup : [dup[1], dup[0]];
+
+  const pairs = new Map<number | undefined, PlayerInfo[]>();
+  for (const p of players) pairs.set(initialResist.get(p), [...(pairs.get(initialResist.get(p)) ?? []), p]);
+  if (pairs.size !== 4 || [...pairs.values()].some((ps) => ps.length !== 2) || !pairs.has(undefined)) return [];
+  const towerOf = (p: PlayerInfo) => towers.find((t) => t.soakers.some((h) => h.p === p));
+  const unplaced = [...pairs.entries()].filter(([resist, ps]) => {
+    if (resist === undefined) return false;
+    const t = towerOf(ps[0]);
+    return !(t && !dup.includes(t) && towerOf(ps[1]) === t);
+  });
+  if (unplaced.length !== 1) return [];
+  const expect = new Map<PlayerInfo, TowerSoak>([
+    ...unplaced[0][1].map((p) => [p, left] as const),
+    ...pairs.get(undefined)!.map((p) => [p, right] as const),
+  ]);
+  const out: { p: PlayerInfo; cast: EnemyEvent; expected: EnemyEvent }[] = [];
+  for (const [p, want] of expect) {
+    const got = towerOf(p);
+    if (got && got !== want && dup.includes(got)) out.push({ p, cast: got.cast, expected: want.cast });
+  }
+  return out;
+}
+
 function detectCelestriad(players: PlayerInfo[], life: Life, enemyCasts: EnemyEvent[]): PullError[] {
   const errors: PullError[] = [];
   const cel = enemyCasts.find((c) => c.abilityId === CELESTRIAD_CAST);
   if (!cel) return errors;
   const towerCasts = enemyCasts.filter((c) => TOWERS[c.abilityId] && c.timestamp > cel.timestamp && c.timestamp < cel.timestamp + 30000);
+  // Each player's initial resistance debuff (applied with the Celestriad
+  // cast, before any tower adds one); players without one aren't in the map.
+  const initialResist = new Map<PlayerInfo, number>();
+  for (const p of players) {
+    for (const { resistId } of Object.values(TOWERS)) {
+      if (debuffIntervals(p, resistId).some((w) => w.start >= cel.timestamp - 1000 && w.start <= cel.timestamp + INITIAL_RESIST_WINDOW_MS)) initialResist.set(p, resistId);
+    }
+  }
 
   clusterByTime(towerCasts, (c) => c.timestamp, 1000).forEach((wave, wi) => {
     const tw = wave[0].timestamp;
@@ -966,6 +1054,26 @@ function detectCelestriad(players: PlayerInfo[], life: Life, enemyCasts: EnemyEv
         }));
       }
     } else if (![...vulnerable].length) {
+      // Everyone soaked something: name whoever broke the duplicate-tower
+      // convention (see header), when it can be read from the log.
+      const wrong = misplacedInDuplicate(players, towers, initialResist);
+      if (wrong.length) {
+        for (const { p, cast, expected } of wrong) {
+          const element = TOWERS[cast.abilityId].element;
+          const init = initialResist.get(p);
+          const rule = init
+            ? `with an initial ${TOWERS[Object.keys(TOWERS).map(Number).find((id) => TOWERS[id].resistId === init)!].resistName} their pair takes the clockwise-first one (the left one, looking out)`
+            : `the pair with no initial resistance debuff takes the clockwise-second one (the right one, looking out)`;
+          errors.push(playerError(p, {
+            ruleId: UK_TOWER_MISSED_RULE_ID, severity: "Major",
+            name: "Wrong Celestriad Tower",
+            description: `Took the wrong ${element} tower in Celestriad wave ${wi + 1}: two ${element} towers were lit, and ${rule}, at ${where(expected).slice(4)}. ` +
+              `They went to the one at ${where(cast).slice(4)} instead: ${consequence}.`,
+            timestamp: tw, abilityId: cast.abilityId, abilityName: `${element} III`,
+          }));
+        }
+        return;
+      }
       const crowded = towers.filter((t) => uniq(t.soakers.map((h) => h.p)).length > 2).flatMap((t) => t.soakers);
       errors.push(raidError(UK_TOWER_MISSED_RULE_ID, "Celestriad Tower Under-soaked",
         `In Celestriad wave ${wi + 1} ${consequence}` + (crowded.length ? `, while ${names(crowded)} crowded into one tower` : "") +

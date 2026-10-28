@@ -222,6 +222,42 @@
 // EXPECTED half (derived from their own role) specifically, not nearest-
 // of-either. Falls back to the old nearest-of-either behavior only when
 // the vote can't be resolved (no support samples, or an exact tie).
+//
+// ── TANK SPOTS SWAP (2026-10-28, BpAdkacQh63VCrRM / gTkMH91DWRmLbNCn) ─────
+//
+// This static's supports spread WEST and DPS EAST; the telegraph flips
+// everyone's spot across the E-W line, except the tanks, who trade slots:
+// support-north pulls put the DRK at (9944,9327) and the PLD at
+// (9416,9929); support-south pulls put the PLD at (9869,10602) and the DRK
+// at (9215,10057). mirrorHalves averaged their x, so every tank read
+// 3.4-7.3y off in every pull (a tank overlap would have been misattributed).
+// Two fixes in learnGravenImageLayout:
+//   - a sample's half comes from the pull's support vote (expectedHalfForRole),
+//     not its own y: the WHM's and tanks' spots sit near the center line and
+//     read on either side of it (the WHM's support-south spot is y 9886-10071).
+//   - mirrorHalves keeps each half's own median when the two x differ by
+//     more than MIRROR_MAX_X_SPREAD_CENTIYALMS (300): same-slot jobs differ
+//     8-175 (PCT widest), the swapping tanks 453-735.
+// After the fix the tanks read 0.0-1.2y off in every clean spread pull.
+// The WHM still reads up to 3.2y in support-south pulls: the larger-offset
+// mirror (pull 17's under-shoot fix above) puts her spot at y 10193-10221
+// where she stands at ~9900-10070.
+//
+// ── CANDIDATE PAIR (2026-10-28, BpAdkacQh63VCrRM Pull 11 0:40) ─────────────
+//
+// The PLD's and SGE's circles overlapped (instances #5 and #6, no cast
+// target) and killed both; the user: the SGE "was off more than the PLD".
+// The log leans the other way: at the hit the PLD read ~0.9y off its
+// learned spot and the SGE ~0.6y (against their own spots in the other
+// support-south pulls 2/6/9/13: PLD ~0.9-1.5y west, SGE ~0.2-1.0y east);
+// both were still walking in 1s before the hit (each ~1.4y short). Nobody
+// clears the 4y floor, so detectCandidatePair names BOTH when the pair
+// stood CANDIDATE_PAIR_MIN_SHORTFALL_CENTIYALMS (1y) closer than their
+// learned spots: spots 6.1y apart, clean spreads 5.6-6.9y (at most 0.5y
+// short, Pull 2), the fatal one 4.7y (1.4y short). A shortfall under 1y is
+// the near-miss shape PITFALLS calls bad luck and stays silent. Two-player
+// overlaps only. OPEN: whether the user's "SGE off more" holds against
+// these numbers (VOD needed before a ruling).
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerInfo } from "@/types/PlayerInfo";
@@ -268,6 +304,19 @@ const SUPPORT_ROLES = new Set(["Tank", "Healer"]);
 // needs enough room to actually reach one, not just the ~0.5s the
 // underlying game mechanic itself snapshots on.
 const PRIOR_SNAPSHOT_WINDOW_MS = 3000;
+
+// A job's two learned halves whose x differ by more than this are two
+// different slots, not one slot mirrored (see "TANK SPOTS SWAP"). Measured
+// BpAdkacQh63VCrRM / gTkMH91DWRmLbNCn: same-slot jobs 8-175 (PCT the widest),
+// the swapping tanks 453-735.
+const MIRROR_MAX_X_SPREAD_CENTIYALMS = 300;
+
+// Candidate pair (see "CANDIDATE PAIR" in the header): a lethal two-player
+// overlap where neither clears OUT_OF_POSITION_FLOOR_CENTIYALMS names both
+// when they stood at least this much closer together than their learned
+// spots. BpAdkacQh63VCrRM PLD/SGE, spots 6.1y apart: clean spreads 5.6-6.9y
+// (shortfall at most 0.5y), the fatal Pull 11 overlap 4.7y (1.4y short).
+const CANDIDATE_PAIR_MIN_SHORTFALL_CENTIYALMS = 100;
 
 // A role-group's shared instance needs at least this many distinct members
 // hit together to unambiguously confirm STACK mode (not a spread overlap,
@@ -354,10 +403,15 @@ export function learnGravenImageLayout(pulls: Pull[]): GravenImageLayout {
   for (const pull of pulls) {
     const grouped = groupByPlayer(extractFirstOccurrenceHits(pull));
     if (isStackPull(grouped)) continue;
+    // The half comes from the pull's support vote, not the sample's own y: a
+    // spot near the center line (BpAdkacQh63VCrRM's WHM and tanks) reads on
+    // either side of it — see "TANK SPOTS SWAP" in the header.
+    const supportSafeHalf = determineSupportSafeHalf(grouped);
     for (const { player, x, y, instances } of grouped) {
       if (instances.size >= 2) continue; // compromised this pull — not a clean sample
       const entry = samplesByClass.get(player.className) ?? { north: [], south: [] };
-      (y < ARENA_CENTER ? entry.north : entry.south).push({ x, y });
+      const half = expectedHalfForRole(player.role, supportSafeHalf) ?? (y < ARENA_CENTER ? "north" : "south");
+      entry[half].push({ x, y });
       samplesByClass.set(player.className, entry);
     }
   }
@@ -393,6 +447,9 @@ function mirrorHalves(north: Point | null, south: Point | null): { north: Point 
   if (!north && !south) return { north: null, south: null };
   if (!north) return { north: { x: south!.x, y: ARENA_CENTER - (south!.y - ARENA_CENTER) }, south };
   if (!south) return { north, south: { x: north.x, y: ARENA_CENTER + (ARENA_CENTER - north.y) } };
+  // Two different slots, not one slot mirrored: keep each half's own median
+  // (see "TANK SPOTS SWAP" in the header).
+  if (Math.abs(north.x - south.x) > MIRROR_MAX_X_SPREAD_CENTIYALMS) return { north, south };
 
   const x = (north.x + south.x) / 2;
   const offset = Math.max(ARENA_CENTER - north.y, south.y - ARENA_CENTER);
@@ -441,6 +498,54 @@ function diedToFlagrantFireInPull(deathEvents: DeathEvent[], playerName: string,
       FLAGRANT_FIRE_III_ABILITY_IDS.has(d.killingAbilityGameId) &&
       Math.abs(d.timestamp - aroundMs) <= 5000
   );
+}
+
+/**
+ * A lethal two-player overlap where neither member clears the floor: both
+ * are named as candidates when they stood CANDIDATE_PAIR_MIN_SHORTFALL
+ * closer together than their learned spots (otherwise the overlap is the
+ * near-miss "bad luck" shape and stays silent). See "CANDIDATE PAIR".
+ */
+function detectCandidatePair(
+  lethalGroup:        ReturnType<typeof groupByPlayer>,
+  withDeviation:      { player: PlayerInfo; distance: number | null }[],
+  layout:             GravenImageLayout,
+  supportSafeHalf:    Half | null,
+  diedToFlagrantFire: (playerName: string, aroundMs: number) => boolean,
+): PullError[] {
+  if (lethalGroup.length !== 2) return [];
+  const spots = lethalGroup.map((c) => {
+    const half = expectedHalfForRole(c.player.role, supportSafeHalf);
+    return half ? layout[c.player.className]?.[half] ?? null : null;
+  });
+  if (!spots[0] || !spots[1]) return [];
+  const [a, b] = lethalGroup;
+  const stood = Math.hypot(a.x - b.x, a.y - b.y);
+  const assigned = Math.hypot(spots[0].x - spots[1].x, spots[0].y - spots[1].y);
+  if (assigned - stood < CANDIDATE_PAIR_MIN_SHORTFALL_CENTIYALMS) return [];
+
+  const yalms = (v: number | null | undefined) => (v === null || v === undefined ? "?" : (v / 100).toFixed(1));
+  const devOf = (name: string) => withDeviation.find((w) => w.player.name === name)?.distance;
+  return lethalGroup.map((c) => {
+    const other = c === a ? b : a;
+    const bothDied = diedToFlagrantFire(c.player.name, c.timestamp) && diedToFlagrantFire(other.player.name, other.timestamp);
+    return {
+      ruleId:      GRAVEN_IMAGE_SPREAD_RULE_ID,
+      severity:    "Major" as const,
+      name:        "Graven Image Spread Misplaced",
+      description: `Candidate: overlapped with ${other.player.name}'s explosion${bothDied ? ", killing them both" : ""}. ` +
+        `They stood ${yalms(stood)} yalms apart where their spread spots are ${yalms(assigned)} apart, but neither was past the ` +
+        `${yalms(OUT_OF_POSITION_FLOOR_CENTIYALMS)}-yalm line (${c.player.name} ~${yalms(devOf(c.player.name))}, ` +
+        `${other.player.name} ~${yalms(devOf(other.player.name))} off their spots) — the log can't tell which of the two crowded the other.`,
+      timestamp:   c.timestamp,
+      player:      c.player.name,
+      class:       c.player.className,
+      specId:      c.player.specId,
+      role:        c.player.role,
+      abilityId:   c.abilityId,
+      abilityName: "Flagrant Fire III",
+    };
+  });
 }
 
 /**
@@ -525,7 +630,9 @@ export function detectGravenImageSpreadErrors(pull: Pull, layout: GravenImageLay
   });
 
   const maxKnownDistance = Math.max(...withDeviation.map((c) => c.distance ?? -1));
-  if (maxKnownDistance < OUT_OF_POSITION_FLOOR_CENTIYALMS) return []; // can't confidently single anyone out
+  if (maxKnownDistance < OUT_OF_POSITION_FLOOR_CENTIYALMS) {
+    return detectCandidatePair(lethalGroup, withDeviation, layout, supportSafeHalf, diedToFlagrantFire);
+  }
 
   const errors: PullError[] = [];
   for (const c of withDeviation) {
