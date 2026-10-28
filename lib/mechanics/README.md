@@ -545,6 +545,30 @@ module. The `/build-module` and `/refine-module` skills
 (`.claude/skills/`) walk through the procedure. When a session learns
 something new, add it to the matching section of PITFALLS.md.
 
+### The DIGEST block (top of every module header)
+
+Module headers grow to 10-90 KB, and agents pay for every full read. So
+each detection module's header **begins with a DIGEST** (right after the
+path line, at most ~2k tokens), between
+`// ── DIGEST (read first; detail in the sections it names) ──` and
+`// ── END DIGEST ──`:
+- **What:** the mechanic(s), phase or window, the self-gating signature,
+  what the module owns versus its neighbours.
+- **Rules:** every rule id as the code spells it, its severity and a
+  one-line meaning (exposure when targeted or assigned).
+- **Cutoffs:** what produces the Raid error.
+- **Key thresholds:** the values that decide calls, with their clean and
+  failure extremes and the pulls they came from.
+- **Strategy/assumptions** the detection relies on.
+- **Sections:** each detailed heading, quoted exactly so `Grep` finds it,
+  with a few words on what it holds.
+- **Open items:** unresolved questions and failure modes not built.
+
+Readers take the DIGEST, then only the sections they need (Grep the
+heading, Read with offset/limit). Whoever changes a rule, threshold or
+section heading updates the DIGEST in the same change. The Dancing Mad
+modules (`ffxiv/dancingmad/`) are the reference examples.
+
 ---
 
 ## Data-shape knowledge (read before designing any new check)

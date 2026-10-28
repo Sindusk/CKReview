@@ -1,5 +1,63 @@
 // lib/mechanics/ffxiv/dancingmad/blackhole.ts
 //
+// ── DIGEST (read first; detail in the sections it names) ─────────────────
+// What: P3 Black Hole tether conga (~9:23). A debuff burst gives each player
+//   First/Second/Third in Line (+ Accretion on one First and one Second), then
+//   Nothingness (47868) fires at 10 fixed moments (+24.3s .. ~+129s). Each
+//   player takes 3 consecutive hits; the check is a strategy-agnostic per-role
+//   UNION of moments. Also owns the Accretion / crust Earthquake (47866)
+//   overlaps. Strategy-specific checks live in blackhole-strategy.ts.
+// Rules (ruleId, severity: meaning):
+//   ffxiv-blackhole-soaked-incorrect-tether      Major  Nothingness hit at a moment
+//     outside the player's role band (moments compromised by 2+ deaths skipped)
+//   ffxiv-blackhole-stole-assigned-tether        Major  took another player's tether
+//     (the robbed player's shortfall is blackhole-strategy.ts's missed-assigned)
+//   ffxiv-blackhole-tether-cleaved-party         Major  one tether hit several players;
+//     named on the band holder; Raid marker when it kills 4+; untaken cleave
+//     names nobody here
+//   ffxiv-blackhole-lost-primordial-crust        Major  crust (1005454) consumed by
+//     another lethal hit before the player's own 3rd Nothingness
+//   ffxiv-blackhole-earthquake-during-vulnerability  Raid  an Earthquake landed while
+//     players still had the previous one's vulnerability (1003372); Accretion-
+//     triggered or unclassified; first overlap per pull only
+//   ffxiv-blackhole-crust-earthquake-overlap     Raid  overlapping Earthquakes both
+//     traced to Primordial Crust pops (e.g. walking into a black hole)
+//   ffxiv-blackhole-crust-before-accretion       Raid  a crust popped before both
+//     Accretion Earthquakes went off (no confirmed sample; built ahead)
+// Cutoffs: tether-cleaved-party Raid marker (1ms after the cleave) when one
+//   cleave kills >= LETHAL_CLEAVE_DEATHS (4) within 4s; the three Earthquake
+//   overlap rules are Raid severity.
+// Key thresholds:
+//   TETHER_MOMENT_OFFSETS_MS 24300/31400/54800/59900/65000/89100/94100/99200/
+//     122100/129200 (m10 extrapolated); TETHER_MOMENT_TOLERANCE_MS = 3000
+//   WIPE_DEATHS_THRESHOLD = 2 within WIPE_DEATHS_WINDOW_MS = 15000 (suppression)
+//   LETHAL_CLEAVE_DEATHS = 4 (failure 4 deaths BpAdkacQh63VCrRM Pull 13 10:51;
+//     other cleave 1 death gTkMH91DWRmLbNCn Pull 5; 2-3 untested)
+//   EARTHQUAKE_CRUST_LOOKBACK 500-1500ms (observed 1069-1113);
+//     EARTHQUAKE_ACCRETION_LOOKBACK 500-2600ms (one 2139ms early fall-off)
+//   CRUST_CONSUMPTION_TOLERANCE_MS = 100; EARTHQUAKE_LANDING_CLUSTER_MS = 100
+// Strategy/assumptions: role bands First {1-4}, First+Acc {3-5}, Second {4-7},
+//   Second+Acc {6-8}, Third {7-10}; covers DoubleTether, DSA, SDA and
+//   on-the-fly reshuffles. Moments 2 and 9 are Double Tether double-holds.
+// Sections (Grep the heading text):
+//   "THE MECHANIC (reverse-engineered"  debuffs, moment timetable, role bands
+//   "PRIMORDIAL CRUST: THE THIRD HIT'S SAFETY NET"  lost-crust rule
+//   "WHAT THIS DOES NOT DO YET"  missed hits, lane order, soak positioning
+//   "RULES IMPLEMENTED"  split between this file and blackhole-strategy.ts
+//   "VERIFIED"  Pull 13 untaken-cleave VOD call
+//   "OPEN QUESTIONS (VOD needed"  strategy gating, DSA/SDA label
+//   "Accretion earthquake vulnerability overlap"  (code) Earthquake overlap rule
+//   "A SECOND, DISTINCT trigger for the SAME Earthquake"  (code) crust triggers
+//   "Wipe suppression"  (code) 2+ deaths compromise a moment
+//   "Tether lanes: who holds which tether instance"  (code) lane map
+//   "Untaken tether cleaves"  (code) isUntakenCleave
+//   "A lethal cleave is the cutoff"  (code) Raid marker threshold
+// Open items: missed tether hits (<3), exact lane order and post-conga soak
+//   positioning not checked; mechanic past tether 10 not built; untaken-cleave
+//   logic rests on one pull; incorrect-direction gated to SDA; DSA/SDA label
+//   is a guess.
+// ── END DIGEST ───────────────────────────────────────────────────────────
+//
 // Encounter-specific error detection for Black Hole ("Earthquake"), the
 // tether conga-line mechanic in FFXIV's Dancing Mad (Kefka's Return)
 // ultimate, beginning ~9:23 into the fight. Like mechanics/forsaken.ts it

@@ -3,6 +3,7 @@
 # (docs/open-items.md, "Plan: a /build-boss-detection skill").
 .claude/*
 !.claude/skills/
+!.claude/agents/
 .env
 .env*.local
 asset-builder/node_modules/

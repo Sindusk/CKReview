@@ -1,5 +1,82 @@
 // lib/mechanics/ffxiv/dancingmad/forsaken.ts
 //
+// ── DIGEST (read first; detail in the sections it names) ─────────────────
+// What: P2 Forsaken towers (cast 47804 ~4:00; 8 resolutions, tower 1 at
+//   cast +13.2-13.5s then every ~10.05s). Soak = Spell's Trouble (1005083)
+//   stack loss paired with a Path of Light (47806) hit, per player. Also owns
+//   tower positioning by assignment debuff (Stack 1005084 / Spread 1005085 /
+//   Cone 1005086) and their follow-ups (47808/47809/47810), the Kefka clone
+//   volley (47833), the death cutoff and the P2 enrage check (Ultimate Embrace).
+// Rules (ruleId, severity: meaning):
+//   ffxiv-forsaken-missed-tower                Major  stack dropped with no Path of
+//     Light hit within +-2s
+//   ffxiv-forsaken-extra-player-in-tower       Major  Path of Light hit on a player
+//     not on the resolving team (overcrowded tower)
+//   ffxiv-forsaken-wrong-tower-position        Major  same-debuff pair on a tower
+//     (swap), or the 3+1 split's soaker who joined the wrong tower
+//   ffxiv-forsaken-wrong-spot-in-tower         Major  soaker off their debuff's spot,
+//     only when that resolution's follow-ups went wrong (off headcount, double
+//     hit, or a death within 6s)
+//   ffxiv-forsaken-stack-overlapped-cone-bait  Major  Stack plant sat too far out
+//     and overlapped the cone bait
+//   ffxiv-forsaken-stack-clipped-too-close     Major  soak partner strayed into the
+//     Stack plant (lethal)
+//   ffxiv-forsaken-stack-misplaced             Major  Stack plant landed where its
+//     bodies couldn't reach
+//   ffxiv-forsaken-cone-bait-too-far           Major  the wrong player caught the cone
+//     (candidate within 50 units of the victim's distance skipped)
+//   ffxiv-forsaken-baited-cone-too-close       Major  death to a 47810 cone that hit
+//     exactly one player
+//   ffxiv-forsaken-clone-overlap               Major  2+ distinct clone instances
+//     hit one player in one volley
+//   ffxiv-forsaken-death-during-forsaken       Raid   death from the Forsaken cast
+//     through tower 7 (+6s grace); tower 8 exempt
+//   ffxiv-forsaken-enrage-check-missed         Raid   final Ultimate Embrace (49740)
+//     completed above 1.5% HP and no hit zeroed Kefka within 6s
+// Cutoffs: ffxiv-forsaken-death-during-forsaken cuts per-player attribution
+//   from the NEXT tower on (the fatal tower's own errors survive);
+//   ffxiv-forsaken-enrage-check-missed.
+// Key thresholds:
+//   PATH_OF_LIGHT_WINDOW_MS = 2000 (clean hit ~550-650ms before the loss,
+//     up to ~90ms after)
+//   ENRAGE_CHECK_MAX_HP_PERCENT = 1.5 (clean max 1.06% / failure 2.69%,
+//     VtdBqhLQkWJXMvDg pull 3); ENRAGE_CHECK_POST_CAST_WINDOW_MS = 6000
+//   FORSAKEN_SEVENTH_TOWER_OFFSET_MS = 76400; FORSAKEN_TOWER_DEATH_GRACE_MS = 6000
+//   FOLLOWUP_DESIGN_HEADCOUNT Circle 1 / Cone 1 / Stack 3 (161 of 166
+//     resolutions exact, the other 5 had a death); FOLLOWUP_DEATH_WINDOW_MS = 6000
+//   TOWER_SNAP_MAX_DIST = 400; ON_TOWER_MAX_DIST = 210 (anchors <= ~201 /
+//     off-spots >= 204); FLARE_MIN_CENTER_DIST = 975 (legit 1002+ / failure 944);
+//     OUTER_MIN_CENTER_DIST = 770 (clean 795 / inner max 740)
+//   CONE_BAIT_TIE_MARGIN_UNITS = 50 (gTkMH91DWRmLbNCn pull 13: 648 vs 633)
+//   CLONE_HIT_CLUSTER_MS = 300
+// Strategy/assumptions: two teams of 4 (inferred from the debuff burst +
+//   partner pairing), towers ordered [1,2,3,8] / [4,5,6,7]; each tower soaked
+//   by 2 players holding different debuffs, each on the spot their debuff owns.
+// Sections (Grep the heading text):
+//   "HOW THE DETECTION WORKS"  per-player stack-loss vs Path of Light
+//   "PHASE 2: POSITIONING DETECTION (see bottom"  summary of positioning rules
+//   "PHASE 3: WHEN THE MECHANIC IS OVER"  death cutoff summary
+//   "WHAT THIS DOES NOT DO YET"  follow-up landing not verified
+//   "LOG IDS FOUND FOR THE REPLAY"  head markers, Wings of Destruction ids
+//   "OPEN QUESTIONS (VOD needed"  open questions + VOD review notes / fixes
+//   "DEATH DURING FORSAKEN -> UNRESOLVABLE"  (code) cutoff window
+//   "Wipe-cleanup removals must not count"  (code)
+//   "Expected resolution timestamp"  (code) error timing
+//   "Tower labeling (display only"  (code) tower #N labels
+//   "Team inference from the initial debuff burst"  (code) teams, partner pairs
+//   "Overcrowded tower detection"  (code) extra-player rule
+//   "Phase 2: positioning detection (wrong tower"  (code) debuff semantics,
+//     spot geometry, follow-up headcount gate
+//   "Pure overcrowding: a tower with no waiting"  (code)
+//   "Lethal cone bait: standing too close"  (code) baited-cone rule
+//   In-function sub-headings (indented "// ── "): "Stack overlapped the cone
+//     bait", "The 3+1 split", "Stack clip", "Stack missed", "Cone bait too far"
+// Open items: post-death missed-tower suppression [STALE?];
+//   gTkMH91DWRmLbNCn pull 7 4:21 (tower 2, two cones on the DRG and PCT)
+//   unruled; clone "assigned spot" unsolved (clone overlap outcome-gated only);
+//   47807 failed-tower kill not modeled.
+// ── END DIGEST ───────────────────────────────────────────────────────────
+//
 // Encounter-specific error detection for Forsaken, the tower-soak mechanic
 // in FFXIV's Dancing Mad (Kefka's Return) ultimate. Unlike the declarative
 // rules in error-rules.ts — which only ever need "one ability ID, maybe

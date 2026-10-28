@@ -1,5 +1,82 @@
 // lib/mechanics/ffxiv/dancingmad/ultima-kefka.ts
 //
+// ── DIGEST (read first; detail in the sections it names) ─────────────────
+// What: Phase 5 (Ultima Kefka), the final phase: Fell Forces role stacks,
+//   Flood, Maddening Orchestra x2, Celestriad towers + Catastrophic Choice,
+//   Stray Apocalypse / Entropy, Forsaken, Forsaken Null enrage, collapse.
+//   Self-gates on Phase 5 ids; clock anchored on Ultima Repeater #1 (47936).
+//   Owns Flood lines, Quake, Tornado, Stray Apocalypse and Stardust (excluded
+//   from the generic ffxiv-damage-down rule).
+// Rules (ruleId, severity: meaning; Major unless noted, a survived hit with no
+//   Damage Down is Minor; exposure role-only: Fell Forces role stacks test
+//   living non-tanks / tank stack the tanks; Orchestra tank duties and
+//   Chaotic Flare the tanks, Holy and Diffusion living non-tanks):
+//   ffxiv-uk-flood-line               Major|Minor  caught by a Flood line
+//   ffxiv-uk-flood-group              Raid|Minor   3+ in one wave, player-less
+//   ffxiv-uk-fell-forces-missed       Major|Minor  non-tank absent from stack
+//   ffxiv-uk-fell-forces-overlap      Major|Minor  took two role stacks
+//   ffxiv-uk-fell-forces-unshared     Major  tank died soloing the tank stack;
+//     flags the alive, absent other tank
+//   ffxiv-uk-orchestra-enmity         Major  non-tank got a Surprise aura with
+//     both tanks alive; flags the tank without one
+//   ffxiv-uk-orchestra-flare-overlap  Major|Minor  one Flare hit 2+ players
+//   ffxiv-uk-orchestra-holy           Major|Minor  stood in another's Holy /
+//     second Holy while vulnerable
+//   ffxiv-uk-orchestra-diffusion      Major|Minor  non-tank hit by on-time
+//     Flare Diffusion
+//   ffxiv-uk-orchestra-early-flare    Raid (player-less) Flare carrier died,
+//     Diffusion hit the party; carrier Major when no killing ability (edge)
+//   ffxiv-uk-chaotic-flare            Major  tank died to shared Chaotic Flare
+//   ffxiv-uk-tower-vulnerable         Major  soaked own vulnerable element
+//   ffxiv-uk-tower-missed             Major  idle player / wrong duplicate
+//     tower; Minor player-less "Under-soaked"; Raid "Celestriad Tower Failed"
+//   ffxiv-uk-choice                   Major|Minor  hit by Quake/Tornado
+//   ffxiv-uk-choice-group             Raid|Minor   3+ in one, player-less
+//   ffxiv-uk-apocalypse               Major|Minor  hit by Stray Apocalypse
+//   ffxiv-uk-entropy-overlap          Major|Minor  two Entropy spreads (never
+//     observed)
+//   ffxiv-uk-forsaken-ground          Major  touched ground pre-Null; 3+ Raid
+//   ffxiv-uk-forsaken-null            Raid   enrage completed
+//   ffxiv-uk-collapse                 Raid   4 dead/removed at once
+//   (occurrence key dm-uk-orchestra-tank is exposure only, not a rule)
+// Cutoffs: flood-group / choice-group with 3+ dead; orchestra-early-flare;
+//   tower-missed "Celestriad Tower Failed" (solo soaker died or tower empty;
+//   user, BpAd Pull 1); forsaken-ground 3+ at once; collapse at 4 out
+//   (COLLAPSE_DEAD_COUNT) and forsaken-null, each only if no earlier Phase 5
+//   Raid. Group size GROUP_SIZE = 3, Raid at GROUP_RAID_DEATHS = 3.
+// Key thresholds:
+//   Pull-over at 4 dead: no pull at 4 dead mid-phase recovered (17/29 cutoffs)
+//   RECENT_RAISE_MS = 8000 (Holy circle with a fresh raise skipped)
+//   DIED_FROM_HIT_MS = 3000; DEATH_EVENT_LAG_MS = 2000 (deaths land ~2.0s late)
+//   Holy overlap only with 3+ eligible baiters and tanks holding both auras
+// Strategy/assumptions: the Surprise Holy tank solos the tank stack under an
+//   invuln after each Orchestra; after Orchestra 2 volley 3 (+145) must be
+//   shared. Tanks hold both Surprise auras. Celestriad pairs fixed by initial
+//   debuff (Fire, Ice, Lightning, none); duplicate towers: debuffed pair first
+//   clockwise (left), no-debuff pair the right one (user, 2026-10-28).
+// Sections (Grep the heading text):
+//   "-- VERIFIED AGAINST LOGS"        reports, cutoffs, clock, model fixes,
+//     Celestriad convention, VOD reviews
+//   "-- RULES IMPLEMENTED --"         full rule list and not-flagged list
+//   "-- GUIDE-DERIVED MODEL: PHASE 5" sources, scope
+//   "-- PHASE BOUNDARY AND CHRONOLOGY --"  guide timeline
+//   "-- ULTIMA REPEATER --", "-- FELL FORCES --", "-- FLOOD / CHAOTIC FLOOD --",
+//   "-- MADDENING ORCHESTRA (TWICE) --", "-- CELESTRIAD / CATASTROPHIC
+//   CHOICE --", "-- STRAY APOCALYPSE / STRAY ENTROPY --", "-- FORSAKEN /
+//   FORSAKEN BONDS / FORSAKEN NULL --"  per-mechanic guide model
+//   "-- OPEN QUESTIONS FOR LOG VERIFICATION --"  model questions Q1-Q8
+//   "── OPEN QUESTIONS (VOD needed"    VOD questions, implementation notes
+//   Code: "── shared helpers", "── Flood", "── Fell Forces", "── Maddening
+//   Orchestra", "── Celestriad towers", "── Stray Apocalypse", "── Forsaken",
+//   "── entry point" (cutoff markers)
+// Open items (VOD): owner of the unshared third tank stack after Orchestra 2;
+//   Orchestra 1 enmity on a non-tank; on-time Diffusion victim vs carrier edge;
+//   arena-edge carrier death; missed-tower owners; who leads group errors;
+//   missed role stacks deliberate?; Holy skip mid-raise; Apocalypse survived-
+//   hit severity; collapse threshold; healing/mitigation deaths unflagged.
+//   Not built: missed Chaotic Flood / Bonds stack; Forsaken bait placement.
+// ── END DIGEST ───────────────────────────────────────────────────────────
+//
 // Phase 5 (Ultima Kefka) per-pull rules for Dancing Mad. Entry point:
 // detectUltimaKefkaErrors. Self-gates on Phase 5 IDs (none of them occur
 // in any earlier phase), so it is safe to run on every pull.

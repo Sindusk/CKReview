@@ -1,5 +1,63 @@
 // lib/mechanics/ffxiv/dancingmad/kefka-says.ts
 //
+// ── DIGEST (read first; detail in the sections it names) ─────────────────
+// What: Phase 4 ("Kefka Says"): Flood of Naught wrong side, short/long
+//   resolution-block spread vs stack, Acceleration Bomb stillness/motion,
+//   and a shared first-death phase cutoff. Self-gates on Antilight damage
+//   (50068/50069), a valid block of 4 elementals, or a Death Bomb (47893).
+//   Most of the header is the wtfdig real/fake decoding model (status 1002056
+//   parity on Neo Exdeath / Chaos, Kefka headmarkers 675-678).
+// Rules (ruleId, severity: meaning; exposure if targeted/assigned):
+//   ffxiv-kefka-says-flood-wrong-side    Major  hit by the wrong Antilight
+//     for own wound + Allagan Field / Beyond Death (no real/fake input)
+//   ffxiv-kefka-says-failed-to-spread    Major  spread holder not isolated
+//   ffxiv-kefka-says-failed-to-stack     Major  stack holder not with group
+//     (targeted: each judged block = one spread + one stack instance)
+//   ffxiv-kefka-says-acceleration-bomb   Major  took Death Bomb; names the
+//     owed stillness/motion and a breaking action if one is logged
+//     (targeted: each set of bombs expiring together, its holders)
+//   ffxiv-kefka-says-death-unresolvable  Raid   first phase death within 30s
+//     of one of the above errors
+// Cutoffs: ffxiv-kefka-says-death-unresolvable at the lethal hit + 1ms; all
+//   checks (Flood included) stop at the first phase death. A deliberate
+//   Damage Down walk-off (no killing ability, no 0-HP hit, still holding
+//   1002911, raid reaches Phase 5) is skipped (BpAdkacQh63VCrRM Pull 5 14:15).
+// Key thresholds:
+//   ISOLATION_THRESHOLD_YALMS = 7 (clean stack max 2.8y / clean spread min
+//     11.3y; failures 0.7, 1.7 and 16.2y, Vmbf6WYw3QGcMntx pull 20)
+//   MIN_STACK_COMPANIONS = 2 (clean stack holders have exactly 2 within 7y)
+//   Block = exactly 4 elemental removals within 300ms, 4 players, 2 FL / 2 CW,
+//     all from the SAME Grand Cross (blocks a pull-12 phantom from wipe removals)
+//   Flood: wound read with strict "<" before the hit; damage amounts are noise
+//   BOMB_RESOLUTION_WINDOW_MS = 1000 (observed 270ms); BREAKING_ACTION 500ms
+//   DEATH_ATTRIBUTION_WINDOW_MS = 30000; SIGNAL_TO_CAST 6-12s (obs. ~9.05s)
+// Strategy/assumptions: strategy-neutral (isolation, not compass spots);
+//   observed groups spread support W / DPS E, stack support N / DPS S.
+//   Missing 1002056 signals -> state-dependent checks report nothing.
+// Sections (Grep the heading text):
+//   "PRIMARY REAL/FAKE SIGNAL"             1002056 parity decode
+//   "PHASE ANCHOR AND ROUND ASSOCIATION"   Kefka Says 49884, Grand Cross pairing
+//   "KEFKA'S ICE/LIGHTNING SIGNAL"         headmarkers 675-678
+//   "TURNING NEO EXDEATH'S VALUE"          debuff -> required behavior table
+//   "MANA CHARGE / MANA RELEASE"           XNOR rule
+//   "FLOOD OF NAUGHT RESULT CHECK"         wound / field ids
+//   "DETERMINING FLOOD OF NAUGHT'S STARTING EDGE"  edge from source position
+//   "REFERENCE PULL SANITY CHECK"          expected decode for one pull
+//   "FULL MECHANIC MODEL AND INTENDED"     player solution, steps 1-8
+//   "DETECTION DESIGN CONSEQUENCES"        provenance, keep "unknown"
+//   "IMPLEMENTATION: FLOOD OF NAUGHT SIDE CALL"  with sub-headings "Why this
+//     check needs NO real/fake input", "The confirmed failure", "Timestamp
+//     precision matters here", "Ability id drift"
+//   "IMPLEMENTATION: SHORT / LONG RESOLUTION BLOCK"  with "What resolves,",
+//     "Finding the blocks", "Judging position", "Death ends the analysis"
+//     (cutoff + walk-off exception)
+//   "IMPLEMENTATION: ACCELERATION BOMB"    Death Bomb anchor, breaking action
+// Open items: not built (no failing log yet): Mystery Magic ice/lightning
+//   dodges, Cursed Shriek gaze, Chaos Entropy / Dynamic Fluid move-vs-stay,
+//   Mana Charge / Release, Flood middle overlap, phase-end HP check. Head
+//   markers are fetched but not transformed or passed in.
+// ── END DIGEST ───────────────────────────────────────────────────────────
+//
 // Phase 4 ("Kefka Says") error detection, plus the implementation notes that
 // document how the wtfdig Kefka Says analyzer determines whether the Phase 4
 // mechanics and their associated debuffs are real or fake from FFLogs.

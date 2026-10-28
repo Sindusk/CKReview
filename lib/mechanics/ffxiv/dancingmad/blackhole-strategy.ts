@@ -1,5 +1,38 @@
 // lib/mechanics/ffxiv/dancingmad/blackhole-strategy.ts
 //
+// ── DIGEST (read first; detail in the sections it names) ─────────────────
+// What: report-level strategy detection for the P3 Black Hole conga (model in
+//   blackhole.ts): scores "split" (DSA/SDA) vs "double-tether" shape across
+//   all pulls, then resolves each pull's own lanes from its hits. Not
+//   strategy-only: it also owns three per-pull rules, and kefkaPositionBearing
+//   (reused by stompies.ts).
+// Rules (ruleId, severity: meaning):
+//   ffxiv-blackhole-missed-assigned-tether        Major  not hit at a moment of the
+//     player's resolved lane (defers to stole-assigned-tether when a taker is
+//     identified; names the owner of an untaken cleave)
+//   ffxiv-blackhole-clipped-by-neighboring-tether Major  hit more times at a moment
+//     than the lane requires; only when that surplus is the moment's sole
+//     discrepancy
+//   ffxiv-blackhole-incorrect-direction           Major  took the wrong cardinal black
+//     hole for the role (Healer = Support); gated to strategy "sda" only
+// Cutoffs: none.
+// Key thresholds: KEFKA_NEAR_CENTER_TOLERANCE = 300 (Kefka facing samples);
+//   reference cast "Slap Happy", first near-centre one before each tether set
+//   (set starts at moments 1/3/6/9).
+// Strategy/assumptions: lanes Split First A {1,2,3} / B {2,3,4}, Third A
+//   {7,8,9} / B {8,9,10}; Double First {1,3,4} / {2,2,3}, Third {7,8,10} /
+//   {8,9,9}; shared Second {4,5,6} / {5,6,7}, First+Acc {3,4,5}, Second+Acc
+//   {6,7,8}. Line debuffs are handed out per pull, so only the SHAPE is
+//   learned, never who takes which lane. "dsa" vs "sda" label is a guess.
+// Sections (Grep the heading text):
+//   "WHY THE THREE STRATEGIES COLLAPSE TO TWO SHAPES"  split vs double-tether
+//   "WHY LANE ASSIGNMENT IS RESOLVED PER-PULL"  per-pull lane resolution
+//   "Direction/priority detection (added 2026-07)"  cardinal geometry intro
+//   "Slot templates"  lane moment arrays
+// Open items: incorrect-direction waits on the Support vs DPS convention for
+//   DSA / Double Tether; DSA/SDA display label unconfirmed.
+// ── END DIGEST ───────────────────────────────────────────────────────────
+//
 // Report-level strategy detection for the Black Hole tether conga (see
 // blackhole.ts for the mechanic model). Where blackhole.ts's schedule check
 // only knows the per-ROLE union of moments a player's debuff assignment

@@ -1,5 +1,86 @@
 // lib/mechanics/ffxiv/dancingmad/phase1.ts
 //
+// ── DIGEST (read first; detail in the sections it names) ─────────────────
+// What: Dancing Mad Phase 1 (pull to ~3:25, PHASE_1_END_MS 210s): Revolting
+//   Ruin III, Graven 1 Mystery Magic, Wave Cannon towers, Confetti (x3),
+//   Graven 2 puddles, Hyperdrive, Tele-Trouncing, Graven 3, enrage check.
+//   Self-gates on Kefka casts (DANCING_MAD_BOSS). NOT here: Graven Image
+//   spread (graven-image.ts), Wave Cannon beam position (wave-cannon.ts).
+// Rules (ffxiv-phase1- prefix omitted; Raid = pull cutoff marker):
+//   revolting-ruin-threat-loss        Major  MT alive, hit 2 not on MT -> OT
+//   revolting-ruin-non-tank-death     Raid   non-tank dies to either hit
+//   revolting-ruin-out-of-position    Major  non-tank hit by the cone
+//   blizzard3-silent-kill             Major  Blowout kill, no Damage Down landed
+//   hyperdrive-out-of-position        Major  non-tank killed by Hyperdrive north
+//   jumped-off-arena                  Raid   first jump (no Damage Down); also
+//                                            "Called Reset" marker at trigger
+//   wave-cannon-tower-overlap         Major  one player hit by 2+ towers
+//   wave-cannon-tower-missed          Major  live non-carrier took 0 tower dmg
+//   wave-cannon-tower-priority-missed Major  conga-priority tower left unsoaked
+//   unmitigated-explosion-wipe        Raid   Unmitigated Explosion cast (47787)
+//   gravitational-explosion-wipe      Raid   Gravitational Explosion (47789)
+//   graven2-spread-misplaced          Major  spreader's Vitrophyre hit 2+
+//   graven2-puddle-proximity          Major  spreader too near a Gravitas puddle
+//   graven2-puddle-placement          Major  off own LP at snapshot (puddle pinned)
+//   graven2-puddle-linger             Major  never left the puddle
+//   graven2-puddle-soak-missed        Major  Gravity III tick(s) unsoaked
+//   graven2-death-wipe                Raid   any death in Graven 2 window
+//   graven-1-death-wipe               Raid   death 1st->2nd Mystery Magic
+//   confetti-lost                     Raid   Confetti carrier dies (not to blast)
+//   confetti-knockback-victim-misplaced Major  1st blast: stack off hitbox ring
+//   confetti-holder-misplaced         Major  1st blast: holder off W/E bearing
+//   confetti-group-misplaced          Major  2nd blast: stacked with wrong group
+//   confetti-final-position-misplaced Major  3rd blast: wrong NW/SE quadrant
+//   tele-trouncing-arrow-misplaced    Major|Minor  arrow off its ring slot
+//   tele-trouncing-death-wipe         Raid   death to Will AoE/Confuse or trap
+//   tele-trouncing-bait-position      Major  ranged too far/cross-latch; melee
+//                                            too close to center
+//   graven3-stack-missed              Major  not in role stack at cast; killed
+//   enrage-check-missed               Raid   Kefka HP over 15% at 47803
+// Cutoffs: every Raid rule above; Called Reset moves the cutoff to the first
+//   Major within 20s before a 4+ jumper walk-off (10s); not across a
+//   mechanic death. Cross-pull Majors (graven-image/wave-cannon) unseen.
+// Key thresholds:
+//   GRAVEN_2_PUDDLE_PROXIMITY = 1065 LP (clean 1098 / fail 1032), eight-stack
+//     1270 (fail 1145); causal gap 5000ms
+//   GRAVEN_2_PUDDLE_PLACEMENT_DEVIATION = 400 (clean ~313 / fail ~501, pull 56)
+//   GRAVEN_2_PUDDLE_LINGER_DISPLACEMENT = 50 (fail ~5 / clean ~98), eight-stack
+//     750; window 1200ms, min react 1500ms
+//   ARROW thresholds: corner Major 1.95y, Minor 1.6y; double-D 1.75y;
+//     UPTIME ARROWS legal only NE/SW
+//   CONFETTI_STACK overshoot 430 / undershoot 350; holder angle 40deg;
+//     final quadrant 45deg
+//   TELE_TROUNCING_BAIT radius 17.7y, min radius 6.5y, cross-latch 1.5y
+//   GRAVEN_3_STACK_OUT_OF_POSITION = 400; ENRAGE_CHECK_MAX_HP_PERCENT = 15
+// Strategy/assumptions: MT tanks both Ruin hits (OT provokes); Graven 2 LP or
+//   eight-stack (graven2-strategy.ts), MT/M1 spread E, OT/M2 W; conga W->E
+//   H2-H1-OT-MT and M1-M2-R1-R2; Confetti DPS E / Support W (1st);
+//   bait pairs MT+R1 N, OT+R2 W, M1+H1 S, M2+H2 E (paired by bearing);
+//   Graven 3 stack DPS NW / Support SE.
+// Sections (Grep the heading text):
+//   "REVOLTING RUIN III THREAT LOSS"   threat, recurrence, cone, non-tank death
+//   "GRAVEN 2 SPREAD MISPLACED"  "GRAVEN 2 DEATH -> UNRESOLVABLE"
+//   "GRAVEN 2 PUDDLE PROXIMITY"  "GRAVEN 2 PUDDLE PLACEMENT"
+//   "GRAVEN 2 PUDDLE LINGER"  "GRAVEN 2 PUDDLE SOAK MISSED"
+//   "BLIZZARD III BLOWOUT SILENT KILL"  "JUMPED OFF THE ARENA" (+ Called Reset)
+//   "WAVE CANNON OUT OF POSITION"  pointer to wave-cannon.ts
+//   "WAVE CANNON TOWER OVERLAP"  "WAVE CANNON TOWER MISSED"
+//   "WAVE CANNON SUPPORT TOWER PRIORITY"  "WHICH TOWER IS WHOSE"
+//   "TELE-TROUNCING ARROW PLACEMENT"  "TELE-TROUNCING RESOLUTION"
+//   "TELE-TROUNCING BAIT POSITION"  "GRAVEN 1 DEATH -> UNRESOLVABLE WIPE"
+//   "CONFETTI LOST -> UNRESOLVABLE WIPE"  "CONFETTI KNOCKBACK POSITIONING"
+//   "CONFETTI GROUP MISPLACED"  "CONFETTI FINAL POSITION"
+//   "WHY INTERPOLATION"  "WHY `healingReceived`"  "damageTaken WAS EXCLUDED"
+//   "GRAVEN 3 MYSTERY MAGIC"  "ENRAGE CHECK"  "LOG IDS FOUND FOR THE REPLAY"
+//   "OPEN QUESTIONS"  (+ VOD review 2026-10-24 / 2026-10-28 notes)
+//   In code: "Hyperdrive (49739)", "UPTIME ARROWS", "CALLED RESET (user"
+// Open items: Puddle Linger h2JvDkntZCaBgmLF pull 41 unruled; pull 49 bait
+//   pair disagrees; gTkMH91DWRmLbNCn pull 6 2:40 DRG arrow sampling error;
+//   2nd Confetti holder/victim geometry; Confetti stack cohesion; Graven 3
+//   spread variant; Hyperdrive tank (Invuln) death; enrage has no pass
+//   sample; Phase 4 HP check; Called Reset can't see cross-pull Majors.
+// ── END DIGEST ───────────────────────────────────────────────────────────
+//
 // Encounter-specific error detection for Phase 1 of FFXIV's Dancing Mad
 // (Kefka's Return) ultimate — everything up through the phase transition
 // at roughly 3:25 (205s) into the fight.

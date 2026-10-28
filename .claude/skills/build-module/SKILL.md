@@ -30,6 +30,11 @@ CLAUDE.md's working preferences apply throughout:
    - position, event and coordinate semantics
 3. Read [lib/mechanics/PITFALLS.md](../../../lib/mechanics/PITFALLS.md),
    the per-boss lessons as a checklist.
+   - This skill runs in the main thread (no subagents). If you delegate a
+     side task, use `subagent_type: refine-worker`
+     (`.claude/agents/refine-worker.md`: six tools, short system prompt)
+     rather than `general-purpose`, and brief it to read DIGESTs and named
+     sections, as `/refine-module`'s briefs.md does.
 4. Skim one reference module of the same game for structure and helpers:
    - **FFXIV:** `ffxiv/arcadion/lindwurm-1.ts` or `tyrant.ts`. Entry point
      `detect<Boss>Errors(players, deaths, enemyCasts, occurrences?)`, with
@@ -181,6 +186,12 @@ Find, for each mechanic:
 ## 8. Write it up, commit, report
 
 1. Put the header in this order, top to bottom:
+   - **DIGEST** (README "The DIGEST block", at most ~2k tokens): what the
+     module covers, every rule id with severity and one-line meaning, the
+     cutoffs, the deciding thresholds with their extremes, the strategy
+     assumed, the section headings quoted exactly, open items. Replace the
+     research model's DIGEST; `/refine-module` agents read only this plus
+     the sections it names.
    - **VERIFIED AGAINST LOGS**, dated: reports A/B/C with their pull
      counts and kills, the clock, log IDs by mechanic, failure findings
      with citations, unexplained wipes, and the cutoff tally.

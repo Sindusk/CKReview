@@ -67,6 +67,14 @@ exhaustive. 150–250 lines per boss has worked well.
    shield?". Put this in one list, not scattered through the text as
    instructions.
 
+8. **A DIGEST at the top** (README "The DIGEST block"): a block of at
+   most ~2k tokens right after the path line, summarizing the model for
+   agents that won't read it all: what the fight's mechanics are, the
+   failure modes (rule ids come later, at build time), the pull-ending
+   failures, the strategy assumed, the `-- SECTION --` headings quoted
+   exactly, and the open questions. `/build-module` rewrites it once rules
+   exist.
+
 ### Per-mechanic block template
 
 ```

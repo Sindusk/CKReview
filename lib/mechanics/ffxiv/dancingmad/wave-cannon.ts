@@ -1,5 +1,41 @@
 // lib/mechanics/ffxiv/dancingmad/wave-cannon.ts
 //
+// ── DIGEST (read first; detail in the sections it names) ─────────────────
+// What: P1 Wave Cannon beams (~0:44, 47784), 4 beams on 4 of 8 players (the
+//   other 4 take towers; tower overlap is phase1.ts's WAVE_CANNON_TOWER_OVERLAP).
+//   Per-job beam spots are LEARNED per report (learnWaveCannonLayout) from
+//   pulls lasting 2+ minutes. Gated on an overlap; position only attributes.
+// Rules (ruleId, severity: meaning):
+//   ffxiv-phase1-wave-cannon-out-of-position  Major  in an overlap cluster
+//     (2+ instances on a player, or one instance on 2+ players), the member(s)
+//     whose deviation from their learned spot beats the cluster's best by both
+//     the ratio and the absolute margin; ambiguous clusters flag nobody
+// Cutoffs: none in this module. A death to one clean beam is no error
+//   (mitigation lives in the Mitigation dialog).
+// Key thresholds:
+//   CULPRIT_MARGIN_RATIO = 1.9 (Pull 12: 1.88x missed before the healingReceived
+//     fix, 2.72x after; h2JvDkntZCaBgmLF pull 3 ~6x)
+//   CULPRIT_MARGIN_ABS_CENTIYALMS = 50; CULPRIT_TIE_EPSILON_CENTIYALMS = 50
+//   WAVE_CANNON_SNAPSHOT_OFFSET_MS = 650 (position interpolated to hit - 0.65s)
+//   WAVE_CANNON_POSITION_WINDOW_MS = 2000; CLEAN_LEARNING_PULL_DURATION_MS =
+//     120_000 (worst clean deviation 4.6y in Q3GzJNZg64k1hLRm);
+//     WAVE_CANNON_VOLLEY_CLUSTER_MS = 250
+// Strategy/assumptions: each job has a fixed beam spot within one report;
+//   compromised players are grouped into clusters by union-find over shared
+//   instances (a 3+-way pileup is one group).
+// Sections (Grep the heading text):
+//   "WHY THIS MOVED OUT OF A HARDCODED TABLE"  per-report learning, 2-min pulls
+//   "THE MECHANIC"  sourceInstance overlap, both overlap shapes
+//   "A DEATH TO ONE CLEAN BEAM IS NOT AN ERROR"  removed mitigation error
+//   "POSITION IS READ ~0.65s BEFORE THE DAMAGE EVENT"  snapshot interpolation
+//   "ATTRIBUTION IS RELATIVE TO THE OVERLAP PARTNER"  cluster culprit margin
+//   "extractHits WAS MISSING THE healingReceived STREAM"  position stream fix
+//   "OPEN: LATE CARRIER CLIPS A NEIGHBOUR"  not-built failure mode
+// Open items: a carrier still walking onto the spot within 1s of the hit
+//   clips a neighbour with both reading on-spot at the snapshot
+//   (BpAdkacQh63VCrRM Pull 9 0:44); not built, no clean/failure range yet.
+// ── END DIGEST ───────────────────────────────────────────────────────────
+//
 // Cross-pull detection for Phase 1's Wave Cannon beam mechanic (~0:44, boss
 // ability "Wave Cannon", 47784 — hits exactly 4 of the 8 players while the
 // other 4 handle the follow-up towers, see phase1.ts's

@@ -15,7 +15,9 @@ validation harness (`scripts/validate.js`, `expectations/`), see
   pulls. Go by the fight names; a report's title is free text.
 - **Refine-module tools** (read-only, `.claude/skills/refine-module/tools/`):
   `pull-errors.js` (a boss's pulls as the app shows them, cross-pull passes
-  included; `--jobs` prints jobs instead of names) and, for The Omega
+  included; `--jobs` prints jobs instead of names; `--roster` prints only
+  name -> job for the report, from disk, to map names in the user's VOD
+  answers) and, for The Omega
   Protocol, `top-probes.js fire-spots|blaster-trace`. Usage in each header.
 - **Validation output:** `validate.js --check --diff-only` prints only the
   CHECK lines, diffs, ruling violations and the summary.
@@ -292,6 +294,29 @@ after every tweak.
   3. Print each element's `top`. A nonzero `top` on `<body>` means a
      browser-default margin.
 - **Viewports.** Check 1920x1080 and 1366x768.
+
+## Measuring an agent session's cost
+
+The user's cost scripts live outside the repo, in
+`~/Documents/CCT/cost-analysis/` (its README lists them). For one
+session, from Git Bash:
+`python -I ~/Documents/CCT/cost-analysis/session_costs.py --session <session id prefix>`.
+It finds the session under `~/.claude/projects/`, counts each API
+response once (by `message.id`), and prints one row per agent (main
+thread, then each subagent with its type and description): requests,
+input / output / cache-write / cache-read tokens, first and average
+context, cost, and the total. It works on a session still running, and
+adds Splitrail's deduplicated figure once Splitrail has scanned it.
+- **Don't sum usage per transcript line.** Claude Code writes one line
+  per content block (thinking, text, each tool call), and each repeats
+  the response's full usage, so raw line sums (including raw rows in
+  Splitrail's database) run 2.2-2.8x high. Splitrail's own UI dedupes.
+- **Prices** (fitted exactly from Splitrail, 2026-10-28): Opus 5.5 $4/M
+  input, $20 output, $5 cache write, $0.20 cache read; Sonnet 5.5 $2 /
+  $10 / $2.5 / $0.20. Cache reads dominate an agentic session and cost the
+  same on both, so a session costs roughly requests x context.
+- `/refine-module` logs each session's total and per-answer cost in
+  `.claude/skills/refine-module/cost-log.md`.
 
 ## Gotchas
 

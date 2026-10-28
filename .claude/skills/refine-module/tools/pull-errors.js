@@ -10,8 +10,13 @@
 // just one mechanic's harness output. Strategy overrides set in the app's
 // Strategy dialog aren't applied (auto-detected only).
 //
-//   node .claude/skills/refine-module/tools/pull-errors.js <ff|wow> <code> "<boss>" [--pulls 1,3-5] [--rule <ruleId prefix>] [--all] [--full] [--summary] [--jobs]
+//   node .claude/skills/refine-module/tools/pull-errors.js <ff|wow> <code> "<boss>" [--pulls 1,3-5] [--rule <ruleId prefix>] [--all] [--full] [--summary] [--jobs] [--roster]
 //
+// --roster   print only the report's roster for that boss: character name ->
+//            the --jobs label, one per line, from the sample data on disk (no
+//            fetch, no detection). The main thread maps every name in the
+//            user's VOD answers through it. The only mode that prints names
+//            on purpose: keep its output out of committed files.
 // --jobs     print players as their job (DRK, SCH, ...; "DRK2" for a second
 //            DRK), names inside descriptions too. Use it for anything an
 //            agent passes on or writes down.
@@ -43,7 +48,7 @@ function parsePulls(s) {
   const [game, code, boss] = args;
   const opt = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
   if (!game || !code || !boss) {
-    console.log('usage: pull-errors.js <ff|wow> <code> "<boss>" [--pulls 1,3-5] [--rule <prefix>] [--all] [--full] [--summary] [--jobs]');
+    console.log('usage: pull-errors.js <ff|wow> <code> "<boss>" [--pulls 1,3-5] [--rule <prefix>] [--all] [--full] [--summary] [--jobs] [--roster]');
     return;
   }
   const want = parsePulls(opt('--pulls'));
@@ -57,6 +62,13 @@ function parsePulls(s) {
   const imported = game === 'wow'
     ? lt.transformReportToPulls(payload.fightDataList, lt.buildWCLAbilityMap(payload.report.masterData.abilities), code)
     : await lt.transformFFReportToPulls(payload.fightDataList, lt.buildFFLAbilityMap(payload.report.masterData.abilities), code, payload.report.startTime);
+  if (args.includes('--roster')) {
+    const { jobLabels } = require('./job-labels');
+    const R = jobLabels(imported.filter((p) => p.name === boss), game);
+    if (!R.map.size) console.log(`no players: no pulls named "${boss}" in sampledata for ${code}`);
+    for (const [name, label] of [...R.map].sort((a, b) => a[1].localeCompare(b[1]))) console.log(`${name} -> ${label}`);
+    return;
+  }
   // Cross-pull passes, learned from every pull in the report as the app does.
   const xp = requireTsFromRoot('lib/cross-pull-passes.ts');
   const state = xp.learnCrossPullState(imported);

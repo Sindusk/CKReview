@@ -1,5 +1,23 @@
 // lib/mechanics/ffxiv/dancingmad/graven2-strategy.ts
 //
+// ── DIGEST (read first; detail in the sections it names) ─────────────────
+// What: Phase 1 Graven 2 STRATEGY identification only (split from phase1.ts):
+//   clusters each player's own earliest Gravitas (47788) hit position and
+//   reports "light-party" (2 clusters of 4), "eight-stack" (1 of 8) or
+//   "unknown"; null if no Gravitas hit has a position (pull never got there).
+// Rules: none. Emits no PullErrors; exports detectGraven2Strategy() only.
+// Cutoffs: none.
+// Key thresholds: GRAVEN2_CLUSTER_RADIUS_CENTIYALMS = 1000 (clean intra-group
+//   spread max ~232 / inter-group distance ~2300, pull 26 of Q3GzJNZg64k1hLRm)
+// Strategy/assumptions: two valid strats (old light-party split, new 8-player
+//   stack); no 8-stack example log exists yet.
+// Sections (Grep the heading text):
+//   "THE TWO STRATEGIES"           both strats, pull 26 positions, scope
+//   "HOW THE SHAPE IS DETECTED"    greedy proximity clustering, variant rules
+// Open items: no per-player stack/spread error detection until a real failure
+//   surfaces (user call 2026-07-30).
+// ── END DIGEST ───────────────────────────────────────────────────────────
+//
 // Per-pull detection of which Graven 2 strategy a raid is running (confirmed
 // 2026-07-30, report Q3GzJNZg64k1hLRm pull 26). Split out from phase1.ts —
 // like Black Hole's tether shape, this is a raid STRATEGY choice, not a

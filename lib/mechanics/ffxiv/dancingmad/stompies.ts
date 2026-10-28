@@ -1,5 +1,54 @@
 // lib/mechanics/ffxiv/dancingmad/stompies.ts
 //
+// ── DIGEST (read first; detail in the sections it names) ─────────────────
+// What: P3 "Stompies" (Earthquake / Stomp-a-Mole), right after Black Hole:
+//   Blizzard III wave 1 (bait spread to intercards), wave 2 (cardinal towers),
+//   then the Stomp-a-Mole pair towers (47856). Relative north K comes from
+//   Kefka's facing at the first Stomp-a-Mole cast (blackhole-strategy.ts's
+//   kefkaPositionBearing). Later stages (slides 4-7) not covered.
+// Rules (ruleId, severity: meaning):
+//   ffxiv-stompies-bait-too-close-to-center  Major  wave 1: every own position
+//     sample within +-1s of the first drop is < 3y from center (no sample: no call)
+//   ffxiv-stompies-wrong-tower               Major  wave 2: bearing > 60 deg off
+//     the player's expected tower; silent when every living player took a
+//     Stomp-a-Mole hit (all towers covered)
+//   ffxiv-stompies-mole-partner              Major  stood in a Stomp-a-Mole tower
+//     already holding another complete pair while own partner was alive
+//   ffxiv-stompies-death-unresolvable        Raid   a player still dead at the
+//     first drop, and a Stomp-a-Mole tower hit then kills someone
+// Cutoffs: ffxiv-stompies-death-unresolvable, anchored on the dead player's
+//   lethal hit; this module's own errors after it are dropped as fallout.
+// Key thresholds:
+//   BAIT_TOO_CLOSE_DISTANCE = 300 (first-pass; no VOD-confirmed true positive
+//     on disk), BAIT_POSITION_WINDOW_MS = 1000
+//   WRONG_TOWER_ANGLE_TOLERANCE = 60 (correct up to ~57 deg / wrong 90+,
+//     LF2yJZabVprjXYvm pull 1)
+//   WAVE1_TO_FIRST_DROP_LEAD_MS = 3400 (drop 1 = wave-1 detonation - 3.4s;
+//     the header's TIMING section still names Earthquake offsets, superseded
+//     by the comment above this constant), FIRST_TO_SECOND_DROP_MS = 3000
+//   MAX_POSITION_SAMPLE_AGE_MS = 4000 (first-pass); STOMP_A_MOLE_SOAK_WINDOW_MS
+//     = 20000; solo soak 149-271k (lethal) vs pairs 56-188k
+// Strategy/assumptions: G1 = MT/H1/M1/R1, G2 = OT/H2/M2/R2. Wave 1: supports
+//   to K, DPS to K+180. Wave 2: Sup G1 K-45, Sup G2 K+45, DPS G1 K+225,
+//   DPS G2 K+135. Mole pairs MT+H1, OT+H2, M1+R1, M2+R2.
+// Sections (Grep the heading text):
+//   "THE MECHANIC, AS FAR AS THIS MODULE COVERS"  Stomp-a-Mole cast, K bearing
+//   "GEOMETRY MODEL, CONFIRMED"  groups, bearing convention, expected bearings
+//   "TIMING: FIXED DROP-TIME OFFSETS"  drop vs detonation, unusable puddle data
+//   "PLAYER POSITION: THREE SOURCES"  nearestPosition streams
+//   "ERRORS DETECTED"  the four rules, VOD review dates
+//   "KNOWN LIMITATIONS (first pass"  unvalidated thresholds, uncovered stages
+//   "OPEN QUESTIONS (VOD needed"  unreviewed flags
+//   "BAIT TOO CLOSE: THE BAITER'S OWN POSITION"  (code) rule 1 evidence
+//   "EVERY TOWER SOAKED => NOBODY PICKED A WRONG TOWER"  (code) rule 2 gate
+//   "STOMP-A-MOLE TOWER PARTNERS"  (code) rule 3 evidence
+//   "DEAD AT THE FIRST DROP -> UNRESOLVABLE"  (code) rule 4 cutoff
+// Open items: bait-too-close re-check on PM8HY9nJ7kTR4tdQ pull 3 if refetched;
+//   qjCMx4bRfgNKwX9T pull 1 11:40 RPR flag not VOD-reviewed; rule 4 rests on
+//   one firing pull (BpAdkacQh63VCrRM Pull 4); drop offsets and thresholds
+//   from one pull.
+// ── END DIGEST ───────────────────────────────────────────────────────────
+//
 // "Earthquake" (user-nicknamed "Stompies" after Kefka's Stomp-a-Mole) — the
 // raid-wide stack/spread/tower dance that immediately follows Black Hole in
 // Dancing Mad's Phase 3, per the 7-slide raidplan in sampledata/ff/Stompies1-7

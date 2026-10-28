@@ -1,5 +1,51 @@
 // lib/mechanics/ffxiv/dancingmad/graven-image.ts
 //
+// ── DIGEST (read first; detail in the sections it names) ─────────────────
+// What: P1 Graven Image (~0:38, cast 48370) resolved by Flagrant Fire III
+//   (47778/47779, one ID per pull), searched 20-60s into the pull. Spread
+//   (8 own instances) or stack (supports / DPS, one shared instance each).
+//   Wrong-HALF deaths belong to phase1.ts (ffxiv-phase1-blizzard3-silent-kill);
+//   this module names who was off their spot within the correct half.
+//   Ideal spots are LEARNED per report (learnGravenImageLayout), not hardcoded.
+// Rules (ruleId, severity: meaning):
+//   ffxiv-phase1-graven-image-spread-misplaced  Major  spread overlap (2+
+//     instances) that killed someone; every overlapped player >= 4y off their
+//     learned spot is named; else detectCandidatePair names both of a 2-player
+//     overlap that stood >= 1y closer than their learned spots
+//   ffxiv-phase1-graven-image-stack-misplaced   Major  stack mode (3+ same-side
+//     on one instance) that killed someone in the group; side members > 4y from
+//     the group centroid (non-joiners) are named
+// Cutoffs: none in this module (outcome-gated attribution only).
+// Key thresholds:
+//   OUT_OF_POSITION_FLOOR_CENTIYALMS = 400 (bystander ~120 / misplaced ~440,
+//     VtdBqhLQkWJXMvDg pull 4; both ~531/~563 flagged, Q3GzJNZg64k1hLRm pull 4)
+//   STACK_OUT_OF_POSITION_THRESHOLD_CENTIYALMS = 400 (trio jitter ~2.4y /
+//     non-joiner ~9.3y, Q3GzJNZg64k1hLRm pull 5); STACK_GROUP_MIN_SIZE = 3
+//   PRIOR_SNAPSHOT_WINDOW_MS = 3000 (pre-hit position; larger deviation wins)
+//   MIRROR_MAX_X_SPREAD_CENTIYALMS = 300 (same-slot jobs 8-175 / swapping
+//     tanks 453-735; above it each half keeps its own median)
+//   CANDIDATE_PAIR_MIN_SHORTFALL_CENTIYALMS = 100 (clean <= 0.5y short Pull 2 /
+//     fatal 1.4y short, BpAdkacQh63VCrRM Pull 11)
+// Strategy/assumptions: supports and DPS take opposite halves, which is
+//   random per pull; the support-safe half is read by majority vote of the
+//   supports' hit positions (determineSupportSafeHalf). Layout mirrored across
+//   center by the larger offset (mirrorHalves). Tanks may trade slots per half.
+// Sections (Grep the heading text):
+//   "THE MECHANIC"  spread vs wrong-half split with phase1.ts
+//   "WHY THIS IS LEARNED, NOT HARDCODED"  per-report layout learning
+//   "THE STACK VARIANT"  stack self-detection, centroid anchor, cast fallback
+//   "MIRRORED, NOT INDEPENDENTLY LEARNED"  mirrorHalves, WHM under-shoot
+//   "SNAPSHOT POSITION"  pre-hit position, late juke
+//   "GATING ON OUTCOME, PER THE USER'S EXPLICIT CALL"  overlap+death gate, floor
+//   "BOTH findPlayerPosition CALLS WERE MISSING healingReceived"  position streams
+//   "WRONG HALF, NOT JUST WRONG SPOT"  support-half vote
+//   "TANK SPOTS SWAP"  per-half medians for tanks, vote-based sample half
+//   "CANDIDATE PAIR (2026-10-28"  near-floor 2-player overlap naming both
+// Open items: stack variant only seen once (no non-joiner-anchor case yet);
+//   WHM still reads up to 3.2y off in support-south pulls (mirror puts her
+//   spot at y 10193-10221); BpAdkacQh63VCrRM Pull 11 candidate pair unruled.
+// ── END DIGEST ───────────────────────────────────────────────────────────
+//
 // Cross-pull detection for Phase 1's Graven Image spread mechanic (~0:38,
 // boss cast "Graven Image", 48370). Split out from phase1.ts — unlike
 // everything there, "the ideal position" here can't be a hardcoded

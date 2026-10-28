@@ -1,5 +1,40 @@
 // lib/mechanics/ffxiv/dancingmad/exdeath.ts
 //
+// ── DIGEST (read first; detail in the sections it names) ─────────────────
+// What: Phase 3 ("Exdeath & Chaos"): Thunder III tankbuster hitting both
+//   tanks, Shockwave killing without its Damage Down, and the Meteor enrage.
+//   Self-gating on the Thunder III mark (1002998 with cause 47884), a Shockwave
+//   killing blow, or a Meteor (50718) hit. Shockwave's normal miss (Damage
+//   Down 1002911) belongs to the generic ffxiv-damage-down rule.
+// Rules (ruleId, severity: meaning; exposure if targeted/assigned):
+//   ffxiv-exdeath-thunder3-wrong-tank    Major  both tanks hit by one cast;
+//     flags the bystander (role-only exposure: each mark cluster, tanks only)
+//   ffxiv-exdeath-shockwave-silent-kill  Major  died to Shockwave 47871/47851
+//     with no Damage Down applied before the death
+//   ffxiv-exdeath-meteor-enrage          Raid   Meteor cast: DPS check missed
+// Cutoffs: ffxiv-exdeath-meteor-enrage at the first Meteor hit (Pull 11,
+//   12:10.7, gTkMH91DWRmLbNCn).
+// Key thresholds:
+//   Wrong-tank attribution: a tank who took the pair's previous hit (pairs
+//     ~3.0s apart, THUNDER_III_PAIR_GAP_MS = 4500) is the bystander (Pull 5
+//     10:41.7, PLD took 10:38.7); else the tank WITHOUT own big personal
+//     mitigation (TANK_PERSONAL_MITIGATION_NAMES; PLD/DRK only, Dark Mind
+//     excluded); both or neither -> flag both tanks.
+//   MARK_CLUSTER_TOLERANCE_MS = 100; MARK_TO_DAMAGE_WINDOW_MS = 1000
+// Strategy/assumptions: MT then OT take the Thunder III pair (~10:38/10:41).
+//   WAR/GNB mitigation lists empty (unseen), so they fall to "flag both".
+// Sections (Grep the heading text):
+//   "THUNDER III (confirmed"          mechanic, mark-cluster failure, override
+//   "PHASE 3 ENRAGE: METEOR"          enrage signature, job coverage note
+//   "SHOCKWAVE SILENT KILL"           gap left by the generic Damage Down rule
+//   "LOG IDS FOUND FOR THE REPLAY"    Bowels of Agony / Shockwave ids
+//   "OPEN QUESTIONS (VOD needed"      open items, not-built list
+// Open items:
+//   Thunder III marking two non-tanks is skipped (maybe Phase 5's Lightning
+//     Resistance Down II, same id); recheck after the cause-47884 filter.
+//   Not built: Shockwave role-stack markers.
+// ── END DIGEST ───────────────────────────────────────────────────────────
+//
 // Encounter-specific error detection for two Phase 3 ("Exdeath & Chaos")
 // mechanics in FFXIV's Dancing Mad ultimate: Thunder III's personal
 // tankbuster mis-targeting a bystander tank, and Shockwave's occasional

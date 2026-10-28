@@ -1,5 +1,45 @@
 // lib/mechanics/ffxiv/dancingmad/limitcut.ts
 //
+// ── DIGEST (read first; detail in the sections it names) ─────────────────
+// What: P3 Limit Cut (~7:30-8:40), right before Black Hole: a gaze/facing
+//   check (debuffs 1001602/1001603 at ~+451s, resolving ~+516s) and the dash
+//   set (8 clone dashes 47844, instance order = player number, ~+531s).
+//   Self-gates on the gaze debuffs' presence.
+// Rules (ruleId, severity: meaning):
+//   ffxiv-limitcut-pushed-off-arena           Major  zero-ability (fall) death during
+//     the player's gaze debuff or within 10s after it
+//   ffxiv-limitcut-dead-during-mechanic       Raid   died between gaze check and dash
+//     set and never dash-hit (their clone re-fires); whole dash set skipped
+//   ffxiv-limitcut-wrong-dash-position        Major  single-victim dash landed away
+//     from its fitted slot, or on-angle but closer than r 1650; missing-player
+//     form (clone landed on someone else) skipped when the dash was dodged
+//   ffxiv-limitcut-dash-clipped-other-player  Major  one dash hit 2+ living players and
+//     some victim is >= 500 from their slot: the farthest is named (both if
+//     within 150 of each other)
+// Cutoffs: ffxiv-limitcut-dead-during-mechanic (Raid; dash-set attribution
+//   skipped).
+// Key thresholds:
+//   FALL_GRACE_WINDOW_MS = 10000 (falls 2.5-2.9s after removal)
+//   TOO_CLOSE_TO_CENTER_RADIUS = 1650 (clean >= 1731 / failure 1407,
+//     xXV3mdnZvFJ8czBP pull 1)
+//   CLIP_MIN_CULPRIT_DEV = 500 (sloppiest clean 469 / culprit 561)
+//   CLIP_ATTRIBUTION_MARGIN = 150; SLOT_SNAP_TOLERANCE_DEG = 22.5;
+//     IDEAL_SLOT_RADIUS = 1880; DASH_WINDOW_AFTER_GAZE_MS = 120000
+// Strategy/assumptions: 8 bait slots at 22.5 + k*45 deg on the rim
+//   (r 1650-1975); instance order walks consecutive slots (start and direction
+//   vary per pull); the dash follows its player, not the slot. Head markers
+//   336-339 = 1-4, 437-440 = 5-8.
+// Sections (Grep the heading text):
+//   "THE MECHANIC (from real logs)"  gaze check, fall-death signature
+//   "THE DASH SET (the"  slots, chords, clip blame, dodge
+//   "RULES IMPLEMENTED (changes)"  dodged-dash skip (BpAdkacQh63VCrRM Pull 4 8:51)
+//   "OPEN QUESTIONS (VOD needed"  not-built items
+//   "Dash-set detection"  (code) dash-set pass
+//   In-function: "Wrong bait spot", "Clipped dashes"
+// Open items: a 4+-player scramble goes unflagged; which gaze debuff means
+//   look toward vs away not pinned (not needed for detection).
+// ── END DIGEST ───────────────────────────────────────────────────────────
+//
 // Encounter-specific error detection for Limit Cut, the facing-check
 // mechanic in FFXIV's Dancing Mad (Kefka's Return) ultimate that runs
 // immediately before Black Hole (~7:30-8:40 into the fight; see
