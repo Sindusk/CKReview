@@ -256,8 +256,8 @@
 // learned spots: spots 6.1y apart, clean spreads 5.6-6.9y (at most 0.5y
 // short, Pull 2), the fatal one 4.7y (1.4y short). A shortfall under 1y is
 // the near-miss shape PITFALLS calls bad luck and stays silent. Two-player
-// overlaps only. OPEN: whether the user's "SGE off more" holds against
-// these numbers (VOD needed before a ruling).
+// overlaps only. Follow-up (user, 2026-10-28): naming both is "probably
+// valid. It's a tough call." Kept as a candidate pair, unruled.
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerInfo } from "@/types/PlayerInfo";

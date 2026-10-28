@@ -105,7 +105,17 @@
 // - A Celestriad tower death does not always end the pull: gTkM#3 (PLD solo
 //   in wave 1, 16:02.8) ran on to Forsaken (17:43); qjCM#3 (SMN solo in wave
 //   2, 16:02.7) ran on to Orchestra 2 (17:02). BpAd#1 (16:09) collapsed at
-//   16:35, qjCM#2 cascaded into a collapse at 16:11.
+//   16:35, qjCM#2 cascaded into a collapse at 16:11. A solo soak leaves no
+//   Damage Down (the soaker just dies, then gets Weakness if raised): BpAd#1
+//   and qjCM#3 have none from Celestriad. Only an EMPTY tower does, via
+//   Stardust on the whole party (gTkM#3 waves 2-3, qjCM#2 wave 3).
+//   Cutoff anyway (user, 2026-10-28, BpAd Pull 1: "the pull is effectively
+//   over from an analysis standpoint ... would never lead to a clear").
+// - Orchestra with a non-tank Surprise Holy carrier: their Flare kills them
+//   and Chaotic Holy fires at once onto another player (BpAd#5: PCT aura
+//   15:33.1, Flare death 15:33.2, Chaotic Holy on the SGE 15:33.2, 205k,
+//   dead). On time it lands ~7.5s after Orchestra on the Holy tank (BpAd#10
+//   15:39.9).
 // - Stray Apocalypse hits (47933) are ~80-220k and apply Damage Down. Stray
 //   Entropy never overlapped (always one hit per player); every Entropy
 //   death followed an earlier exaflare hit on the same player. (Q2, Q5)
@@ -149,7 +159,11 @@
 //                                   the other tank was alive and absent;
 //                                   flags the absent tank
 //   ffxiv-uk-orchestra-enmity      both tanks alive but a non-tank got a
-//                                   Surprise aura; flags the tank without one
+//                                   Surprise aura; flags the tank without one,
+//                                   at the Flare hit. Names an early Chaotic
+//                                   Holy death as its fallout (user,
+//                                   2026-10-28, BpAd Pull 5, unsure but
+//                                   matches the log chain)
 //   ffxiv-uk-orchestra-flare-overlap  one Flare circle hit 2+ players
 //   ffxiv-uk-orchestra-holy        stood in another player's Holy, or took a
 //                                   second Holy while vulnerable (only with
@@ -176,7 +190,11 @@
 //                                   first ice tower clockwise"); player-less
 //                                   Minor only when the convention can't name
 //                                   anyone. A set that still resolved (both
-//                                   towers held two) is no error.
+//                                   towers held two) is no error. When the
+//                                   failure killed the solo soaker or left a
+//                                   tower empty, a player-less Raid cutoff
+//                                   "Celestriad Tower Failed" follows (user,
+//                                   2026-10-28).
 //   ffxiv-uk-choice                hit by Quake/Tornado (wrong tower half)
 //   ffxiv-uk-choice-group          3+ in one Quake/Tornado (player-less;
 //                                   Raid if 3+ died, else Minor)
@@ -524,6 +542,10 @@ const FLARE                = 47954;
 const HOLY                 = 47956;
 const CHAOTIC_FLARE        = 47955;
 const FLARE_DIFFUSION      = 47957;
+const CHAOTIC_HOLY         = 47958;
+// Chaotic Holy on time lands ~7.5s after Orchestra; anything inside this
+// window fired early because its carrier died (BpAd Pull 5: +1.6s).
+const EARLY_CHAOTIC_HOLY_MS = 5000;
 const SURPRISE_FLARE       = 1005350;
 const SURPRISE_HOLY        = 1005351;
 const CELESTRIAD_CAST      = 47938;
@@ -782,14 +804,26 @@ function detectOrchestra(players: PlayerInfo[], deaths: DeathEvent[], life: Life
     // 1. Enmity: a non-tank in the top two while both tanks lived.
     if (bothTanksAlive && nonTankCarriers.length) {
       const flareHits = hitsIn(nonTankCarriers, FLARE, T, T + 2500);
+      // A non-tank Surprise Holy carrier killed by their Flare sets Chaotic
+      // Holy off at once onto someone else: fallout of the lost enmity, named
+      // here. BpAd Pull 5: the PCT got Surprise Holy at 15:33.1 and died to
+      // Flare at 15:33.2; Chaotic Holy fired at 15:33.2 on the SGE (205k,
+      // dead). On time it fires ~7.5s after Orchestra on the Holy tank
+      // (BpAd Pull 10 15:39.9). User, 2026-10-28: "fallout from the lack of aggro".
+      const holyDead = holyCarrier && holyCarrier.role !== "Tank" && flareHits.some((h) => h.p === holyCarrier && life.diedFrom(h.p, h.e.timestamp));
+      const earlyChaoticHoly = holyDead
+        ? hitsIn(players, CHAOTIC_HOLY, T, T + EARLY_CHAOTIC_HOLY_MS).filter((h) => h.p !== holyCarrier && life.diedFrom(h.p, h.e.timestamp))
+        : [];
       for (const tank of tanks.filter((p) => !carriers.includes(p))) {
         const died = flareHits.filter((h) => life.diedFrom(h.p, h.e.timestamp));
         errors.push(playerError(tank, {
           ruleId: UK_ENMITY_RULE_ID, severity: "Major",
           name: "Lost Enmity at Maddening Orchestra",
           description: `Wasn't in the top two of enmity when Maddening Orchestra marked its Flare targets, so ${joinNames(nonTankCarriers.map((p) => p.name))} took a Flare and a Surprise aura instead` +
-            (died.length ? `; ${names(died)} died to it.` : "."),
-          timestamp: T, abilityId: FLARE, abilityName: "Flare",
+            (died.length ? `; ${names(died)} died to it` : "") +
+            (earlyChaoticHoly.length ? `, which set off Chaotic Holy early on ${names(earlyChaoticHoly)}, who died too.` : "."),
+          // At the Flare hit (Orchestra +1.6s), so the deaths that follow sit within the error's reach.
+          timestamp: flareHits[0]?.e.timestamp ?? T, abilityId: FLARE, abilityName: "Flare",
         }));
       }
     }
@@ -1044,6 +1078,19 @@ function detectCelestriad(players: PlayerInfo[], life: Life, enemyCasts: EnemyEv
       const solo = soakers[0];
       return `${solo.p.name} soaked the ${tower.element} tower${where(cast)} alone (${kFmt(solo.e.amount ?? 0)})${life.diedFrom(solo.p, solo.e.timestamp) ? " and died" : ""}`;
     }).join("; ");
+    // A tower failure that kills its solo soaker (or fires Stardust on the
+    // party) ends the pull for analysis, even when the raid plays on (user,
+    // 2026-10-28, BpAd Pull 1 16:09/16:15: "the pull is effectively over from
+    // an analysis standpoint ... that pull would never lead to a clear").
+    // Clean extreme: every duo soak in the 9 reports survived (~90-190k each).
+    // Failure: every solo soak died (205-358k), BpAd#1, gTkM#3, qjCM#3. The
+    // other two raids played on (see VERIFIED); analysis still ends here.
+    const fatal = under.some(({ soakers }) => !soakers.length || soakers.some((h) => life.diedFrom(h.p, h.e.timestamp)));
+    if (fatal) {
+      errors.push(raidError(UK_TOWER_MISSED_RULE_ID, "Celestriad Tower Failed",
+        `In Celestriad wave ${wi + 1} ${consequence}. A pull that loses a Celestriad tower can't lead to a clear from here, so this is treated as the cutoff point.`,
+        tw + RAID_MARKER_SORT_OFFSET_MS, under[0].cast.abilityId, `${TOWERS[under[0].cast.abilityId].element} III`));
+    }
     if (idle.length) {
       for (const p of idle) {
         errors.push(playerError(p, {
@@ -1074,6 +1121,7 @@ function detectCelestriad(players: PlayerInfo[], life: Life, enemyCasts: EnemyEv
         }
         return;
       }
+      if (fatal) return; // the cutoff marker above already describes it
       const crowded = towers.filter((t) => uniq(t.soakers.map((h) => h.p)).length > 2).flatMap((t) => t.soakers);
       errors.push(raidError(UK_TOWER_MISSED_RULE_ID, "Celestriad Tower Under-soaked",
         `In Celestriad wave ${wi + 1} ${consequence}` + (crowded.length ? `, while ${names(crowded)} crowded into one tower` : "") +
