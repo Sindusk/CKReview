@@ -148,10 +148,17 @@
 //   east row three, and the RDM and SGE overlapped there.
 // - F45 3:42.6: the DRK walked into the wall before Bladedance; its
 //   untaken cone killed all six (fallout, user).
-// - F32 3:04.9: the user calls the MNK's swap wrong ("neither had to
-//   swap"); the log shows the DNC at the MNK's row's stack: DNC unruled.
-// - F17 2:52.9 (GNB/SAM pair, 26.9y apart): the user's answer named the
-//   DRK and DNC; unruled, asked again.
+// - F32 3:04.9: the MNK's row was the right side and their stack's spot
+//   south of the three M clones; the MNK took it to the left side, where
+//   the DNC's was ("neither had to swap"; user). The MNK's row went with
+//   them, so a majority read of the rows names the DNC instead; the log
+//   doesn't place the stacks after the knockback: both stay named, the DNC
+//   unruled.
+// - F17 2:52.9 (GNB/SAM pair, 26.9y apart): the user names the GNB and the
+//   DNC as too far; the log has the SAM 15.1y off the line, the GNB 11.8y
+//   and the DNC on its spot. Only the GNB is ruled.
+// - F5 2:54.9: the O pair (MNK, DNC) both west of the line and in the
+//   laser; the MNK should have flexed to the other side (user).
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-top2-avoidable (Major on death, else Minor: no Damage Down in P2):
@@ -168,6 +175,9 @@
 //   another vulnerable player, D72). synergy-order.ts keeps the partner off their Fire slot
 //   (>= 9y, partner <= 7y; the slot model from the learned order). The
 //   description gives both partners' distance from the eye's line (F5).
+//   A pair skipped for the laser but both on one side of the line:
+//   synergy-order.ts names the one whose row is the other side ("Didn't
+//   Flex", user, F5).
 // ffxiv-top2-fire: one Fire that hit 2+ players names them all (not the
 //   glitch-vulnerable ones); synergy-order.ts keeps the ones on the wrong
 //   side of the eye for their row when the rest weren't (user, E11), else

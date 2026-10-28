@@ -33,6 +33,7 @@ import type { PullError, EnemyEvent } from "@/types/PullError";
 import type { HeadMarker } from "../fru/usurper-of-frost";
 import type { PantokratorConga } from "./pantokrator-conga";
 import { readSynergy, partnerOf, fireGroups, TOP2_GLITCH_RULE_ID, TOP2_STACK_RULE_ID, TOP2_FIRE_RULE_ID, type SynergyRead } from "./omega-mf";
+import { playerError } from "@/lib/mechanics/wow/common";
 
 export type SynergyOrder = {
   /** Every best-fitting order of keys (jobs, or names when keyed by name). */
@@ -104,7 +105,7 @@ export function slotDeviations(read: SynergyRead, early: (n: string) => boolean 
 
 /** Players on the wrong side of the eye's axis for their row (every player votes on which side is early). */
 function wrongSide(read: SynergyRead, early: (n: string) => boolean | undefined): Set<string> | undefined {
-  const u = read.axis;
+  const u = read.axis ?? read.lineAxis;
   if (!u) return undefined;
   const lat = (q: { x: number; y: number }) => u.x * (q.y - 10000) - u.y * (q.x - 10000);
   const names = [...read.firePos.keys()].filter((n) => early(n) !== undefined);
@@ -270,7 +271,7 @@ export function applySynergyOrder(
 ): PullError[] {
   if (!so) return errors;
   const pairErr = (e: PullError) => (e.ruleId === TOP2_GLITCH_RULE_ID && e.name === "Out of Glitch Range") || (e.ruleId === TOP2_STACK_RULE_ID && e.name === "Same Stack as Partner")
-    || (e.ruleId === TOP2_FIRE_RULE_ID && e.name === "Fire Overlap");
+    || (e.ruleId === TOP2_FIRE_RULE_ID && e.name === "Fire Overlap") || e.abilityName === "Optical Laser";
   if (!errors.some(pairErr)) return errors;
   const read = readSynergy(players, deathEvents, enemyCasts, headMarkers ?? []);
   if (!read) return errors;
@@ -354,6 +355,26 @@ export function applySynergyOrder(
       }
     }
   }
+  // A glitch pair both on one side of the eye's line, which omega-mf.ts
+  // leaves to the laser that hit them: the partner whose row is the other
+  // side didn't flex (user, 2026-10-28, hjgk42MDf81arFVY Pull 5 2:54.9:
+  // "MNK should be flexing for DNC"; both west, both in the laser).
+  const added: PullError[] = [];
+  if (wrong) {
+    for (const [a, b] of read.pairs) {
+      if (!read.vulnAtFire.has(a) || !read.vulnAtFire.has(b)) continue;
+      if (errors.some((e) => e.ruleId === TOP2_GLITCH_RULE_ID && (e.player === a || e.player === b))) continue;
+      const off = [a, b].filter((n) => wrong.has(n));
+      const p = off.length === 1 ? players.find((x) => x.name === off[0]) : undefined;
+      if (!p) continue;
+      const died = deathEvents.some((d) => d.player === p.name && d.timestamp >= read.fireT && d.timestamp - read.fireT <= 4000);
+      added.push(playerError(p, {
+        ruleId: TOP2_GLITCH_RULE_ID, severity: died ? "Major" : "Minor", name: "Didn't Flex",
+        description: `${read.remote ? "Remote" : "Mid"} Glitch (${read.symbol.get(a) ?? "?"} pair with ${p.name === a ? b : a}) at Fire: both stood on one side of the eye's line, under Vulnerability Up. By the raid's order, ${p.name} belonged on the other side.`,
+        timestamp: read.fireT, abilityId: 31535, abilityName: "Optimized Fire III",
+      }));
+    }
+  }
   // Fire overlaps inside one row: whoever moved toward the other from
   // their own spot (the raid's learned spots) crowded them; the one who
   // stayed put is dropped.
@@ -383,7 +404,7 @@ export function applySynergyOrder(
       }
     }
   }
-  return errors.filter((e) => !drop.has(e)).map((e) => {
+  const kept = errors.filter((e) => !drop.has(e)).map((e) => {
     if (!narrowed.has(e)) return e;
     const off = offBy.get(e.player ?? "");
     const toward = moved.get(e.player ?? "");
@@ -394,4 +415,5 @@ export function applySynergyOrder(
         .replace("Either could have been off their spot.", toward ? `${e.player} moved ${toward}.` : `By the raid's order, ${e.player} was on the wrong side of the eye.`),
     };
   });
+  return added.length ? [...kept, ...added].sort((a, b) => a.timestamp - b.timestamp) : kept;
 }
