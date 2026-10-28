@@ -187,8 +187,10 @@
 //   (both; synergy-order.ts keeps the one outside their expected stack),
 //   both marks together (3+ in both stacks: the two marked players), else
 //   a player in both stacks or none.
-// ffxiv-top2-synergy (Raid): the Fire or Spotlight killed 3+; the clones
-//   killed 4+ in one resolution (player-less, alongside each victim's own
+// ffxiv-top2-synergy (Raid): anyone dead at the Fire, at their fatal hit
+//   ("Dead Before the Fire"; user, F46: "if they are dead to the AoEs in
+//   Party Synergy, the pull is effectively over"); the Fire or Spotlight
+//   killed 3+; the clones killed 4+ in one resolution (player-less, alongside each victim's own
 //   Major avoidable: user, D66, and the follow-up on D68 and D71).
 // ffxiv-top2-bladedance (targeted: both tanks): a tank in both cones held
 //   both tethers, so the other tank took none; a cone no tank took names
@@ -769,6 +771,31 @@ const CLONE_COLLAPSE_DEAD = 4;
  * formed"), alongside each victim's own Major avoidable ("Each individual
  * who gets hit by the clones should be named with a major error").
  */
+/**
+ * Anyone dead at the Fire: Party Synergy needs all eight, so the pull is
+ * over at that death (user, 2026-10-28, hjgk42MDf81arFVY Pull 46 2:49.1:
+ * "The cutoff should be the moment someone dies before the Optimized Fire.
+ * If they are dead to the AoEs in Party Synergy, the pull is effectively
+ * over"). At their fatal hit, not before Party Synergy's cast.
+ */
+function deadAtFire(players: PlayerInfo[], life: Life, casts: EnemyEvent[], read: SynergyRead | undefined, from: number, end: number): PullError[] {
+  const ps = read && castsOf(casts, PARTY_SYNERGY, end).find((c) => c.timestamp > from);
+  if (!read || !ps) return [];
+  const dead = players.filter((p) => !life.alive(p, read.fireT - 500));
+  if (!dead.length) return [];
+  const fatal = (p: PlayerInfo) => {
+    const w = life.outIntervals.find((x) => x.p === p && read.fireT - 500 >= x.start && read.fireT - 500 < x.end)!;
+    const deathT = w.start + 100 + DEATH_EVENT_LAG_MS;
+    const hit = p.damageTaken.filter((e) => !bodyHit(e) && e.timestamp <= deathT && deathT - e.timestamp <= DEATH_EVENT_LAG_MS + 1500)
+      .sort((a, b) => b.timestamp - a.timestamp)[0];
+    return { t: Math.max(ps.timestamp, hit?.timestamp ?? deathT - DEATH_EVENT_LAG_MS), how: hit && hit.timestamp >= ps.timestamp ? hit.abilityName : undefined };
+  };
+  const first = dead.map((p) => ({ p, ...fatal(p) })).sort((a, b) => a.t - b.t)[0];
+  return [raidMarker(TOP2_SYNERGY_RULE_ID, "Dead Before the Fire",
+    `${namesOf(dead)} ${dead.length > 1 ? "were" : "was"} dead at the Fire${first.how ? ` (${first.p.name} to ${first.how})` : ""}: Party Synergy can't resolve with a player down; treated as the cutoff.`,
+    first.t + RAID_MARKER_SORT_OFFSET_MS, FIRE, "Optimized Fire III")];
+}
+
 function cloneCollapse(players: PlayerInfo[], life: Life, avoidable: PullError[]): PullError[] {
   const hits = avoidable.filter((e) => CLONE_IDS.includes(e.abilityId ?? 0)).sort((a, b) => a.timestamp - b.timestamp);
   const errors: PullError[] = [];
@@ -1181,6 +1208,7 @@ export function detectOmegaMFErrors(
   const errors = [
     ...avoidable,
     ...cloneCollapse(players, life, avoidable),
+    ...deadAtFire(players, life, enemyCasts, read, start, end).filter(() => !cloneCollapse(players, life, avoidable).length),
     ...detectSolarRay(players, life, enemyCasts, start, end, occurrences),
     ...detectSynergy(players, life, read, avoidable),
     ...blade.errors,

@@ -34,6 +34,7 @@ import type { HeadMarker } from "../fru/usurper-of-frost";
 import type { PantokratorConga } from "./pantokrator-conga";
 import { readSynergy, partnerOf, fireGroups, TOP2_GLITCH_RULE_ID, TOP2_STACK_RULE_ID, TOP2_FIRE_RULE_ID, type SynergyRead } from "./omega-mf";
 import { playerError } from "@/lib/mechanics/wow/common";
+import { buildLife } from "../fru/common";
 
 export type SynergyOrder = {
   /** Every best-fitting order of keys (jobs, or names when keyed by name). */
@@ -360,7 +361,10 @@ export function applySynergyOrder(
   // side didn't flex (user, 2026-10-28, hjgk42MDf81arFVY Pull 5 2:54.9:
   // "MNK should be flexing for DNC"; both west, both in the laser).
   const added: PullError[] = [];
-  if (wrong) {
+  // All eight alive, like the glitch rule (one down is the cutoff: Pull 46).
+  const life = buildLife(players, deathEvents);
+  const allUp = players.every((p) => life.alive(p, read.fireT - 500));
+  if (wrong && allUp) {
     for (const [a, b] of read.pairs) {
       if (!read.vulnAtFire.has(a) || !read.vulnAtFire.has(b)) continue;
       if (errors.some((e) => e.ruleId === TOP2_GLITCH_RULE_ID && (e.player === a || e.player === b))) continue;
