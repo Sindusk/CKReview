@@ -6,150 +6,128 @@ argument-hint: <report URL or code> [boss / fight name] [pull numbers]
 
 # Refine a boss module with a reviewed log
 
-The loop from the Lindwurm review of QwNrFkGZ4m1yKpXC (2026-10-12):
-1. Analyze the report with the existing module.
-2. Ask about what the log can't settle.
-3. Turn the user's VOD answers into narrow fixes and rulings.
-4. Validate, commit, then ask about the pulls the new rules changed.
+The loop:
+1. An analyst subagent runs the module on the report and writes the VOD
+   questions plus the evidence behind them.
+2. The main thread asks; the user answers a whole batch.
+3. Implementer subagents turn the answers into narrow fixes.
+4. The main thread writes rulings, validates, commits, follows up.
+
+**Why subagents:** a session's cost is requests × context. Module
+headers, PITFALLS, tool output and probes stay in the subagents; the main
+thread holds only the question list, the evidence file, the answers and
+the implementers' diff summaries.
 
 **The user's review is ground truth** (README philosophy 6). CLAUDE.md
 applies throughout:
-- give times as MM:SS;
+- times as MM:SS, pulls as "Pull X" (no report letters, no +SSS);
 - the user writes up a whole batch, so take it all;
-- commit and push without asking;
-- never deploy;
-- no character names in code or docs.
+- rulings only from a VOD review, written by hand, never by `--update`;
+  never edit an existing ruling;
+- scope `--check` to the boss's reports (CLAUDE.md's Validation fact);
+- commit and push without asking; never deploy;
+- no character names in code or docs: use jobs (`--jobs` on the tools).
 
-## 0. Read the module first
+**Models.** Analyst and implementers: the Agent tool, `subagent_type:
+general-purpose`, `model: opus`. Haiku (`Explore`) only for a lookup that
+needs more than one Grep across files nobody will edit. Never the
+Workflow tool unless the user asks for it.
 
-- Find the boss's module. It's listed in the tree at the top of
-  [lib/mechanics/README.md](../../../lib/mechanics/README.md); WoW
-  modules are also in `wow/registry.ts`. Read its header **in full**:
-  VERIFIED AGAINST LOGS, RULES IMPLEMENTED and the model.
-- Read [lib/mechanics/PITFALLS.md](../../../lib/mechanics/PITFALLS.md) and
-  the README's attribution philosophy.
-- Check `expectations/rulings.json` for earlier rulings on this boss;
-  they are the user's past calls.
+Brief templates: [briefs.md](briefs.md). Fill every `<…>`; a subagent
+knows only its brief.
 
-## 1. Get the report and a baseline
+## 0. Identify the boss (main thread)
 
-1. Fetch only the boss's fights, in the background:
-   `fetch-ff-report.js <url> --boss-exact "<fight>"` or
-   `fetch-wow-report.js <url> --boss "<boss>"`. Skip this if
-   `sampledata/<game>/<code>/` already has them.
-2. If the report is new, snapshot the module's current output first:
-   `node scripts/validate.js --update sampledata/<game>/<code>`. Later
-   `--check` diffs then show exactly what the refinement changed.
+- If `sampledata/<game>/<code>/meta.json` exists, read the fight names
+  from it. Otherwise run `node scripts/fetch-<ff|wow>-report.js <code>
+  --meta-only`: one call, no pulls fetched, prints the title and the
+  fights by name. **The fight names decide the boss, never the title**
+  (a report titled "TOP Day 3" was once taken for Dancing Mad).
+- Find the module's path: the tree at the top of
+  [lib/mechanics/README.md](../../../lib/mechanics/README.md); WoW modules
+  are also in `wow/registry.ts`. Don't read the header here.
+- If you don't know which VOD the user has loaded (which pulls it
+  covers), ask now.
 
-## 2. Analyze with the existing detection
+## 1. Analyst (one Opus subagent)
 
-Per-boss view, from the real pipeline (what the app shows):
+Send briefs.md's **Analyst** brief. It reads the module header(s) in
+full, the PITFALLS index plus the general and relevant sections, and the
+boss's prior rulings; fetches; snapshots a new report; runs the tools;
+probes. It returns:
+1. the numbered VOD question list, in CLAUDE.md's format, for the loaded
+   VOD's pulls only;
+2. the path of the evidence file it wrote in the session scratchpad.
 
-```
-node .claude/skills/refine-module/tools/pull-errors.js <ff|wow> <code> "<fight>" --summary
-node .claude/skills/refine-module/tools/pull-errors.js <ff|wow> <code> "<fight>" --pulls 3,8-12 [--rule <prefix>] [--all]
-```
+Read only those two. If it returns OVER BUDGET, decide from its progress
+whether to continue it (SendMessage) or ask what it has.
 
-The per-pull mode marks each cutoff and lists **UNEXPLAINED DEATH**
-lines: deaths no error accounts for.
+## 2. Ask
 
-Collect the calls the module isn't sure of. Look for:
-- **Candidate sets:** one failure naming two or more players, e.g. "Their
-  cone or X's", both chain partners, both baits that stood together.
-- **Player-less errors** where a player might be at fault: owner couldn't
-  be placed, sequence already broken, layout failed as a whole.
-- **Unexplained deaths,** especially no-killing-blow ones classed as a
-  fall, and any death the tool lists.
-- **Cutoffs from generic markers** (collapse, called wipe): what started
-  the collapse?
-- **Errors in a kill,** which should be rare.
-- **Rules firing far more often** here than in the header's reports.
-- **Values near a threshold.** Compare them with the header's clean and
-  failure extremes.
-- **IDs the module doesn't know:** run `analyze-report.js <code> sweep`
-  against the module's constants, for a new patch or a different strategy.
-- **Model failure modes listed as not built** that occur in this report.
+Check the list against CLAUDE.md's VOD format before sending: one list,
+1, 2, 3 … with no sub-letters, ordered by pull; each item gives "Pull X
+MM:SS", what detection says with the players it names, and the exact
+thing to look at; a question for several pulls asked once, at the first.
+About a dozen, preferring questions whose answer would change a rule.
 
-Use `analyze-report.js` (`timeline`, `window`, `resolutions`, `nokb`) and
-scratchpad probes (`.claude/skills/build-module/tools/probe-pulls.js`) to
-learn what the log shows at each one before asking.
+## 3. Check the answers before encoding them
 
-## 3. Ask (CLAUDE.md's VOD format)
+Take the whole batch. For each answer, compare the user's account with
+the evidence file (and the log, when the file doesn't cover it):
+- **They agree:** encode it.
+- **They disagree** (a job named in the answer isn't the one the log
+  shows there; a Spotlight call the row positions contradict): pin only
+  the confirmed part, and ask about the rest in the next round.
+- **The user says the log can't settle it,** or nothing separates it:
+  keep the current behavior, leave it unruled, note it in the header.
 
-- If you don't know which VOD the user has loaded, ask. Ask only about
-  pulls in that VOD.
-- Write one numbered list, 1, 2, 3 …, with no sub-letters, ordered by
-  pull. Each item gives:
-  - the pull and its MM:SS, written "Pull X 6:12", never with a report
-    letter (CLAUDE.md);
-  - what detection currently says, with the players it names;
-  - the exact thing to look at.
-- Ask a question that applies to several pulls once, at the first pull.
-- Prefer the questions whose answer would change a rule. Keep a round to
-  about a dozen.
+Don't build a rule fitted to one pull and then remove it: if the
+evidence has a single pull for a signal, ask or wait for more.
 
-## 4. Apply the answers
+Sort the encodable answers:
+- **Confirmed as detected:** a ruling only (step 5).
+- **Wrong player or severity, or a new failure kind:** an implementer.
 
-Take the whole batch, and group the answers by mechanic. For each answer:
+## 4. Implementers (Opus, one per mechanic group)
 
-- **Confirmed as detected:** it becomes a ruling.
-- **Wrong player or wrong severity:** find a log signal that separates the
-  user's account from the alternative, then check it on **every report on
-  disk** for the boss. Signals that worked before:
-  - the position at the moment the mechanic snapshots;
-  - distance from the arena center or from clean-pull reference spots;
-  - who baited nothing;
-  - an aura that ended at the hit;
-  - process of elimination.
+Group the answers by the files the fix would touch. One implementer per
+group; run them in parallel only when their files don't overlap,
+otherwise one after another. Send briefs.md's **Implementer** brief
+with the user's answers for that group **verbatim** and the matching
+evidence entries.
 
-  Encode it as a **narrow override** with the thresholds' clean and
-  failure extremes in a comment, citing the ruling ("user, <date>, A50
-  +2:28: …").
-- **The user says the log can't settle it**, or no signal separates it:
-  keep the current behavior. Leave that player unruled and note it in the
-  header.
-- **A new failure kind:** add a rule, or a rule id when a different group
-  is responsible, with its exposure.
+Implementers never edit `expectations/rulings.json`, never run
+`--update`, never commit. Each returns its diff summary (every `+ - ~`
+line explained) and the clean/failure threshold values it used.
 
-Don't fit a rule to one pull. Run `pull-errors.js --summary` on the boss's
-other reports too, and read every new or removed error the change causes.
+## 5. Validate and record (main thread)
 
-## 5. Validate and record
-
-1. Run `node scripts/validate.js --check <mechanic> <the boss's report
-   folders>` and read the whole diff. Scope it the way CLAUDE.md's
-   Validation fact says: only the reports holding this boss, unscoped only
-   for cross-boss code. Each added, removed or changed line must be an
-   intended consequence, and every one of the boss's reports counts, not
-   just this one. Fix anything unexpected before going on.
-2. Write the rulings **by hand** into `expectations/rulings.json`, at the
-   end, once detection has settled. Follow the file's `_doc` schema:
-   `{ report, mechanic, boss, pull, mustFlag, mustNotFlag, note, date }`.
-   - Pin the decision with ruleId + player. Add `name` or `t` only when
-     the same rule fires on that player for something else in the pull.
-   - Leave unruled whatever the user couldn't settle.
-   - Pin only the confirmed part of a disputed account, and ask about the
-     rest.
-   - Add new rulings only; never edit an existing one (CLAUDE.md). An
-     on-disk ruling your change breaks is reported to the user, not
-     rewritten.
-3. Run `--check` again (rulings must pass), then
-   `--update sampledata/<game>/<code>` for the reports whose diff you
-   reviewed, then `npx tsc --noEmit`.
-4. In the module header:
-   - add a "VOD review <date> (user): report X pulls …, rulings in
-     expectations/rulings.json" line;
-   - update RULES IMPLEMENTED for every changed rule;
-   - add new log facts to VERIFIED.
-
-   Add anything that generalizes to
-   [PITFALLS.md](../../../lib/mechanics/PITFALLS.md).
-5. Commit (with CLAUDE.md's co-author trailer) and push. Say it's ready to
+1. Read each summary. Every diff line must be an intended consequence
+   on every one of the boss's reports, not just this one. Send anything
+   unexpected back to its implementer.
+2. Run the scoped cross-report check yourself:
+   `node scripts/validate.js --check <mechanic(s)> <the boss's
+   sampledata folders> --diff-only` (all of a game for cross-boss code).
+3. Write the rulings **by hand** into `expectations/rulings.json`, now
+   that detection has settled. Follow its `_doc` schema: `{ report,
+   mechanic, boss, pull, mustFlag, mustNotFlag, note, date }`.
+   - Pin ruleId + player; add `name` or `t` only when the same rule fires
+     on that player for something else in the pull.
+   - Only what the VOD review confirmed; nothing the user couldn't settle.
+   - New rulings only. An on-disk ruling a change breaks is reported to
+     the user, not rewritten.
+4. `--check` again (rulings must pass), then `--update` the folders whose
+   diff you reviewed, then `npx tsc --noEmit`.
+5. Module header: a "VOD review <date> (user): Pulls …, rulings in
+   expectations/rulings.json" line; check the implementers updated RULES
+   IMPLEMENTED and VERIFIED. Add anything that generalizes to
+   [PITFALLS.md](../../../lib/mechanics/PITFALLS.md), under its section.
+6. Commit (CLAUDE.md's co-author trailer) and push. Say it's ready to
    deploy.
 
 ## 6. Follow up
 
 Reply with what changed per answer and which pulls' cutoffs moved. Then
 send a short numbered follow-up list in the same format, about the pulls
-in the same VOD where the new rules made a call the user hasn't seen yet.
-Stop when the user says to.
+in the same VOD where the new rules made a call the user hasn't seen yet
+(the implementers' summaries name them). Stop when the user says to.

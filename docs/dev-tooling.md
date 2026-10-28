@@ -10,6 +10,15 @@ validation harness (`scripts/validate.js`, `expectations/`), see
   (or `fetch-ff-report.js`). `--boss` matches any fight name containing the
   text; `fetch-ff-report.js --boss-exact "<name>"` matches the whole name
   (`Lindwurm` without `Lindwurm II`).
+- **Which boss is in a report:** `--meta-only` (both fetch scripts) writes
+  `meta.json` and prints the title and the fights by name, fetching no
+  pulls. Go by the fight names; a report's title is free text.
+- **Refine-module tools** (read-only, `.claude/skills/refine-module/tools/`):
+  `pull-errors.js` (a boss's pulls as the app shows them, cross-pull passes
+  included; `--jobs` prints jobs instead of names) and, for The Omega
+  Protocol, `top-probes.js fire-spots|blaster-trace`. Usage in each header.
+- **Validation output:** `validate.js --check --diff-only` prints only the
+  CHECK lines, diffs, ruling violations and the summary.
 - **Replay tools** (read-only, any saved replay): `replay-inventory.js`
   (every ability, tether, marker, status and actor in a time range),
   `replay-fitcheck.js` (drawn shapes against who was really hit) and

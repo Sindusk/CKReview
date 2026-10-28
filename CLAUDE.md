@@ -139,7 +139,11 @@ Standing preferences, each learned from a real correction.
 
 - **Sample data:** `sampledata/` is gitignored. Fetch it with
   `node scripts/fetch-{ff,wow}-report.js <code-or-URL>`; setup is in
-  docs/dev-tooling.md.
+  docs/dev-tooling.md. `--meta-only` prints a report's title and fights
+  without fetching pulls: identify the boss by fight name, not title.
+- **Per-boss pull view:** `.claude/skills/refine-module/tools/pull-errors.js`
+  (matches the app; `--jobs` prints jobs, not names); TOP probes in
+  `top-probes.js` beside it.
 - **Validation:** before considering any mechanic change done, run
   `node scripts/validate.js --check` (compares mechanic output against
   local `expectations/` baselines and rulings) and `npx tsc --noEmit`.
@@ -157,6 +161,8 @@ Standing preferences, each learned from a real correction.
     code: log fetching and transforms (`lib/log-transforms.ts`,
     `lib/log-auth.ts`, `scripts/lib/`), the shared damage layer
     (`lib/damage/*.ts` outside `ffxiv/` and `wow/`), or `validate.js`.
+  - `--diff-only` (with `--check`) drops the per-pull listings: only CHECK
+    lines, diffs, ruling violations and the summary.
   - For an intended behavior change, confirm the `--check` diff is exactly
     the intended delta, then `--update`. `--prune` drops snapshots for
     deleted reports. `expectations/rulings.json` is hand-edited only.
