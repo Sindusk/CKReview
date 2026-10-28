@@ -8,8 +8,38 @@ covers Ultima Kefka. Each item says what goes wrong, what to do instead,
 and where it was learned. The module headers hold the specifics.
 
 The `/build-module` and `/refine-module` skills read this at their
-verification step. [README.md](README.md) holds the method, the attribution
-philosophy and the data semantics this list assumes.
+verification step, through the index below. [README.md](README.md) holds
+the method, the attribution philosophy and the data semantics this list
+assumes.
+
+## Index
+
+Every build or refine session reads the **general** sections. Read a
+**topic** section when the mechanic in hand is that kind; skip the rest.
+
+General (every session):
+- **Fetching** — before any fetch: one boss only, rate limits, partial
+  captures, every module gating on its own fight.
+- **Clean baselines** — before setting or moving any threshold.
+- **Ownership and attribution: Reading the log** and **Blame method** —
+  before naming a player for any error.
+- **Cutoffs** — whenever a pull's first Raid error (or a wipe with none)
+  is in question; every refine session checks them.
+- **Repo hygiene** — before committing.
+
+Topic (when it applies):
+- **Mapping IDs and the boss's clock** — mapping a new boss's or phase's
+  ability, status, marker or tether IDs and timers (every build session;
+  refine only when an ID or timer is in doubt). Long: scan the bold
+  lead-ins.
+- **Ownership and attribution**, by kind: *Cascades and whole-raid
+  failures* (deaths after the first failure, resets, calls); *Spreads and
+  stacks*; *Baits, cones and lines*; *Tethers, partners and hand-offs*;
+  *Towers, soaks and carriers*; *Tanks* (busters, aggro, swaps);
+  *Sequences and numbered mechanics*; *Debuffs and cleanses*.
+- **Deaths with no killing blow** — a death with no killing blow, or an
+  unexplained death in `pull-errors.js` output.
+- **Multi-phase fights** — a module spanning phases, or a phase hand-off.
 
 ## Fetching
 
@@ -259,9 +289,8 @@ philosophy and the data semantics this list assumes.
 
 ## Ownership and attribution
 
-- **Progression strategy is improvised; build on outcomes, not spots.**
-  Use clock spots or groups only once the user confirms the plan
-  (Red Hot and Deep Blue, Lindwurm).
+### Reading the log: targets, positions, auras, instances
+
 - **Cast targets usually name the bait owner, but check each ability.**
   Mortal Slayer's and the Scourges' targets are the baits. A Hemorrhagic
   Projection cone's target was its *victim*; its owner stood on the cast's
@@ -297,6 +326,264 @@ philosophy and the data semantics this list assumes.
   TEA's Limit Cut 79-86 are numbers 1-8, and a player dead at the markers
   gets none. The cast target names the holder only when the hit lands on
   one player.
+- **Instance numbers are per caster, and they get reused.** Key a copy by
+  caster + instance (Red Hot and Deep Blue). Add the ability when two
+  kinds share a caster (Mortal Slayer's green and purple orbs). Instances
+  are reused across waves, stages (Ula'tek's eggs) and even within a
+  second (Curtain Call's chain breaks 0.3s apart). Cluster such families
+  tightly.
+- **Multi-spawn adds need `sourceInstance` on casts and buffs.** WCL logs
+  some add applybuffs twice; dedupe by instance (The Twin Fangs, The
+  Coiled Altar).
+- **A "front of the line" hit shows in the unmitigated amount.** Enuo's
+  Return to Nothing gives its first player(s) several times the rest;
+  compare each non-tank's unmitigated hit with the other non-tanks'
+  median (clean max 1.4x, failures 3.4x+), not raw damage.
+- **A late arrival doesn't show at the hit.** Positions are logged at the
+  damage, after the player got there; "late to the spot" at the snapshot
+  is a VOD call (The Tyrant's scythe, both players on their spots).
+- **Measure positions the same way the thresholds were calibrated.** A
+  hit event's own x/y for a jump can differ from the interpolated track
+  (Darkest Dance: 14.9y vs 12.4y, either side of the 15y line).
+- **Judge position at the moment the mechanic snapshots, not at the hit.**
+  The chain connection (Lindwurm) and the Mystery Magic cast (Graven 3)
+  were the moments that mattered.
+- **Hidden object state shows as player-side traces.** Watch for a
+  raid-wide burst (Ula'tek's egg hatch) or a carrier debuff ending early
+  just before a huge hit (The Coiled Altar).
+- **A scripted hit that stops arriving proves destruction** (Enter the
+  Dragon's crystal, `NpcHit[]`).
+- **Boss HP at a cast decides a DPS gate** (Enter the Dragon's Morn Afah).
+  **Provoke history names an enmity steal** (Enter the Dragon).
+- **Count by outcome, not by object ID.** Egg actors reuse instance
+  numbers; spawn counts at each impact accounted for every egg (Ula'tek).
+- **A "min targets" penalty shows up as the next hit,** not a separate
+  spell (The Twin Fangs' Ravenous Feast).
+
+### Blame method
+
+- **Progression strategy is improvised; build on outcomes, not spots.**
+  Use clock spots or groups only once the user confirms the plan
+  (Red Hot and Deep Blue, Lindwurm).
+- **Generic families beat one rule per mechanic.** Use table-driven
+  personal-bait (`PERSONAL`) and stack (`STACKS`) detectors; see tyrant.ts
+  and lindwurm-1.ts.
+- **Fixed spots move the blame onto whoever missed theirs.** Omega P5's
+  World spots are set, so a jump onto a sit-out names the chain player
+  who took no hit, and a player in an origin circle is the extra, not the
+  holder (a player in the fight).
+- **Process of elimination beats geometry.** With N interchangeable
+  candidates and N-1 accounted for, the last one is decisive (Fatebreaker
+  towers; Lindwurm's Metamitosis free players).
+- **A published flex priority can name who went wrong.** Check it against
+  the static's clean resolutions first: the user's static followed NAUR's
+  Refrain Water swap (MT > OT > H1 > H2, melee > R1 > R2) every time, and
+  it named both reviewed failures (Oracle of Darkness `naurGroups`).
+- **Mirrored misses need a reference layout.** Two players who each miss
+  the other's tower are 5.0y off each other symmetrically. The tie-break
+  is the clean pulls' launch spots (`LAUNCH_SPOTS`, Lindwurm).
+- **Check where a lone victim stood before blaming aim.** Pandora's wing
+  victims had gone into a tower early.
+- **Tabulate a failure's outcomes before choosing blame.** Blast Wave
+  split into no-bounce, too-late and too-early, and exposed waves where
+  nobody bounced (The Lost Explorers).
+- **With few pulls, annotate instead of exempting.** Add the context to
+  the description and list the question in the module header's OPEN
+  QUESTIONS block (Nek'zali).
+- **No clean/failure gap means a judgment call.** Use relative attribution
+  (the worst member of the cluster) or ask the user. Don't silently pick a
+  threshold (Wave Cannon, Tele-Trouncing).
+
+### Cascades and whole-raid failures
+
+- **Checkpoint resets aren't pulls.** After a phase kill, groups pull the
+  next phase and die on purpose to reset cooldowns. A death before the
+  phase's opening raidwide marks it (Lindwurm II).
+- **Both healers dead with no Red Mage or Summoner ends any FFXIV pull**
+  (user, 2026-10-14). The rule is in `ffxiv/common.ts`, so boss modules
+  don't repeat it.
+- **A buff lost on death makes the next deaths fallout.** Omega P6's
+  Brilliant Dynamis goes at death and raises don't restore it: a raised
+  player dies to a share or their own spread that everyone else survives,
+  and their LB refund is gone. The first death is the cutoff, minus a
+  planned sacrifice (a DRK dying to Magic Number after their tank LB3),
+  and a mechanic judged after it (a share with seven) is moot (Omega P6,
+  a player in the fights).
+- **Deaths can spawn the failure.** Tag a burst by its timing: The Twin
+  Fangs' globules were released by deaths.
+- **Cascades need an "inherited" exemption.** Merge a player's
+  back-to-back contacts into one episode (The Coiled Altar).
+- **A whole-raid failure is a call, not eight errors.** Everyone alive in
+  one wrong safe spot followed a wrong call: one player-less Raid marker,
+  with the per-player hits as fallout (Fatebreaker's Blasting Zone).
+- **A death that leaves later shares short is a cutoff only if the
+  shortfall killed.** Omega P1's Pantokrator: a player dead before the
+  fourth set left their group short, and the later lines killed the two
+  sharing; with a raise in time, or the short sets killing nobody, five
+  pulls still cleared the phase (user: "on the fourth one, it's
+  recoverable"). Gate on the outcome, and never in a phase clear.
+
+### Spreads and stacks
+
+- **A shared spread with no logged owner on the whole group stays
+  player-less.** Queen Eternal's Ice Dart lost its cast target in every
+  failure that hit the stack group (A13, B8, B13 kill).
+- **A spread can always place every circle.** TEA P4's Optical Sight puts
+  eight circles on the living however many are dead, so the spares double
+  onto survivors and kill them (four wipes and a kill). Count overlaps only
+  with everyone up.
+- **A doubled stack usually means a dead target.** 7 of 9 doubled Sharp
+  Tastes followed a healer's death (The Tyrant).
+- **An aimed share follows its aimer into the wrong zone.** When the
+  player a shared cone is aimed at took an avoidable hit, their partners
+  "missing" the cone is fallout; the aimer's avoidable is the error
+  (Necron's Shockwave behind Aetherblight).
+- **Name the takers when a stack goes elsewhere.** One player alone under
+  it while most stood elsewhere is the stack leaving the group (The
+  Tyrant).
+- **Waiting in the center is a duty too.** A player away from the center
+  when it isn't their turn confuses the pair that is resolving (Minor). A
+  chain that explodes on the players waiting there is the breaker's alone
+  (Lindwurm Act 2, user ruling).
+- **A wrong-island launch owns its spread overlaps.** Once the off-spot
+  launcher is named, the players on that island who caught the spread
+  aren't (Lindwurm Act 3, user ruling).
+- **A stack taken away from a waiting group names its holder.** When the
+  "absent" players stood together on their spot, the stack-marked player was
+  the one who left (Lindwurm Act 1, Lindwurm II Idyllic, user rulings).
+- **Spread overlaps between two players who stood almost far enough apart
+  are bad luck.** Measure the pair's distance against the clean volleys'
+  minimum: The Tyrant's Comets cleanly kept 6.1y+, the near misses 5.8-6.2y
+  (one player-less Minor, user ruling), the misplacements 2.8-4.2y.
+- **A clock layout by role group can name the off-spot player without
+  roles.ts.** Omega P6's Wave Cannon puts supports on cardinals and DPS on
+  intercardinals; clean hits stayed within 21 degrees, overlap culprits
+  were 25-43 off or within 5y of the boss. Late captures have no opening
+  auto, so roles.ts's MT/OT is unreliable there anyway.
+- **A partner-distance penalty marks both partners; a learned layout names
+  one.** Omega P2's glitch Vulnerability Up lands on both. The report's
+  clean Fire rows give the side order (one order fit 131 of 131 pairs), and
+  a slot model built from that pull's clean players (side, distance off the
+  axis, rank along the row) puts the culprit 9-31y off their slot and the
+  partner within 7y. Where both stood near their slots, keep the pair
+  (synergy-order.ts).
+- **A stack that splits names the member who stood off its spot,** not
+  the players waiting in the middle (Oracle of Darkness's Shell Crusher:
+  the BRD 6y out, the four missers within 1y of center).
+- **A lethal stack cap needs a ledger, not a threshold** (The Twin Fangs'
+  Eternal Venom). An enemy cast with a player target at each application
+  can be the cleanest per-stack record.
+- **Stack counts need an overlap allowance.** A tank swap can leak one
+  stack: clean peak 7, rule at 9, skipped with the other tank dead (The
+  Lost Explorers' Shredding Shards).
+- **A spread overlap names whoever moved toward the other.** Learn the
+  raid's own spots from the clean spreads; the member displaced toward the
+  other's spot (1.5y+) crowded them, and one within 1.0y stayed put
+  (Omega P2's Fire, user rulings). Distance off a line didn't separate
+  glitch partners the same way.
+- **A clean-looking overlap can be a group's plan.** Ask before flagging a
+  doubled hit that recurs every pull with nobody dying: one static stacks
+  both tanks for the second Burn Mark on purpose (Fatebreaker).
+
+### Baits, cones and lines
+
+- **Proximity baits retarget onto survivors.** Gate them on everyone being
+  alive, or on the slots not having shifted (The Tyrant, Pandora, Ultimate
+  Kefka).
+- **A rotating line that sweeps the party is its baiter's.** Omega P5's
+  Delta arms rotate out of the arena when baited from the right side;
+  lines on the party (six players in K8) name the player nearest the arm
+  at its first line, not the players hit (a player in the fight).
+- **One bait per player pairs casts with players one-to-one.** Lindwurm's
+  Act 1 cones each cast from their owner's spot. Players stacked together
+  are all "on" several casts. A least-total-distance pairing, where no cast
+  can own a player it hit, still splits them; interpolated positions were
+  0.2-0.5y loose (user ruling). The casts also carry the owner's facing
+  (`sourceResources.facing`). Players' own facing isn't logged near the
+  cast.
+- **A bait nobody took names the player who owed it.** The bait retargets
+  onto whoever is nearest, so don't name the player it landed on (Lindwurm
+  II's Rep1 second-set darks, Mortal Slayer).
+- **A shared cone is its baiter's.** A cone hits its own baiter, so in a
+  shared one the player hit by nothing else aimed it; the doubled players
+  were in their spots (Usurper of Frost's Mirror, Mirror, user ruling).
+- **A bait landing on everyone can be the boss's spot.** A boss-centered
+  donut hitting 3+ players names the tank holding the boss (Usurper of
+  Frost, user ruling).
+- **A nearest-player bait that went to the wrong player:** name whoever
+  baited nothing (and anyone in a bait that isn't their role's), not the
+  players who caught the leftovers (Lindwurm's Mortal Slayer, user
+  ruling).
+- **A cone baited through a helper blames the helper it aimed through,**
+  not the carrier: compare each helper's direction from the source with
+  the direction to the wrongly hit players (Fatebreaker's Sinblaze and Bow
+  Shock, user rulings). The angle alone isn't an error; clean baits came
+  within 44 degrees.
+- **A raised player drawing a bait from where they were raised is bad
+  luck,** not an overlap (The Tyrant's raise grace; Ultima Kefka's Holy,
+  raised the same second the spread landed).
+- **A ground hazard's activation delay separates groups from
+  stragglers.** Four or more burning at once is the party on the wrong
+  side (Red Hot and Deep Blue).
+- **A nearest-player volley can belong to a role group.** TEA's
+  invisible protean volleys go to fixed groups (tanks + melee, then
+  healers + ranged); a player outside the group who took one and a group
+  member who took none are the pair out of position, and the outsider
+  usually dies to the next volley under the resistance down.
+
+### Tethers, partners and hand-offs
+
+- **A partner resolution names a group.** A clean tether on one side
+  tells who belonged in the failed one (Fatebreaker's Fall of Faith).
+- **Two marked players both lose the mark at once:** the one whose death
+  came first set it off. A later death is the explosion's own victim
+  (Fatebreaker's Fated Burn Mark).
+- **A cast that lost its target can get its owner from a role swap.** A
+  holder killed by their own line drops off the cast. When the next wave
+  swaps roles (Flatliner's breath baiters take the tethers), the one player
+  of the swapped role missing from the wave's targets owns it (The Tyrant).
+- **Status hand-offs look like removals.** A removal is a break only
+  without the successor in the same millisecond (Enter the Dragon).
+- **A hand-off order can be the raid's priority line.** Omega P1's
+  Blaster tethers: the earlier new holder in the conga takes the earlier
+  previous holder's tether (247 of 254). When two take one tether, the one
+  whose tether stayed put is wrong, whoever took last.
+
+### Towers, soaks and carriers
+
+- **Pair soaks can follow the role pairs.** Enuo's orbs went to the same
+  two players (T/T, H/H, melee, ranged) in every kill, so a lone soaker
+  names their role partner (roles.ts slots) and a third soaker is whoever
+  is outside the orb's pair.
+- **A lockout debuff counts the soakers.** Companion debuffs at the mark
+  turn a soak into arithmetic (Ula'tek's Soul Constrictor, Ingested Venom).
+- **Immunity soaks are strategy.** Skip zero-damage hits unless the player
+  died (The Coiled Altar).
+- **Carriers come from cast targets, not hit counts.** Atomic Impact's
+  puddles chained through six players; the casts named the two carriers
+  (The Tyrant).
+
+### Tanks
+
+- **An unplanned aggro swap shows in the boss's autos.** A buster on the
+  wrong tank, with the autos moving over and no Provoke or Shirk, is the
+  tank who took aggro (Oracle of Darkness's Black Halo; the DRK hadn't
+  dropped tank stance).
+- **FFXIV logs carry no enmity.** The boss's single-target autos show who
+  is #1, and `lib/mitigation/enmity.ts` fills the gaps with a simulated
+  table (who held it, how close #2 came, why each swap happened). A
+  planned tank swap is judged by who the enmity-targeted hit landed on
+  twice, plus the Provoke casts. Damage done after a Provoke doesn't
+  predict a race within a few %. A tank raised shortly before is
+  exempt, because the swap can fail by milliseconds with nothing wrong in
+  the log (Pandora's wings).
+- **Read MT from the boss's first assigned buster, not the opening
+  auto.** roles.ts's opening auto-attack named the off-tank as MT in 4 of
+  24 FRU pulls of one static; the first Powder Mark Trail was on the same
+  tank every pull (Fatebreaker's Fall of Faith conga).
+
+### Sequences and numbered mechanics
+
 - **A stray hit in a numbered sequence usually kills later.** TEA's Limit
   Cut hits leave a 17s vulnerability, so the stray victim dies at their
   own number; count that death on the stray hit, and skip the next attack
@@ -308,249 +595,21 @@ philosophy and the data semantics this list assumes.
 - **A sequence of baits can reuse caster instances within one set.**
   Queen Eternal's eight Divide and Conquer lines, 1s apart, reuse
   caster instances; key each hit to the latest matching cast, not caster#instance.
-- **A shared spread with no logged owner on the whole group stays
-  player-less.** Queen Eternal's Ice Dart lost its cast target in every
-  failure that hit the stack group (A13, B8, B13 kill).
-- **Instance numbers are per caster, and they get reused.** Key a copy by
-  caster + instance (Red Hot and Deep Blue). Add the ability when two
-  kinds share a caster (Mortal Slayer's green and purple orbs). Instances
-  are reused across waves, stages (Ula'tek's eggs) and even within a
-  second (Curtain Call's chain breaks 0.3s apart). Cluster such families
-  tightly.
-- **Multi-spawn adds need `sourceInstance` on casts and buffs.** WCL logs
-  some add applybuffs twice; dedupe by instance (The Twin Fangs, The
-  Coiled Altar).
-- **Generic families beat one rule per mechanic.** Use table-driven
-  personal-bait (`PERSONAL`) and stack (`STACKS`) detectors; see tyrant.ts
-  and lindwurm-1.ts.
-- **Proximity baits retarget onto survivors.** Gate them on everyone being
-  alive, or on the slots not having shifted (The Tyrant, Pandora, Ultimate
-  Kefka).
-- **A spread can always place every circle.** TEA P4's Optical Sight puts
-  eight circles on the living however many are dead, so the spares double
-  onto survivors and kill them (four wipes and a kill). Count overlaps only
-  with everyone up.
-- **A doubled stack usually means a dead target.** 7 of 9 doubled Sharp
-  Tastes followed a healer's death (The Tyrant).
-- **A rotating line that sweeps the party is its baiter's.** Omega P5's
-  Delta arms rotate out of the arena when baited from the right side;
-  lines on the party (six players in K8) name the player nearest the arm
-  at its first line, not the players hit (a player in the fight).
-- **Fixed spots move the blame onto whoever missed theirs.** Omega P5's
-  World spots are set, so a jump onto a sit-out names the chain player
-  who took no hit, and a player in an origin circle is the extra, not the
-  holder (a player in the fight).
-- **An aimed share follows its aimer into the wrong zone.** When the
-  player a shared cone is aimed at took an avoidable hit, their partners
-  "missing" the cone is fallout; the aimer's avoidable is the error
-  (Necron's Shockwave behind Aetherblight).
-- **Name the takers when a stack goes elsewhere.** One player alone under
-  it while most stood elsewhere is the stack leaving the group (The
-  Tyrant).
-- **One bait per player pairs casts with players one-to-one.** Lindwurm's
-  Act 1 cones each cast from their owner's spot. Players stacked together
-  are all "on" several casts. A least-total-distance pairing, where no cast
-  can own a player it hit, still splits them; interpolated positions were
-  0.2-0.5y loose (user ruling). The casts also carry the owner's facing
-  (`sourceResources.facing`). Players' own facing isn't logged near the
-  cast.
-- **Waiting in the center is a duty too.** A player away from the center
-  when it isn't their turn confuses the pair that is resolving (Minor). A
-  chain that explodes on the players waiting there is the breaker's alone
-  (Lindwurm Act 2, user ruling).
-- **A wrong-island launch owns its spread overlaps.** Once the off-spot
-  launcher is named, the players on that island who caught the spread
-  aren't (Lindwurm Act 3, user ruling).
-- **A stack taken away from a waiting group names its holder.** When the
-  "absent" players stood together on their spot, the stack-marked player was
-  the one who left (Lindwurm Act 1, Lindwurm II Idyllic, user rulings).
-- **A bait nobody took names the player who owed it.** The bait retargets
-  onto whoever is nearest, so don't name the player it landed on (Lindwurm
-  II's Rep1 second-set darks, Mortal Slayer).
-- **Checkpoint resets aren't pulls.** After a phase kill, groups pull the
-  next phase and die on purpose to reset cooldowns. A death before the
-  phase's opening raidwide marks it (Lindwurm II).
-- **Both healers dead with no Red Mage or Summoner ends any FFXIV pull**
-  (user, 2026-10-14). The rule is in `ffxiv/common.ts`, so boss modules
-  don't repeat it.
-- **A shared cone is its baiter's.** A cone hits its own baiter, so in a
-  shared one the player hit by nothing else aimed it; the doubled players
-  were in their spots (Usurper of Frost's Mirror, Mirror, user ruling).
-- **A bait landing on everyone can be the boss's spot.** A boss-centered
-  donut hitting 3+ players names the tank holding the boss (Usurper of
-  Frost, user ruling).
-- **A nearest-player bait that went to the wrong player:** name whoever
-  baited nothing (and anyone in a bait that isn't their role's), not the
-  players who caught the leftovers (Lindwurm's Mortal Slayer, user
-  ruling).
-- **A partner resolution names a group.** A clean tether on one side
-  tells who belonged in the failed one (Fatebreaker's Fall of Faith).
-- **A cone baited through a helper blames the helper it aimed through,**
-  not the carrier: compare each helper's direction from the source with
-  the direction to the wrongly hit players (Fatebreaker's Sinblaze and Bow
-  Shock, user rulings). The angle alone isn't an error; clean baits came
-  within 44 degrees.
-- **Two marked players both lose the mark at once:** the one whose death
-  came first set it off. A later death is the explosion's own victim
-  (Fatebreaker's Fated Burn Mark).
-- **Pair soaks can follow the role pairs.** Enuo's orbs went to the same
-  two players (T/T, H/H, melee, ranged) in every kill, so a lone soaker
-  names their role partner (roles.ts slots) and a third soaker is whoever
-  is outside the orb's pair.
-- **A "front of the line" hit shows in the unmitigated amount.** Enuo's
-  Return to Nothing gives its first player(s) several times the rest;
-  compare each non-tank's unmitigated hit with the other non-tanks'
-  median (clean max 1.4x, failures 3.4x+), not raw damage.
-- **A cast that lost its target can get its owner from a role swap.** A
-  holder killed by their own line drops off the cast. When the next wave
-  swaps roles (Flatliner's breath baiters take the tethers), the one player
-  of the swapped role missing from the wave's targets owns it (The Tyrant).
-- **Spread overlaps between two players who stood almost far enough apart
-  are bad luck.** Measure the pair's distance against the clean volleys'
-  minimum: The Tyrant's Comets cleanly kept 6.1y+, the near misses 5.8-6.2y
-  (one player-less Minor, user ruling), the misplacements 2.8-4.2y.
-- **A late arrival doesn't show at the hit.** Positions are logged at the
-  damage, after the player got there; "late to the spot" at the snapshot
-  is a VOD call (The Tyrant's scythe, both players on their spots).
-- **A buff lost on death makes the next deaths fallout.** Omega P6's
-  Brilliant Dynamis goes at death and raises don't restore it: a raised
-  player dies to a share or their own spread that everyone else survives,
-  and their LB refund is gone. The first death is the cutoff, minus a
-  planned sacrifice (a DRK dying to Magic Number after their tank LB3),
-  and a mechanic judged after it (a share with seven) is moot (Omega P6,
-  a player in the fights).
-- **A clock layout by role group can name the off-spot player without
-  roles.ts.** Omega P6's Wave Cannon puts supports on cardinals and DPS on
-  intercardinals; clean hits stayed within 21 degrees, overlap culprits
-  were 25-43 off or within 5y of the boss. Late captures have no opening
-  auto, so roles.ts's MT/OT is unreliable there anyway.
-- **Process of elimination beats geometry.** With N interchangeable
-  candidates and N-1 accounted for, the last one is decisive (Fatebreaker
-  towers; Lindwurm's Metamitosis free players).
-- **A published flex priority can name who went wrong.** Check it against
-  the static's clean resolutions first: the user's static followed NAUR's
-  Refrain Water swap (MT > OT > H1 > H2, melee > R1 > R2) every time, and
-  it named both reviewed failures (Oracle of Darkness `naurGroups`).
-- **A partner-distance penalty marks both partners; a learned layout names
-  one.** Omega P2's glitch Vulnerability Up lands on both. The report's
-  clean Fire rows give the side order (one order fit 131 of 131 pairs), and
-  a slot model built from that pull's clean players (side, distance off the
-  axis, rank along the row) puts the culprit 9-31y off their slot and the
-  partner within 7y. Where both stood near their slots, keep the pair
-  (synergy-order.ts).
-- **A stack that splits names the member who stood off its spot,** not
-  the players waiting in the middle (Oracle of Darkness's Shell Crusher:
-  the BRD 6y out, the four missers within 1y of center).
-- **An unplanned aggro swap shows in the boss's autos.** A buster on the
-  wrong tank, with the autos moving over and no Provoke or Shirk, is the
-  tank who took aggro (Oracle of Darkness's Black Halo; the DRK hadn't
-  dropped tank stance).
-- **Measure positions the same way the thresholds were calibrated.** A
-  hit event's own x/y for a jump can differ from the interpolated track
-  (Darkest Dance: 14.9y vs 12.4y, either side of the 15y line).
-- **Mirrored misses need a reference layout.** Two players who each miss
-  the other's tower are 5.0y off each other symmetrically. The tie-break
-  is the clean pulls' launch spots (`LAUNCH_SPOTS`, Lindwurm).
-- **Judge position at the moment the mechanic snapshots, not at the hit.**
-  The chain connection (Lindwurm) and the Mystery Magic cast (Graven 3)
-  were the moments that mattered.
 - **When one player's cast starts the chain, blame the cast's timing**
   (The Lost Explorers' fish).
+
+### Debuffs and cleanses
+
 - **"Who caused it" can be the player whose own debuff ended at that
   instant** (The Coiled Altar's ghosts).
-- **A lockout debuff counts the soakers.** Companion debuffs at the mark
-  turn a soak into arithmetic (Ula'tek's Soul Constrictor, Ingested Venom).
-- **Hidden object state shows as player-side traces.** Watch for a
-  raid-wide burst (Ula'tek's egg hatch) or a carrier debuff ending early
-  just before a huge hit (The Coiled Altar).
 - **A debuff's cause names whose error a later death is.** Use
   `causeAbilityId`: Pandora's Resistance Down, Enter the Dragon's
   Lightsteeped stacks.
-- **Status hand-offs look like removals.** A removal is a break only
-  without the successor in the same millisecond (Enter the Dragon).
-- **A scripted hit that stops arriving proves destruction** (Enter the
-  Dragon's crystal, `NpcHit[]`).
-- **Boss HP at a cast decides a DPS gate** (Enter the Dragon's Morn Afah).
-  **Provoke history names an enmity steal** (Enter the Dragon).
-- **FFXIV logs carry no enmity.** The boss's single-target autos show who
-  is #1, and `lib/mitigation/enmity.ts` fills the gaps with a simulated
-  table (who held it, how close #2 came, why each swap happened). A
-  planned tank swap is judged by who the enmity-targeted hit landed on
-  twice, plus the Provoke casts. Damage done after a Provoke doesn't
-  predict a race within a few %. A tank raised shortly before is
-  exempt, because the swap can fail by milliseconds with nothing wrong in
-  the log (Pandora's wings).
-- **Check where a lone victim stood before blaming aim.** Pandora's wing
-  victims had gone into a tower early.
-- **Tabulate a failure's outcomes before choosing blame.** Blast Wave
-  split into no-bounce, too-late and too-early, and exposed waves where
-  nobody bounced (The Lost Explorers).
-- **A raised player drawing a bait from where they were raised is bad
-  luck,** not an overlap (The Tyrant's raise grace; Ultima Kefka's Holy,
-  raised the same second the spread landed).
-- **Immunity soaks are strategy.** Skip zero-damage hits unless the player
-  died (The Coiled Altar).
-- **A lethal stack cap needs a ledger, not a threshold** (The Twin Fangs'
-  Eternal Venom). An enemy cast with a player target at each application
-  can be the cleanest per-stack record.
-- **Stack counts need an overlap allowance.** A tank swap can leak one
-  stack: clean peak 7, rule at 9, skipped with the other tank dead (The
-  Lost Explorers' Shredding Shards).
-- **Carriers come from cast targets, not hit counts.** Atomic Impact's
-  puddles chained through six players; the casts named the two carriers
-  (The Tyrant).
-- **Count by outcome, not by object ID.** Egg actors reuse instance
-  numbers; spawn counts at each impact accounted for every egg (Ula'tek).
-- **A "min targets" penalty shows up as the next hit,** not a separate
-  spell (The Twin Fangs' Ravenous Feast).
-- **Deaths can spawn the failure.** Tag a burst by its timing: The Twin
-  Fangs' globules were released by deaths.
-- **Cascades need an "inherited" exemption.** Merge a player's
-  back-to-back contacts into one episode (The Coiled Altar).
-- **A ground hazard's activation delay separates groups from
-  stragglers.** Four or more burning at once is the party on the wrong
-  side (Red Hot and Deep Blue).
-- **A nearest-player volley can belong to a role group.** TEA's
-  invisible protean volleys go to fixed groups (tanks + melee, then
-  healers + ranged); a player outside the group who took one and a group
-  member who took none are the pair out of position, and the outsider
-  usually dies to the next volley under the resistance down.
 - **Who cleansed is the Esuna cast on the holder at the removal.** A
   missed cleanse names the healer with fewer successful cleanses when the
   pair splits them every pull (TEA's Throttle).
 - **A cleanse can be the fatal hit.** Don't drop death-time removals
   blindly (Red Hot and Deep Blue's Xtreme).
-- **With few pulls, annotate instead of exempting.** Add the context to
-  the description and list the question in the module header's OPEN
-  QUESTIONS block (Nek'zali).
-- **No clean/failure gap means a judgment call.** Use relative attribution
-  (the worst member of the cluster) or ask the user. Don't silently pick a
-  threshold (Wave Cannon, Tele-Trouncing).
-- **Read MT from the boss's first assigned buster, not the opening
-  auto.** roles.ts's opening auto-attack named the off-tank as MT in 4 of
-  24 FRU pulls of one static; the first Powder Mark Trail was on the same
-  tank every pull (Fatebreaker's Fall of Faith conga).
-- **A whole-raid failure is a call, not eight errors.** Everyone alive in
-  one wrong safe spot followed a wrong call: one player-less Raid marker,
-  with the per-player hits as fallout (Fatebreaker's Blasting Zone).
-- **A death that leaves later shares short is a cutoff only if the
-  shortfall killed.** Omega P1's Pantokrator: a player dead before the
-  fourth set left their group short, and the later lines killed the two
-  sharing; with a raise in time, or the short sets killing nobody, five
-  pulls still cleared the phase (user: "on the fourth one, it's
-  recoverable"). Gate on the outcome, and never in a phase clear.
-- **A hand-off order can be the raid's priority line.** Omega P1's
-  Blaster tethers: the earlier new holder in the conga takes the earlier
-  previous holder's tether (247 of 254). When two take one tether, the one
-  whose tether stayed put is wrong, whoever took last.
-- **A spread overlap names whoever moved toward the other.** Learn the
-  raid's own spots from the clean spreads; the member displaced toward the
-  other's spot (1.5y+) crowded them, and one within 1.0y stayed put
-  (Omega P2's Fire, user rulings). Distance off a line didn't separate
-  glitch partners the same way.
-- **A clean-looking overlap can be a group's plan.** Ask before flagging a
-  doubled hit that recurs every pull with nobody dying: one static stacks
-  both tanks for the second Burn Mark on purpose (Fatebreaker).
 
 ## Deaths with no killing blow
 
