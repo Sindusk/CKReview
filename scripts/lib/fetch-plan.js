@@ -62,4 +62,26 @@ function writeAtomic(filePath, data) {
   fs.renameSync(tmp, filePath);
 }
 
-module.exports = { killsFirst, rateLimitWaitSeconds, withRateLimitWait, writeAtomic };
+/**
+ * --meta-only: the report's title and its fights grouped by name (pulls,
+ * kills, longest), so the boss is identified from the log itself before
+ * any module is read. A title is the uploader's free text ("TOP Day 3"
+ * was once assumed to be Dancing Mad); the fight names are what count.
+ */
+function printReportOverview(report) {
+  console.log(`  title: ${report.title}`);
+  const byName = new Map();
+  for (const f of report.fights.filter((x) => x.endTime > x.startTime)) {
+    const g = byName.get(f.name) ?? { pulls: 0, kills: 0, longest: 0 };
+    g.pulls++;
+    if (f.kill) g.kills++;
+    g.longest = Math.max(g.longest, f.endTime - f.startTime);
+    byName.set(f.name, g);
+  }
+  const mmss = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`;
+  for (const [name, g] of [...byName].sort((a, b) => b[1].pulls - a[1].pulls)) {
+    console.log(`  ${String(g.pulls).padStart(4)} pull(s), ${g.kills} kill(s), longest ${mmss(g.longest)}: ${name}`);
+  }
+}
+
+module.exports = { killsFirst, rateLimitWaitSeconds, withRateLimitWait, writeAtomic, printReportOverview };

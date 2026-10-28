@@ -635,7 +635,7 @@ function detectAvoidable(players: PlayerInfo[], life: Life, end: number): PullEr
 
 // ── Program Loop: towers and Blaster tethers ────────────────────────────────
 
-type Round = { r: number; t: number; casts: EnemyEvent[] };
+export type Round = { r: number; t: number; casts: EnemyEvent[] };
 
 /**
  * The round's two tower cardinals and the two free ones the holders take.
@@ -653,8 +653,8 @@ function roundCardinals(players: PlayerInfo[], life: Life, rd: Round): { towers:
   return { towers, free: [0, 1, 2, 3].filter((c) => !towers.includes(c)) };
 }
 
-/** The four Program Loop rounds: two towers and two Blasters each, ~9s apart. */
-function loopRounds(casts: EnemyEvent[], end: number): Round[] {
+/** The four Program Loop rounds: two towers and two Blasters each, ~9s apart. Exported for the refine-module probes (top-probes.js). */
+export function loopRounds(casts: EnemyEvent[], end: number): Round[] {
   return clusterByGap(castsOf(casts, [TOWER, OBLITERATION, BLASTER], end), (c) => c.timestamp, ROUND_GAP_MS)
     .slice(0, 4).map((g, i) => ({ r: i + 1, t: g[0].timestamp, casts: g }));
 }

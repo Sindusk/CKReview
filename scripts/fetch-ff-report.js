@@ -29,6 +29,8 @@
 //   --to-minutes <n>   Stop the bulky streams n minutes into each fight (deaths
 //                      still run to the end). With --from-minutes it fetches one
 //                      middle phase (FRU P2: --from-minutes 2.4 --to-minutes 7.75).
+//   --meta-only      Write meta.json, print the title and the fights by name,
+//                    fetch no pulls: one cheap call to identify the boss first
 //   --refetch        Download again the pulls whose file already exists. Pulls
 //                    not on disk are skipped; name them with --fight to add them.
 //
@@ -43,10 +45,10 @@ const path = require('path');
 const { requireTsFromRoot, ROOT } = require('./lib/require-ts');
 const { createNodeLogAuth } = require('./lib/node-log-auth');
 const { slimFflReport } = require('./lib/slim-report');
-const { killsFirst, withRateLimitWait, writeAtomic } = require('./lib/fetch-plan');
+const { killsFirst, withRateLimitWait, writeAtomic, printReportOverview } = require('./lib/fetch-plan');
 
 function parseArgs(argv) {
-  const args = { fights: [], out: null, boss: null, bossExact: null, creds: null, minMinutes: 0, minPhase: 0, fromMinutes: 0, toMinutes: 0, refetch: false };
+  const args = { fights: [], out: null, boss: null, bossExact: null, creds: null, minMinutes: 0, minPhase: 0, fromMinutes: 0, toMinutes: 0, refetch: false, metaOnly: false };
   let reportCode = null;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -60,13 +62,14 @@ function parseArgs(argv) {
     else if (a === '--from-minutes') args.fromMinutes = Number(argv[++i]);
     else if (a === '--to-minutes') args.toMinutes = Number(argv[++i]);
     else if (a === '--refetch') args.refetch = true;
+    else if (a === '--meta-only') args.metaOnly = true;
     else if (!reportCode) reportCode = a;
     else throw new Error(`Unrecognized argument: ${a}`);
   }
   if (!reportCode) {
     throw new Error(
       'Usage: node scripts/fetch-ff-report.js <reportCode> [--out dir] [--fight id]... [--boss name] [--boss-exact name] [--creds path] ' +
-      '[--min-minutes n] [--min-phase n] [--from-minutes n] [--to-minutes n] [--refetch]'
+      '[--min-minutes n] [--min-phase n] [--from-minutes n] [--to-minutes n] [--refetch] [--meta-only]'
     );
   }
   return { reportCode: extractReportCode(reportCode), ...args };
@@ -82,7 +85,7 @@ function extractReportCode(input) {
 }
 
 async function main() {
-  const { reportCode, out, fights, boss, bossExact, creds, minMinutes, minPhase, fromMinutes, toMinutes, refetch } = parseArgs(process.argv.slice(2));
+  const { reportCode, out, fights, boss, bossExact, creds, minMinutes, minPhase, fromMinutes, toMinutes, refetch, metaOnly } = parseArgs(process.argv.slice(2));
   const outDir    = out   ? path.resolve(out)   : path.join(ROOT, 'sampledata', 'ff', reportCode);
   const credsPath = creds ? path.resolve(creds) : path.join(ROOT, '.credentials', 'ffl-token.json');
 
@@ -111,6 +114,7 @@ async function main() {
     JSON.stringify({ code: report.code, title: report.title, startTime: report.startTime, fights: report.fights, masterData: report.masterData }, null, 2)
   );
   console.log(`  wrote meta.json (${report.fights.length} fights, ${report.masterData.actors.length} actors)`);
+  if (metaOnly) { printReportOverview(report); return; }
 
   let targetFights = killsFirst(report.fights.filter((f) => f.endTime > f.startTime));
   if (fights.length > 0) targetFights = targetFights.filter((f) => fights.includes(f.id));

@@ -12,6 +12,7 @@
 //   node scripts/validate.js --update                 # regenerate expectations/
 //   node scripts/validate.js --prune                  # drop snapshots whose sampledata is gone
 //   node scripts/validate.js --check --game ff        # one game only (the default scope)
+//   node scripts/validate.js --check --diff-only ...  # only CHECK lines, diffs, rulings, summary
 //   node scripts/validate.js --list                   # print mechanic names
 //
 // Args that match a mechanic name select mechanics; anything else is treated
@@ -1529,6 +1530,7 @@ if (rawArgs.includes('--list') || rawArgs.includes('--help') || rawArgs.includes
   console.log('No mechanic args = all. No reportDir args = every folder under sampledata/{ff,wow}/.');
   console.log('--check  diff detection output against expectations/ (snapshots + rulings); nonzero exit on any difference');
   console.log('--update regenerate expectations/ snapshots from current output (rulings are never touched)');
+  console.log('--diff-only  with --check: print only CHECK lines, diffs, ruling violations and the summary');
   console.log('--prune  delete snapshots whose sampledata report folder no longer exists');
   console.log('--game ff|wow  only that game (the default for work on one game; both only after shared-code changes)');
   process.exit(0);
@@ -1544,6 +1546,14 @@ if (rawArgs.includes('--check') && rawArgs.includes('--update')) {
   console.error('--check and --update are mutually exclusive');
   process.exit(1);
 }
+
+// --diff-only (with --check): mute the per-report headers and per-pull error
+// listings, keeping the CHECK lines, the +/-/~ diff, ruling violations and
+// the final summary. Warnings and errors (console.warn/error) still print.
+const diffOnly = mode === 'check' && rawArgs.includes('--diff-only');
+const realLog = console.log;
+const mute = () => { if (diffOnly) console.log = () => {}; };
+const unmute = () => { console.log = realLog; };
 
 // --game ff|wow: only that game's mechanics and reports (user, 2026-10-13:
 // work on one game validates that game; run both only after a change to
@@ -1608,6 +1618,7 @@ function gamesOfDir(dir) {
       const actorMap = buildActorMap(meta);
       const abilityMap = buildAbilityMap(meta);
 
+      mute();
       console.log('#'.repeat(70));
       console.log(`${meta.title ?? meta.code} (${dir})`);
       console.log(`  ${pulls.length} pull(s)`);
@@ -1628,6 +1639,7 @@ function gamesOfDir(dir) {
         currentMechanic = name;
         await MECHANICS[name].run({ mod: modFor(name), dir, meta, pulls, ctxs, actorMap, abilityMap });
       }
+      unmute();
       const entries = sortEntries(currentEntries);
       currentEntries = null;
       const code = meta.code ?? path.basename(dir);
@@ -1635,7 +1647,7 @@ function gamesOfDir(dir) {
       if (mode === 'update') {
         writeSnapshot(game, code, dirMechs, entries);
       } else if (mode === 'check') {
-        console.log('~'.repeat(70));
+        if (!diffOnly) console.log('~'.repeat(70));
         const snapshot = readSnapshot(game, code);
         if (!snapshot) {
           console.log(`CHECK ${game}-${code}: NO BASELINE — run \`node scripts/validate.js --update ${dir}\` to create one`);

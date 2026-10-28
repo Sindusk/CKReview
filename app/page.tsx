@@ -37,18 +37,11 @@ import DamageDialog from "@/components/DamageDialog";
 import { detectTerminateKickOrder } from "@/lib/mechanics/wow/vs-dr-mqd/terminate-kicks";
 import { detectCrystalAssignments } from "@/lib/mechanics/wow/vs-dr-mqd/crystal-assignments";
 import { applyDutyAssignments, detectDutyAssignments, resolveDutyAssignments, type DutyOverrides } from "@/lib/mechanics/assignments";
-import {
-  detectBlackHoleStrategy,
-  detectMissedAssignedTetherErrors,
-  detectClippedByNeighborTetherErrors,
-  detectIncorrectBlackHoleDirectionErrors,
-  type BlackHoleStrategyId,
-} from "@/lib/mechanics/ffxiv/dancingmad/blackhole-strategy";
-import { learnGravenImageLayout, detectGravenImageSpreadErrors, detectGravenImageStackErrors } from "@/lib/mechanics/ffxiv/dancingmad/graven-image";
-import { learnWaveCannonLayout, detectWaveCannonPositionErrors } from "@/lib/mechanics/ffxiv/dancingmad/wave-cannon";
-import { applyFallback, buildFallbackProfiles } from "@/lib/mechanics/fallback";
-import { learnPantokratorConga, applyPantokratorConga } from "@/lib/mechanics/ffxiv/top/pantokrator-conga";
-import { learnSynergyOrder, applySynergyOrder } from "@/lib/mechanics/ffxiv/top/synergy-order";
+import { detectBlackHoleStrategy, type BlackHoleStrategyId } from "@/lib/mechanics/ffxiv/dancingmad/blackhole-strategy";
+import { learnGravenImageLayout } from "@/lib/mechanics/ffxiv/dancingmad/graven-image";
+import { learnWaveCannonLayout } from "@/lib/mechanics/ffxiv/dancingmad/wave-cannon";
+import { buildFallbackProfiles } from "@/lib/mechanics/fallback";
+import { applyCrossPullPasses, learnReportConga, learnReportSynergyOrder } from "@/lib/cross-pull-passes";
 import type { Pull } from "../types/Pull";
 import { createCallWipeError, CALL_WIPE_RULE_ID, createManualError, type ManualErrorInput } from "@/types/PullError";
 import type { SavedSession, SavedSessionVod } from "@/types/Session";
@@ -205,14 +198,11 @@ export default function Home() {
   // The Omega Protocol's Pantokrator conga, learned from the report's own
   // clean splits (pantokrator-conga.ts): it names which player of a
   // same-number pair didn't cross.
-  const pantokratorConga = useMemo(
-    () => learnPantokratorConga(pulls.map((p) => ({ players: p.players, deathEvents: p.deathEvents, enemyCasts: p.enemyCasts ?? [] }))),
-    [pulls]
-  );
+  const pantokratorConga = useMemo(() => learnReportConga(pulls), [pulls]);
   // Its Party Synergy order (synergy-order.ts): it names which glitch
   // partner stood in the wrong row or stack. The conga breaks its ties.
   const synergyOrder = useMemo(
-    () => learnSynergyOrder(pulls.filter((p) => p.name === "The Omega Protocol").map((p) => ({ players: p.players, deathEvents: p.deathEvents, enemyCasts: p.enemyCasts ?? [], headMarkers: p.headMarkers })), pantokratorConga),
+    () => learnReportSynergyOrder(pulls, pantokratorConga),
     [pulls, pantokratorConga]
   );
   // Bosses without an encounter module get the fallback model, which learns
@@ -244,29 +234,12 @@ export default function Home() {
   // and `pullsRef` stay
   // untouched since they're also what gets persisted to the session (wipe
   // calls / manual errors) and re-derived on strategy swap.
+  // The passes themselves live in lib/cross-pull-passes.ts, shared with the
+  // refine-module tools so their output matches this view.
   const displayPulls = useMemo(() => {
-    return pulls.map((pull) => {
-      const base = applyDutyAssignments(applyFallback(pull, fallbackProfiles), dutyAssignments);
-      const conga = pantokratorConga && base.name === "The Omega Protocol"
-        ? { ...base, errors: applyPantokratorConga(base.errors, base.players, base.deathEvents, base.enemyCasts ?? [], pantokratorConga) }
-        : base;
-      const p = synergyOrder && conga.name === "The Omega Protocol"
-        ? { ...conga, errors: applySynergyOrder(conga.errors, conga.players, conga.deathEvents, conga.enemyCasts ?? [], conga.headMarkers, synergyOrder) }
-        : conga;
-      const blackHoleErrors = [
-        ...detectMissedAssignedTetherErrors(p, blackHoleStrategy),
-        ...detectClippedByNeighborTetherErrors(p, blackHoleStrategy),
-        ...detectIncorrectBlackHoleDirectionErrors(p, blackHoleStrategy),
-      ];
-      const gravenImageErrors = [
-        ...detectGravenImageSpreadErrors(p, gravenImageLayout),
-        ...detectGravenImageStackErrors(p),
-      ];
-      const waveCannonErrors = detectWaveCannonPositionErrors(p.players, p.deathEvents, waveCannonLayout);
-      const extra = [...blackHoleErrors, ...gravenImageErrors, ...waveCannonErrors];
-      return extra.length === 0 ? p : { ...p, errors: [...p.errors, ...extra] };
-    });
-  }, [pulls, blackHoleStrategy, gravenImageLayout, waveCannonLayout, pantokratorConga, fallbackProfiles, dutyAssignments]);
+    const state = { fallbackProfiles, dutyAssignments, pantokratorConga, synergyOrder, blackHoleStrategy, gravenImageLayout, waveCannonLayout };
+    return pulls.map((pull) => applyCrossPullPasses(pull, state));
+  }, [pulls, blackHoleStrategy, gravenImageLayout, waveCannonLayout, pantokratorConga, synergyOrder, fallbackProfiles, dutyAssignments]);
   const [selectedPullId, setSelectedPullId] = useState<number | null>(null);
 
   const [importError, setImportError] = useState<string | null>(null);

@@ -2,11 +2,19 @@
 // pull, the result and length, the cutoff (first Raid error), every error
 // at MM:SS with its player and severity, and the deaths no error explains
 // (no error on that player within 4s before the death event, which lands
-// ~2s after the fatal hit). Runs the real pipeline (log-transforms.ts), so
-// it matches the app, not just one mechanic's harness output.
+// ~2s after the fatal hit). Runs the real pipeline: per-pull detection
+// (log-transforms.ts), then the cross-pull passes the app applies on top
+// (lib/cross-pull-passes.ts: assigned duties, fallback, TOP's Pantokrator
+// conga and Party Synergy order, Dancing Mad's Black Hole / Graven Image /
+// Wave Cannon), learned from the whole report, so it matches the app, not
+// just one mechanic's harness output. Strategy overrides set in the app's
+// Strategy dialog aren't applied (auto-detected only).
 //
-//   node .claude/skills/refine-module/tools/pull-errors.js <ff|wow> <code> "<boss>" [--pulls 1,3-5] [--rule <ruleId prefix>] [--all] [--full] [--summary]
+//   node .claude/skills/refine-module/tools/pull-errors.js <ff|wow> <code> "<boss>" [--pulls 1,3-5] [--rule <ruleId prefix>] [--all] [--full] [--summary] [--jobs]
 //
+// --jobs     print players as their job (DRK, SCH, ...; "DRK2" for a second
+//            DRK), names inside descriptions too. Use it for anything an
+//            agent passes on or writes down.
 // --pulls    only these pull numbers (the app's per-boss numbering)
 // --rule     only errors whose ruleId starts with this (e.g. ffxiv-lw1-chain)
 // --all      also list errors after the cutoff (default: count them only)
@@ -35,7 +43,7 @@ function parsePulls(s) {
   const [game, code, boss] = args;
   const opt = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
   if (!game || !code || !boss) {
-    console.log('usage: pull-errors.js <ff|wow> <code> "<boss>" [--pulls 1,3-5] [--rule <prefix>] [--all]');
+    console.log('usage: pull-errors.js <ff|wow> <code> "<boss>" [--pulls 1,3-5] [--rule <prefix>] [--all] [--full] [--summary] [--jobs]');
     return;
   }
   const want = parsePulls(opt('--pulls'));
@@ -46,11 +54,18 @@ function parsePulls(s) {
   const store = requireTsFromRoot('lib/sample-report-store.ts');
   const lt = requireTsFromRoot('lib/log-transforms.ts', { './log-auth': {} });
   const payload = await store.loadSampleReport(game === 'wow' ? 'wcl' : 'ffl', code);
-  const pulls = game === 'wow'
+  const imported = game === 'wow'
     ? lt.transformReportToPulls(payload.fightDataList, lt.buildWCLAbilityMap(payload.report.masterData.abilities), code)
     : await lt.transformFFReportToPulls(payload.fightDataList, lt.buildFFLAbilityMap(payload.report.masterData.abilities), code, payload.report.startTime);
+  // Cross-pull passes, learned from every pull in the report as the app does.
+  const xp = requireTsFromRoot('lib/cross-pull-passes.ts');
+  const state = xp.learnCrossPullState(imported);
+  const pulls = imported.map((p) => xp.applyCrossPullPasses(p, state));
 
   const chosen = pulls.filter((p) => p.name === boss && (!want || want.has(p.pullNumber)));
+  const { jobLabels, identity } = require('./job-labels');
+  const J = args.includes('--jobs') ? jobLabels(pulls.filter((p) => p.name === boss), game) : identity;
+  const who = (name) => (name ? J.label(name) : '(raid)');
   if (args.includes('--summary')) {
     // Per rule + name + severity: count and example pulls; per cutoff kind:
     // the pulls it ended; every error in a kill (a kill should be near-clean).
@@ -62,12 +77,12 @@ function parsePulls(s) {
       cuts.set(ck, [...(cuts.get(ck) ?? []), `${pull.pullNumber}@${clock(cut ? cut.timestamp : pull.fightDuration)}`]);
       for (const e of errors) {
         if (rule && !e.ruleId.startsWith(rule)) continue;
-        const k = `${e.ruleId} | ${e.name} | ${e.severity}${cut && e.timestamp > cut.timestamp ? ' (after cutoff)' : ''}`;
+        const k = `${e.ruleId} | ${J.sub(e.name)} |${e.severity}${cut && e.timestamp > cut.timestamp ? ' (after cutoff)' : ''}`;
         byName.set(k, [...(byName.get(k) ?? []), `${pull.pullNumber}@${clock(e.timestamp)}`]);
       }
       if (pull.result === 'Kill') {
         console.log(`KILL pull ${pull.pullNumber} (${clock(pull.fightDuration)}): ${errors.length} errors`);
-        for (const e of errors) console.log(`  ${clock(e.timestamp)} [${e.severity}] ${e.player ?? '(raid)'} — ${e.name}`);
+        for (const e of errors) console.log(`  ${clock(e.timestamp)} [${e.severity}] ${who(e.player)} — ${J.sub(e.name)}`);
       }
     }
     console.log('\nErrors by rule | name | severity (count, first pulls):');
@@ -86,8 +101,9 @@ function parsePulls(s) {
       if (rule && !e.ruleId.startsWith(rule)) continue;
       const late = cut && e.timestamp > cut.timestamp;
       if (late && !all) { after++; continue; }
-      const desc = full || e.description.length <= 220 ? e.description : `${e.description.slice(0, 217)}...`;
-      console.log(`  ${clock(e.timestamp).padStart(6)} ${late ? '(after cutoff) ' : ''}[${e.severity}] ${e.player ?? '(raid)'} — ${e.name} [${e.ruleId}]: ${desc}`);
+      const d0 = J.sub(e.description);
+      const desc = full || d0.length <= 220 ? d0 : `${d0.slice(0, 217)}...`;
+      console.log(`  ${clock(e.timestamp).padStart(6)} ${late ? '(after cutoff) ' : ''}[${e.severity}] ${who(e.player)} — ${J.sub(e.name)} [${e.ruleId}]: ${desc}`);
     }
     if (after) console.log(`  … ${after} more after the cutoff (--all to list)`);
     // Explained: an error on that player, or an error naming them (a missed
@@ -97,7 +113,7 @@ function parsePulls(s) {
       !errors.some((e) => (e.player === d.player || e.description.includes(d.player)) && e.timestamp <= d.timestamp && e.timestamp >= d.timestamp - 4000));
     for (const d of unexplained) {
       const blow = d.killingAbilityGameId ? `${d.cause} (${d.killingAbilityGameId})` : 'none';
-      console.log(`  ${clock(d.timestamp - 2000).padStart(6)} UNEXPLAINED DEATH ${d.player} — killing blow: ${blow}; death event ${clock(d.timestamp)}`);
+      console.log(`  ${clock(d.timestamp - 2000).padStart(6)} UNEXPLAINED DEATH ${who(d.player)} — killing blow: ${J.sub(blow)}; death event ${clock(d.timestamp)}`);
     }
   }
 })();

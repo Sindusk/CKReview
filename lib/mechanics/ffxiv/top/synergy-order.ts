@@ -47,7 +47,7 @@ export type SynergyOrder = {
   slots?: Map<string, Pt>;
 };
 
-type Pt = { lat: number; al: number };
+export type Pt = { lat: number; al: number };
 
 type PullLike = { players: PlayerInfo[]; deathEvents: DeathEvent[]; enemyCasts: EnemyEvent[]; headMarkers?: HeadMarker[] };
 
@@ -199,10 +199,12 @@ const FRAME_FIT = 400;
 const OVERLAP_MOVED = 150;
 const OVERLAP_STILL = 100;
 
-const slotKey = (read: SynergyRead, rank: number) => `${read.remote ? "R" : "M"}${rank}`;
+// slotKey, expectedRows and eyeFrame are exported for the refine-module
+// probes (.claude/skills/refine-module/tools/top-probes.js fire-spots).
+export const slotKey = (read: SynergyRead, rank: number) => `${read.remote ? "R" : "M"}${rank}`;
 
 /** The expected row (0 = early) of every pair member, by the order. */
-function expectedRows(read: SynergyRead, players: PlayerInfo[], so: SynergyOrder): Map<string, 0 | 1> {
+export function expectedRows(read: SynergyRead, players: PlayerInfo[], so: SynergyOrder): Map<string, 0 | 1> {
   const key = keyer(players, so.byName);
   const exp = new Map<string, 0 | 1>();
   for (const [a, b] of read.pairs) {
@@ -215,7 +217,7 @@ function expectedRows(read: SynergyRead, players: PlayerInfo[], so: SynergyOrder
 }
 
 /** The pull's eye frame: each player's point and spot rank, oriented by the clean players' sides and ranks. */
-function eyeFrame(read: SynergyRead, exp: Map<string, 0 | 1>): { pt: (n: string) => Pt; rank: (n: string) => number; names: string[] } | undefined {
+export function eyeFrame(read: SynergyRead, exp: Map<string, 0 | 1>): { pt: (n: string) => Pt; rank: (n: string) => number; names: string[] } | undefined {
   const u = read.axis;
   if (!u) return undefined;
   const lat = (q: { x: number; y: number }) => u.x * (q.y - 10000) - u.y * (q.x - 10000);

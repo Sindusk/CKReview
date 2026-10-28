@@ -78,6 +78,25 @@ export const FF_JOB_BY_NAME: Record<string, FFJobInfo> = {
   Archer:       { name: "Archer",       role: "DPS",    rangeType: "Ranged" },
 };
 
+// ─── Three-letter abbreviations, keyed by display name ───────────────────────
+//
+// For compact text output (the refine-module tools' --jobs mode).
+
+export const FF_JOB_ABBR: Record<string, string> = {
+  "Paladin": "PLD", "Warrior": "WAR", "Dark Knight": "DRK", "Gunbreaker": "GNB",
+  "White Mage": "WHM", "Scholar": "SCH", "Astrologian": "AST", "Sage": "SGE",
+  "Monk": "MNK", "Dragoon": "DRG", "Ninja": "NIN", "Samurai": "SAM", "Reaper": "RPR", "Viper": "VPR",
+  "Bard": "BRD", "Machinist": "MCH", "Dancer": "DNC",
+  "Black Mage": "BLM", "Summoner": "SMN", "Red Mage": "RDM", "Pictomancer": "PCT", "Blue Mage": "BLU",
+  "Gladiator": "GLA", "Marauder": "MRD", "Conjurer": "CNJ", "Pugilist": "PGL", "Lancer": "LNC",
+  "Rogue": "ROG", "Arcanist": "ACN", "Thaumaturge": "THM", "Archer": "ARC",
+};
+
+/** "Dark Knight" -> "DRK"; unknown names come back with spaces removed. */
+export function getFFJobAbbr(displayName: string): string {
+  return FF_JOB_ABBR[displayName] ?? displayName.replace(/\s+/g, "");
+}
+
 // ─── Lookup by FFLogs numeric gameID ─────────────────────────────────────────
 //
 // FFLogs may also expose a numeric job/class ID on some event or actor fields.

@@ -30,6 +30,8 @@
 //   --fight <id>     Restrict to this WCL fight id — repeatable
 //   --boss <name>    Restrict to fights whose name contains this (case-insensitive)
 //   --creds <path>   Credentials file (default: .credentials/wcl-token.json)
+//   --meta-only      Write meta.json, print the title and the fights by name,
+//                    fetch no pulls: one cheap call to identify the boss first
 //   --refetch        Download again the pulls whose file already exists. Pulls
 //                    not on disk are skipped (a report can hold dozens of other
 //                    fights — dungeons, other bosses — that would burn API
@@ -54,10 +56,10 @@ const path = require('path');
 const { requireTsFromRoot, ROOT } = require('./lib/require-ts');
 const { createNodeLogAuth } = require('./lib/node-log-auth');
 const { slimWclReport } = require('./lib/slim-report');
-const { killsFirst, withRateLimitWait, writeAtomic } = require('./lib/fetch-plan');
+const { killsFirst, withRateLimitWait, writeAtomic, printReportOverview } = require('./lib/fetch-plan');
 
 function parseArgs(argv) {
-  const args = { fights: [], out: null, boss: null, creds: null, refetch: false };
+  const args = { fights: [], out: null, boss: null, creds: null, refetch: false, metaOnly: false };
   let reportCode = null;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -66,12 +68,13 @@ function parseArgs(argv) {
     else if (a === '--boss') args.boss = argv[++i];
     else if (a === '--creds') args.creds = argv[++i];
     else if (a === '--refetch') args.refetch = true;
+    else if (a === '--meta-only') args.metaOnly = true;
     else if (!reportCode) reportCode = a;
     else throw new Error(`Unrecognized argument: ${a}`);
   }
   if (!reportCode) {
     throw new Error(
-      'Usage: node scripts/fetch-wow-report.js <reportCode> [--out dir] [--fight id]... [--boss name] [--creds path] [--refetch]'
+      'Usage: node scripts/fetch-wow-report.js <reportCode> [--out dir] [--fight id]... [--boss name] [--creds path] [--refetch] [--meta-only]'
     );
   }
   return { reportCode: extractReportCode(reportCode), ...args };
@@ -87,7 +90,7 @@ function extractReportCode(input) {
 }
 
 async function main() {
-  const { reportCode, out, fights, boss, creds, refetch } = parseArgs(process.argv.slice(2));
+  const { reportCode, out, fights, boss, creds, refetch, metaOnly } = parseArgs(process.argv.slice(2));
   const outDir    = out   ? path.resolve(out)   : path.join(ROOT, 'sampledata', 'wow', reportCode);
   const credsPath = creds ? path.resolve(creds) : path.join(ROOT, '.credentials', 'wcl-token.json');
 
@@ -119,6 +122,7 @@ async function main() {
     JSON.stringify({ code: report.code, title: report.title, startTime: report.startTime, fights: report.fights, masterData: report.masterData }, null, 2)
   );
   console.log(`  wrote meta.json (${report.fights.length} fights, ${report.masterData.actors.length} actors)`);
+  if (metaOnly) { printReportOverview(report); return; }
 
   let targetFights = killsFirst(report.fights.filter((f) => f.endTime > f.startTime));
   if (fights.length > 0) targetFights = targetFights.filter((f) => fights.includes(f.id));
