@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { isAuthenticated, isFFAuthenticated } from "@/lib/log-auth";
+import { MenuIconDefs, MenuIconTile, type MenuIconName } from "@/components/MenuIcons";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -33,7 +34,7 @@ function MenuItem({
   onClick,
   disabled,
 }: {
-  icon:      string;
+  icon:      MenuIconName;
   label:     string;
   sublabel?: string;
   onClick?:  () => void;
@@ -41,9 +42,7 @@ function MenuItem({
 }) {
   return (
     <button className="ck-menu-item" onClick={onClick} disabled={disabled}>
-      <span style={{ fontSize: "15px", width: "18px", textAlign: "center", flexShrink: 0, opacity: disabled ? 0.4 : 1 }}>
-        {icon}
-      </span>
+      <MenuIconTile name={icon} disabled={disabled} />
       <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
         <span>{label}</span>
         {sublabel && (
@@ -71,7 +70,7 @@ function MenuLinkItem({
   onNavigate,
   newTab = true,
 }: {
-  icon:       string;
+  icon:       MenuIconName;
   label:      string;
   href:       string;
   onNavigate?: () => void;
@@ -85,9 +84,7 @@ function MenuLinkItem({
       rel={newTab ? "noopener noreferrer" : undefined}
       onClick={onNavigate}
     >
-      <span style={{ fontSize: "15px", width: "18px", textAlign: "center", flexShrink: 0 }}>
-        {icon}
-      </span>
+      <MenuIconTile name={icon} />
       <span>{label}</span>
     </a>
   );
@@ -232,11 +229,13 @@ export default function BurgerMenu({
             zIndex:   300,
           }}
         >
+          <MenuIconDefs />
+
           {/* ── Review ── */}
           <SectionLabel label="Review" />
 
           <MenuLinkItem
-            icon="🆕"
+            icon="new-session"
             label="New Session"
             href="https://review.consistencykings.com/"
             newTab={false}
@@ -253,14 +252,14 @@ export default function BurgerMenu({
               user can still change or remove their client ID there. */}
           {fflReady ? (
             <MenuItem
-              icon="✅"
+              icon="integration-connected"
               label="FFLogs Connected"
               sublabel="Manage your FFLogs API client"
               onClick={handleConnectFFL}
             />
           ) : (
             <MenuItem
-              icon="🎮"
+              icon="integration-disconnected"
               label="Connect FFLogs"
               sublabel="Add your API client to import FFXIV reports"
               onClick={handleConnectFFL}
@@ -269,14 +268,14 @@ export default function BurgerMenu({
 
           {wclReady ? (
             <MenuItem
-              icon="✅"
+              icon="integration-connected"
               label="WarcraftLogs Connected"
               sublabel="Manage your WarcraftLogs API client"
               onClick={handleConnectWCL}
             />
           ) : (
             <MenuItem
-              icon="📊"
+              icon="integration-disconnected"
               label="Connect WarcraftLogs"
               sublabel="Add your API client to import WoW reports"
               onClick={handleConnectWCL}
@@ -290,7 +289,7 @@ export default function BurgerMenu({
           <SectionLabel label="Statics" />
 
           <MenuItem
-            icon="➕"
+            icon="static-add-review"
             label="Add Review To Static"
             sublabel={hasActiveSession ? "Save the current review to a static" : "Save some progress first"}
             onClick={handleAddReviewToStatic}
@@ -298,7 +297,7 @@ export default function BurgerMenu({
           />
 
           <MenuItem
-            icon="📥"
+            icon="static-batch-import"
             label="Batch Import To Static"
             sublabel="Import several reports, or resync a static"
             onClick={() => { setOpen(false); onBatchImport(); }}
@@ -306,7 +305,7 @@ export default function BurgerMenu({
           />
 
           <MenuItem
-            icon="🛠️"
+            icon="static-manage"
             label="Manage Statics"
             sublabel="Create or delete your statics"
             onClick={handleManageStatics}
@@ -321,26 +320,26 @@ export default function BurgerMenu({
           {currentUser ? (
             <>
               <MenuItem
-                icon="👤"
+                icon="account"
                 label={currentUser.username}
                 sublabel={currentUser.role}
                 disabled
               />
               <MenuItem
-                icon="🔐"
+                icon="sign-in-methods"
                 label="Sign-in methods"
                 sublabel="Google, PIN"
                 onClick={handleAccount}
               />
               <MenuItem
-                icon="🚪"
+                icon="log-out"
                 label="Log Out"
                 onClick={handleLogout}
               />
             </>
           ) : (
             <MenuItem
-              icon="🔑"
+              icon="sign-in-methods"
               label="Log In"
               sublabel="Required to use Statics"
               onClick={handleLogin}
@@ -354,19 +353,19 @@ export default function BurgerMenu({
           <SectionLabel label="About" />
 
           <MenuLinkItem
-            icon="🐙"
+            icon="github-branch"
             label="View on GitHub"
             href="https://github.com/Sindusk/CKReview"
             onNavigate={() => setOpen(false)}
           />
           <MenuLinkItem
-            icon="📄"
+            icon="privacy-policy"
             label="Privacy Policy"
             href="/privacy"
             onNavigate={() => setOpen(false)}
           />
           <MenuLinkItem
-            icon="📄"
+            icon="terms-of-service"
             label="Terms of Service"
             href="/terms"
             onNavigate={() => setOpen(false)}
