@@ -216,10 +216,12 @@ export default function BurgerMenu({
 
       {/* Dropdown
           zIndex: 300 ensures it renders above the grid panels (border/background
-          elements) that sit below the header in the page layout. */}
+          elements) that sit below the header in the page layout. It wears the
+          major-panel gilt frame and corners (.ck-panel), not the plainer
+          .ck-menu border that custom selects keep. */}
       {open && (
         <div
-          className="ck-menu"
+          className="ck-panel"
           style={{
             position: "absolute",
             top:      "calc(100% + 8px)",
@@ -230,6 +232,10 @@ export default function BurgerMenu({
           }}
         >
           <MenuIconDefs />
+          <span aria-hidden="true" className="ck-corner ck-corner--tl" />
+          <span aria-hidden="true" className="ck-corner ck-corner--tr" />
+          <span aria-hidden="true" className="ck-corner ck-corner--bl" />
+          <span aria-hidden="true" className="ck-corner ck-corner--br" />
 
           {/* ── Review ── */}
           <SectionLabel label="Review" />
