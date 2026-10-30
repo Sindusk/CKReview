@@ -359,6 +359,18 @@ export default function BurgerMenu({
             href="https://github.com/Sindusk/CKReview"
             onNavigate={() => setOpen(false)}
           />
+          <MenuLinkItem
+            icon="📄"
+            label="Privacy Policy"
+            href="/privacy"
+            onNavigate={() => setOpen(false)}
+          />
+          <MenuLinkItem
+            icon="📄"
+            label="Terms of Service"
+            href="/terms"
+            onNavigate={() => setOpen(false)}
+          />
 
           {/*
             ── Add future menu items below ──
