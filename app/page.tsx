@@ -326,10 +326,15 @@ export default function Home() {
     // A Google round trip comes back with ?auth=<code> (lib/google-auth.ts):
     // drop it from the address bar, then show its message in whichever
     // dialog fits — Sign-in methods when logged in, Log In otherwise.
+    // ?panel=sign-in-methods is how sibling apps (Stonks' menu) open
+    // Sign-in methods here, since unlinking and the PIN switch live only in
+    // this app.
     const url = new URL(window.location.href);
     const authCode = url.searchParams.get("auth");
-    if (authCode) {
+    const openSignInMethods = url.searchParams.get("panel") === "sign-in-methods";
+    if (authCode || openSignInMethods) {
       url.searchParams.delete("auth");
+      url.searchParams.delete("panel");
       window.history.replaceState(null, "", url.toString());
     }
 
@@ -338,6 +343,10 @@ export default function Home() {
       .then(data => {
         setCurrentUser(data.user);
         setGoogleEnabled(Boolean(data.googleEnabled));
+        if (openSignInMethods) {
+          if (data.user) setShowAccountDialog(true);
+          else setShowLoginDialog(true);
+        }
         const notice = authCode ? AUTH_MESSAGES[authCode] : null;
         if (!notice) return;
         setAuthNotice(notice);
