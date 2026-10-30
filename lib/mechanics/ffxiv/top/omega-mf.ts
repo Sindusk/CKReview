@@ -159,6 +159,25 @@
 //   and the DNC on its spot. Only the GNB is ruled.
 // - F5 2:54.9: the O pair (MNK, DNC) both west of the line and in the
 //   laser; the MNK should have flexed to the other side (user).
+// Report G = KCX2qW4khczmZ9T1 (the user's static; same eight jobs). VOD
+// review 2026-10-30 (user): Pulls 10, 18 and the Fire cutoff. Findings:
+// - The Fire snapshots the glitch's Vulnerability Up at its CAST (the hits
+//   land ~0.6s later; dying removes the aura at ~+0.62s). In all four
+//   reports with P2 pulls, a player holding it at the cast took a 73k+ Fire
+//   (lethal), one not holding it 31k or less, whatever happened in the
+//   0.5s after: G10's MNK and DNC (removed +266ms) died, G20's DRK and RDM
+//   (removed -357ms, re-applied +267ms) took 20.7k / 30.9k.
+// - G10 2:53.9 (Remote, MNK/DNC 36.9y at the hit): "MNK was late to their
+//   spot. The DNC was fine." The log can't tell who was late: the DNC has
+//   no position sample from -5s to the hit (+0.6s), and in G18 (same pair,
+//   Mid) both were moving (the DNC 12.1y between -4.3s and the hit, the MNK
+//   19.4y between -2.2s and the hit). Both stay named; the rulings pin the
+//   user's call.
+// - G10 2:54.6: the Fire killed two (MNK, DNC); "the pull was over at the
+//   time that the MNK and DNC died" (the Spotlight cutoff ~11s later
+//   was too late). Same shape: G18, G26 and G30 (one in the laser, one to
+//   the Fire), G39; E19, E24; F15, F17, F37. None of those went on to clear
+//   P2 (G10, G18, G39, E24, F15 reached Limitless Synergy).
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-top2-avoidable (Major on death, else Minor: no Damage Down in P2):
@@ -169,7 +188,10 @@
 // ffxiv-top2-solar-ray (targeted: both tanks): both Solar Rays on one tank,
 //   both alive: the tank with none didn't hold their Omega.
 // ffxiv-top2-glitch: at the Fire, all eight alive, a pair under the glitch
-//   Vulnerability Up (both named, unless one took the laser or a clone:
+//   Vulnerability Up at the Fire's cast, its snapshot (G10, G20; not 0.5s
+//   later), skipped when it was gone from both by +0.5s and one of them
+//   shared a Fire with a player not under it (the overlap is the error:
+//   E11's RDM / SGE at +43ms, F18's MNK at +178ms). Both named, unless one took the laser or a clone:
 //   that's theirs; or only one shared a Fire with a player outside the
 //   glitch: they stood on someone else's spot, user, E11, E29; not with
 //   another vulnerable player, D72). synergy-order.ts keeps the partner off their Fire slot
@@ -179,7 +201,7 @@
 //   synergy-order.ts names the one whose row is the other side ("Didn't
 //   Flex", user, F5).
 // ffxiv-top2-fire: one Fire that hit 2+ players names them all (not the
-//   glitch-vulnerable ones); synergy-order.ts keeps the ones on the wrong
+//   ones still glitch-vulnerable 0.5s after the cast); synergy-order.ts keeps the ones on the wrong
 //   side of the eye for their row when the rest weren't (user, E11), else
 //   the ones who moved 1.5y+ toward the others from their learned spot when
 //   the rest moved under 1.0y (user, F15, F18, F33).
@@ -189,8 +211,10 @@
 //   a player in both stacks or none.
 // ffxiv-top2-synergy (Raid): anyone dead at the Fire, at their fatal hit
 //   ("Dead Before the Fire"; user, F46: "if they are dead to the AoEs in
-//   Party Synergy, the pull is effectively over"); the Fire or Spotlight
-//   killed 3+; the clones killed 4+ in one resolution (player-less, alongside each victim's own
+//   Party Synergy, the pull is effectively over"), placed after the rest of
+//   that death's resolution (G2: a second clone victim +0.1s); the Fire
+//   (with the laser) killed 2+ (user, G10) or Spotlight 3+; the clones
+//   killed 4+ in one resolution, at the last victim's hit (G19) (player-less, alongside each victim's own
 //   Major avoidable: user, D66, and the follow-up on D68 and D71).
 // ffxiv-top2-bladedance (targeted: both tanks): a tank in both cones held
 //   both tethers, so the other tank took none; a cone no tank took names
@@ -203,7 +227,8 @@
 // ffxiv-top2-pile-pitch (targeted: the jumped player): Pile Pitch on the
 //   player Beyond Defense jumped, with Doom (Major). "Pile Pitch Not
 //   Shared" (Major on death, else Minor): its target, not the jumped one,
-//   hit with at most one other, all eight alive (user, E40).
+//   hit with at most one other, all eight alive at the jump and at Pile
+//   Pitch (user, E40; E31: a tank raised in between is fallout).
 // ffxiv-top2-wall (Major): a silent death no knockback, reset or hit explains,
 //   including one near the end when mechanic deaths followed it (F45).
 // ffxiv-top2-enrage (Laser Shower hits that killed) / -called-wipe (3+
@@ -214,7 +239,8 @@
 // Not built: Firewall group swaps (throughput only), Discharger knockback
 // direction (no wall deaths in a pull with everyone alive), meteor and
 // Cosmo Memory survival (healing), which partner moved when both stood near
-// their slots (B5, C27), the second Remote Glitch threshold (34 vs 35y).
+// their slots (B5, C27) or which arrived late (G10: too few position
+// samples before the cast), the second Remote Glitch threshold (34 vs 35y).
 //
 // -- GUIDE-DERIVED MODEL (2026-10-14) --
 // Written before any report was analyzed; VERIFIED AGAINST LOGS above wins.
@@ -519,6 +545,13 @@ const COLLAPSE_END_MS     = 20_000;
 // Party Synergy has no raise window: a resolution that killed this many
 // ended every pull it happened in.
 const SYNERGY_RAID_DEATHS = 3;
+// The Fire (and the laser that snapshots with it) killing this many ends the
+// pull: Spotlight's stacks need four each (user, 2026-10-30,
+// KCX2qW4khczmZ9T1 Pull 10 2:54.6, the MNK and DNC dead: "The pull was over
+// at the time that the MNK and DNC died"; Pulls 18, 26, 30, 39 the same).
+// No pull on disk lost exactly one to the Fire with all eight alive before
+// it, and no P2 clear lost any.
+const FIRE_RAID_DEATHS    = 2;
 const RESET_AFTER_DEATH_MS = 10_000;
 const SILENT_HIT_MS       = 3500;
 // Positions at the Fire hits: the hit's own x/y, else interpolated (lethal
@@ -598,8 +631,10 @@ export type SynergyRead = {
   /** Each Fire's owner (its cast target), keyed by fireKey(actor, instance). */
   fireOwner: Map<string, string>;
   stacks: Map<string, number[]>;
-  /** Players under the glitch's Vulnerability Up at the Fire / Spotlight hits. */
+  /** Players under the glitch's Vulnerability Up at the Fire cast (its snapshot) / the Spotlight hits. */
   vulnAtFire: Set<string>;
+  /** Of vulnAtFire, those still under it 0.5s after the cast (the pair never got in range). */
+  vulnHeld: Set<string>;
   vulnAtSpot: Set<string>;
 };
 
@@ -639,13 +674,26 @@ export function readSynergy(
     seen.add(k);
   }
   const ownerOfHit = (e: PlayerEvent) => (e.sourceInstance === undefined ? undefined : owner.get(fireKey(e.source, e.sourceInstance)));
-  const vulnAtFire = new Set(players.filter((p) => fireHits.some((h) => h.p === p) && holdsAt(p, GLITCH_VULN, fire.timestamp + 500)).map((p) => p.name));
+  // The Fire snapshots the glitch's Vulnerability Up at its CAST; the hits
+  // land ~0.6s later and the aura's removal lags (user, 2026-10-30,
+  // KCX2qW4khczmZ9T1 Pull 10 2:53.9: the MNK late to their spot). Held at
+  // the cast, every Fire hit was 73k+ (lethal); not held, 31k or less: held
+  // with removal +43ms (LG64YVQy2KZbtpN8 Pull 11) to +489ms (KCX Pull 4),
+  // removed by -135ms (KCX Pull 10's GNB/DRK) or re-applied +89ms / +267ms
+  // (KCX Pulls 8, 20: normal Fires). The old cast+500ms test missed the
+  // first and flagged the second.
+  const vulnAtFire = new Set(players.filter((p) => fireHits.some((h) => h.p === p) && holdsAt(p, GLITCH_VULN, fire.timestamp)).map((p) => p.name));
+  // Still under it 0.5s on, as the hits land: the pair never got in range.
+  const vulnHeld = new Set([...vulnAtFire].filter((n) => holdsAt(players.find((p) => p.name === n)!, GLITCH_VULN, fire.timestamp + 500)));
   const clean = new Set<string>();
   const pos = new Map<string, { x: number; y: number }>();
   for (const p of players) {
     const mine = fireHits.filter((h) => h.p === p);
     if (!mine.length) continue;
-    if (mine.length === 1 && ownerOfHit(mine[0].e) === p.name && !vulnAtFire.has(p.name)) clean.add(p.name);
+    // Clean as the hits land (cast + 0.5s): the learned spots predate the
+    // cast snapshot and the user's rulings rest on them (hjgk42MDf81arFVY
+    // Pull 18's SCH).
+    if (mine.length === 1 && ownerOfHit(mine[0].e) === p.name && !holdsAt(p, GLITCH_VULN, fire.timestamp + 500)) clean.add(p.name);
     const at = positionAt(p, mine[0].e.timestamp, mine.find((h) => h.e.x !== undefined)?.e);
     if (at) pos.set(p.name, at);
   }
@@ -706,7 +754,7 @@ export function readSynergy(
       if (inst.length && holdsAt(p, GLITCH_VULN, spot.timestamp + 500)) vulnAtSpot.add(p.name);
     }
   }
-  return { remote, fireT: fire.timestamp, spotT: spot?.timestamp, pairs, symbol, marks, rows, left, axis, lineAxis: lineAxis ?? axis, firePos: pos, clean, fireOwner: owner, stacks, vulnAtFire, vulnAtSpot };
+  return { remote, fireT: fire.timestamp, spotT: spot?.timestamp, pairs, symbol, marks, rows, left, axis, lineAxis: lineAxis ?? axis, firePos: pos, clean, fireOwner: owner, stacks, vulnAtFire, vulnHeld, vulnAtSpot };
 }
 
 const fireKey = (actor: string | undefined, instance: number) => `${actor ?? "?"}#${instance}`;
@@ -790,24 +838,31 @@ function deadAtFire(players: PlayerInfo[], life: Life, casts: EnemyEvent[], read
       .sort((a, b) => b.timestamp - a.timestamp)[0];
     return { t: Math.max(ps.timestamp, hit?.timestamp ?? deathT - DEATH_EVENT_LAG_MS), how: hit && hit.timestamp >= ps.timestamp ? hit.abilityName : undefined };
   };
-  const first = dead.map((p) => ({ p, ...fatal(p) })).sort((a, b) => a.t - b.t)[0];
+  const fatals = dead.map((p) => ({ p, ...fatal(p) })).sort((a, b) => a.t - b.t);
+  const first = fatals[0];
+  // After the rest of the first death's resolution (KCX2qW4khczmZ9T1 Pull 2
+  // 2:46.9: the SAM's clone hit 0.1s after the MNK's sat after the cutoff).
+  const at = Math.max(...fatals.filter((x) => x.t - first.t <= RESOLUTION_MS).map((x) => x.t));
   return [raidMarker(TOP2_SYNERGY_RULE_ID, "Dead Before the Fire",
     `${namesOf(dead)} ${dead.length > 1 ? "were" : "was"} dead at the Fire${first.how ? ` (${first.p.name} to ${first.how})` : ""}: Party Synergy can't resolve with a player down; treated as the cutoff.`,
-    first.t + RAID_MARKER_SORT_OFFSET_MS, FIRE, "Optimized Fire III")];
+    at + RAID_MARKER_SORT_OFFSET_MS, FIRE, "Optimized Fire III")];
 }
 
 function cloneCollapse(players: PlayerInfo[], life: Life, avoidable: PullError[]): PullError[] {
   const hits = avoidable.filter((e) => CLONE_IDS.includes(e.abilityId ?? 0)).sort((a, b) => a.timestamp - b.timestamp);
   const errors: PullError[] = [];
   for (const g of clusterByGap(hits, (e) => e.timestamp, 1500)) {
-    const died = uniq(g.filter((e) => {
+    const fatal = g.filter((e) => {
       const p = players.find((x) => x.name === e.player);
       return p && life.diedFrom(p, e.timestamp);
-    }).map((e) => e.player!));
+    });
+    const died = uniq(fatal.map((e) => e.player!));
     if (died.length < CLONE_COLLAPSE_DEAD) continue;
     errors.push(raidMarker(TOP2_SYNERGY_RULE_ID, "Party Synergy Failed",
       `Party Synergy's clones killed ${died.length} at once (${joinNames(died)}): the raid wasn't where both clones' weapons leave safe.`,
-      g[0].timestamp, g[0].abilityId ?? 0, g[0].abilityName ?? "Party Synergy"));
+      // At the last victim's hit, so every victim sits before the cutoff
+      // (KCX2qW4khczmZ9T1 Pull 19 2:47.0: three hit 0.1-0.2s after the first).
+      fatal[fatal.length - 1].timestamp + RAID_MARKER_SORT_OFFSET_MS, g[0].abilityId ?? 0, g[0].abilityName ?? "Party Synergy"));
   }
   return errors;
 }
@@ -851,13 +906,14 @@ const STACK_WHY = "Each row stacks its own Spotlight; if both marks share a row,
 /**
  * Party Synergy, with all eight alive at the resolution (a death changes
  * who can stand where):
- * - Fire: a pair under the glitch's Vulnerability Up at the hits (both
+ * - Fire: a pair under the glitch's Vulnerability Up at the Fire cast (both
  *   named; synergy-order.ts keeps the one in the wrong row), unless one of
  *   them took the laser or a clone (that's theirs, and the partner's
  *   penalty is fallout: A12, B2); two players inside each other's Fire.
  * - Spotlight: a pair in one stack (both named; synergy-order.ts keeps the
  *   one in the wrong stack), a player in both stacks or none.
- * - A resolution that killed SYNERGY_RAID_DEATHS or more is the cutoff.
+ * - The Fire killing FIRE_RAID_DEATHS or more, or Spotlight
+ *   SYNERGY_RAID_DEATHS or more, is the cutoff.
  */
 function detectSynergy(players: PlayerInfo[], life: Life, read: SynergyRead | undefined, avoidable: PullError[]): PullError[] {
   if (!read) return [];
@@ -873,6 +929,13 @@ function detectSynergy(players: PlayerInfo[], life: Life, read: SynergyRead | un
       if (!read.vulnAtFire.has(a) && !read.vulnAtFire.has(b)) continue;
       if (tookAvoidable(a, read.fireT) || tookAvoidable(b, read.fireT)) continue;
       const pair = [byName.get(a)!, byName.get(b)!];
+      // In range by the hits, and one of them in a Fire with a player outside
+      // the glitch: the overlap (ffxiv-top2-fire) is the error, not the range
+      // (user, LG64YVQy2KZbtpN8 Pull 11 2:54.1: the RDM / SGE pair's aura
+      // dropped +43ms, the DRK in the RDM's Fire was named; hjgk42MDf81arFVY
+      // Pull 18 2:52.9: the MNK's +178ms, the MNK named for the Fire).
+      const inRangeLate = pair.every((p) => !read.vulnHeld.has(p.name));
+      if (inRangeLate && pair.some((p) => fires.some((g) => g.includes(p) && g.some((q) => q !== p && !read.vulnHeld.has(q.name))))) continue;
       const died = pair.filter((p) => life.diedFrom(p, read.fireT));
       const sameRow = read.rows?.get(a) !== undefined && read.rows.get(a) === read.rows.get(b);
       // A partner sharing a Fire with a player outside the glitch stood on
@@ -881,7 +944,7 @@ function detectSynergy(players: PlayerInfo[], life: Life, read: SynergyRead | un
       // spot; Pull 11 2:54.1: the DNC). Not with another vulnerable player:
       // 2qgaAkxVypGWv9CN Pull 72's MNK and DRK overlapped in a shuffled row
       // and the user named the MNK's partner.
-      const crowded = pair.filter((p) => fires.some((g) => g.includes(p) && g.some((q) => q !== p && !read.vulnAtFire.has(q.name))));
+      const crowded = pair.filter((p) => fires.some((g) => g.includes(p) && g.some((q) => q !== p && !read.vulnHeld.has(q.name))));
       const named = crowded.length === 1 ? crowded : pair;
       // How far each stood from the eye's line, to gauge who was off (user,
       // 2026-10-28, hjgk42MDf81arFVY Pull 5 2:54.9: the GNB 15.3y, the SGE
@@ -901,14 +964,15 @@ function detectSynergy(players: PlayerInfo[], life: Life, read: SynergyRead | un
     // Fire overlaps: one Fire (actor and instance) that hit two or more
     // players names them all; a Fire that hit several loses its cast target
     // (B22 +41.4), so who owned it isn't known. The glitch already explains
-    // a vulnerable player's death.
+    // the death of a player still vulnerable as the hits land (vulnHeld; one
+    // whose pair got in range during the cast is judged on the overlap).
     const overlaps = new Map<PlayerInfo, Set<PlayerInfo>>();
     for (const hit of fireGroups(players, read.fireT)) {
       for (const p of hit) for (const q of hit) if (p !== q) overlaps.set(p, (overlaps.get(p) ?? new Set()).add(q));
     }
     for (const [p, with_] of overlaps) {
-      if (read.vulnAtFire.has(p.name) || tookAvoidable(p.name, read.fireT)) continue;
-      const others = [...with_].filter((q) => !read.vulnAtFire.has(q.name));
+      if (read.vulnHeld.has(p.name) || tookAvoidable(p.name, read.fireT)) continue;
+      const others = [...with_].filter((q) => !read.vulnHeld.has(q.name));
       if (!others.length) continue;
       const died = [p, ...others].filter((q) => life.diedFrom(q, read.fireT));
       errors.push(playerError(p, {
@@ -973,7 +1037,7 @@ function detectSynergy(players: PlayerInfo[], life: Life, read: SynergyRead | un
   for (const [t, name, ids] of [[read.fireT, "Fire", [FIRE, OPTICAL_LASER]], [read.spotT, "Spotlight", [SPOTLIGHT, BLADEWORK]]] as const) {
     if (t === undefined) continue;
     const killed = uniq(players.flatMap((p) => p.damageTaken.filter((e) => (ids as readonly number[]).includes(e.abilityId) && Math.abs(e.timestamp - t) <= RESOLUTION_MS && !bodyHit(e) && life.diedFrom(p, e.timestamp)).map(() => p)));
-    if (killed.length < SYNERGY_RAID_DEATHS) continue;
+    if (killed.length < (name === "Fire" ? FIRE_RAID_DEATHS : SYNERGY_RAID_DEATHS)) continue;
     errors.push(raidMarker(TOP2_SYNERGY_RULE_ID, "Party Synergy Failed",
       `The ${name === "Fire" ? "Fire spreads" : "Spotlight stacks"} killed ${killed.length} (${namesOf(killed)}). No time to raise before the next hits; treated as the cutoff.`,
       t + RAID_MARKER_SORT_OFFSET_MS, ids[0], name === "Fire" ? "Optimized Fire III" : "Spotlight"));
@@ -1108,10 +1172,13 @@ function detectBeyondDefense(players: PlayerInfo[], life: Life, deaths: DeathEve
     // Shared by seven in every clean pull (LG64YVQy2KZbtpN8 Pulls 44, 48).
     // Its target alone, or with one more, all eight alive: the target didn't
     // bring it into the party (user, 2026-10-24, Pull 40 3:58.6: the GNB
-    // took it alone, 116k, and died).
+    // took it alone, 116k, and died). All eight alive at the jump too: a
+    // tank raised between the jump and Pile Pitch couldn't set it up (Pull
+    // 31: the GNB down from 3:43.8, raised 3:55.1, after the 3:54.3 jump on
+    // the SGE; Pile Pitch on the SGE 3:57.5 is fallout, user).
     const shared = uniq(hitsNear(players, life, [PILE_PITCH], pile.timestamp + 800, 2000).map((h) => h.p));
     const target = shared.find((p) => p.name === pile.target);
-    if (target && shared.length <= PILE_ALONE_MAX && !jumped.includes(target) && allAlive(players, life, pile.timestamp - 500)) {
+    if (target && shared.length <= PILE_ALONE_MAX && !jumped.includes(target) && allAlive(players, life, jump.timestamp - 500) && allAlive(players, life, pile.timestamp - 500)) {
       const died = !!life.diedFrom(target, pile.timestamp + 800);
       errors.push(playerError(target, {
         ruleId: TOP2_PILE_PITCH_RULE_ID, severity: died ? "Major" : "Minor", name: "Pile Pitch Not Shared",

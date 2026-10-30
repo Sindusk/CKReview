@@ -2,7 +2,7 @@
 //
 // Cross-pull: the raid's priority line in The Omega Protocol's Phase 1,
 // learned from the report's own clean resolutions, then used to name the
-// one player of a pair who stood on the wrong side. Two uses:
+// one player of a pair who stood on the wrong side. Three uses:
 //
 // 1. Pantokrator. Groups split the eight In Line players by one conga
 // line: for each number, the player earlier in the line goes to one side
@@ -42,6 +42,16 @@
 // both took one tether, the one whose tether stayed put is named
 // (applyTetherPairing).
 //
+// 3. Program Loop towers. The round's two In Line players take the two
+// tower cardinals by a priority learned the same way from the rounds where
+// each tower took one of them (KCX2qW4khczmZ9T1: one fit, 129 of 129, a
+// north clockwise scan with the reversed conga SCH DNC MNK DRK GNB SAM RDM
+// SGE, earlier on the first tower; 2qgaAkxVypGWv9CN 200/201,
+// LG64YVQy2KZbtpN8 152/152, hjgk42MDf81arFVY 156/156, same fit). omega.ts
+// names both of a pair in one tower (SAME_TOWER_NAME); here the one whose
+// tower was left empty keeps it, "Wrong Tower" (user, 2026-10-30,
+// KCX2qW4khczmZ9T1 Pull 17 0:37.7), via applyTowerPriority.
+//
 // ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
 //   - Two players with the same line number on one side (report
 //     b9FcR6vxAPd3zhkH, Pull 46 and Pull 55 at 1:21): settled by the
@@ -52,8 +62,8 @@ import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import {
-  readPantokrator, readProgramLoop, readLoopNumbers, offCardinal, SAME_SIDE_NAME, HOLDERS_TOGETHER_NAME, TOOK_ANOTHERS_NAME, STAYED_PUT,
-  TOP1_LINE_RULE_ID, TOP1_BLASTER_RULE_ID,
+  readPantokrator, readProgramLoop, readLoopNumbers, offCardinal, SAME_SIDE_NAME, SAME_TOWER_NAME, HOLDERS_TOGETHER_NAME, TOOK_ANOTHERS_NAME, STAYED_PUT,
+  TOP1_LINE_RULE_ID, TOP1_BLASTER_RULE_ID, TOP1_TOWER_RULE_ID,
 } from "./omega";
 import { playerError } from "@/lib/mechanics/wow/common";
 
@@ -65,6 +75,8 @@ export type PantokratorConga = {
   fits: number;
   /** The Program Loop holder priority, when the clean rounds give one. */
   loop?: LoopPriority;
+  /** The Program Loop tower priority (which of a round's two In Line players takes which tower), when the clean rounds give one. */
+  tower?: LoopPriority;
 };
 
 /** Best fits of (order, scan start) for the holders: start 0 N .. 3 W, scanning clockwise. */
@@ -94,8 +106,9 @@ function permutations<T>(xs: T[]): T[][] {
 export function learnPantokratorConga(pulls: PullLike[]): PantokratorConga | undefined {
   const panto = learnSplits(pulls);
   const loop = learnLoopPriority(pulls);
-  if (!panto && !loop) return undefined;
-  return { ...(panto ?? { orders: [], pulls: 0, fits: 0 }), loop };
+  const tower = learnTowerPriority(pulls);
+  if (!panto && !loop && !tower) return undefined;
+  return { ...(panto ?? { orders: [], pulls: 0, fits: 0 }), loop, tower };
 }
 
 function learnSplits(pulls: PullLike[]): Omit<PantokratorConga, "loop"> | undefined {
@@ -146,6 +159,32 @@ function learnLoopPriority(pulls: PullLike[]): LoopPriority | undefined {
       names.add(a.name); names.add(b.name);
     }
   }
+  return fitPriority(rounds, names);
+}
+
+/**
+ * Tower priority: the two In Line players of a round on the two tower
+ * cardinals, learned like the holders' from the clean tower rounds (each
+ * tower soaked by one of them). KCX2qW4khczmZ9T1: 127 of 127 clean rounds
+ * fit one scan (from north, clockwise, the LATER player in the conga on the
+ * first tower).
+ */
+function learnTowerPriority(pulls: PullLike[]): LoopPriority | undefined {
+  const rounds: { a: string; b: string; ca: number; cb: number }[] = [];
+  const names = new Set<string>();
+  for (const pull of pulls) {
+    for (const rd of readProgramLoop(pull.players, pull.deathEvents, pull.enemyCasts) ?? []) {
+      if (!rd.towerClean) continue;
+      const [a, b] = rd.soaks;
+      rounds.push({ a: a.name, b: b.name, ca: a.card, cb: b.card });
+      names.add(a.name); names.add(b.name);
+    }
+  }
+  return fitPriority(rounds, names);
+}
+
+/** Best (order, scan start) fits for rounds where a stood on ca and b on cb; undefined unless clean enough. */
+function fitPriority(rounds: { a: string; b: string; ca: number; cb: number }[], names: Set<string>): LoopPriority | undefined {
   if (rounds.length < MIN_LOOP_ROUNDS || names.size !== 8) return undefined;
   // 40320 orders x 4 starts over every round: index arrays, not maps.
   const idx = new Map([...names].map((n, i) => [n, i]));
@@ -175,7 +214,64 @@ export function applyPantokratorConga(
 ): PullError[] {
   if (!conga) return errors;
   const split = applyTetherPairing(applySplits(errors, players, deathEvents, enemyCasts, conga), players, enemyCasts, conga);
-  return applyLoopPriority(split, players, deathEvents, enemyCasts, conga.loop);
+  const held = applyLoopPriority(split, players, deathEvents, enemyCasts, conga.loop);
+  return applyTowerPriority(held, players, deathEvents, enemyCasts, conga.tower);
+}
+
+/**
+ * Both In Line players in one tower (omega.ts names both, SAME_TOWER_NAME):
+ * by the learned tower priority, the one whose tower was the empty one is
+ * at fault and the other is dropped (user, 2026-10-30, KCX2qW4khczmZ9T1
+ * Pull 17 0:37.7: "GNB is incorrect here. SGE was taking the correct
+ * tower"). The empty tower's cardinal is the one neither the soaked tower
+ * nor a Blaster holder took (each holder within HOLDER_SPOT_DEG of a
+ * distinct free cardinal); the Obliteration's cast spot can repeat the
+ * previous round's (KCX2qW4khczmZ9T1 Pulls 29, 40). Both stay named when
+ * the holders don't pin it or the fits disagree.
+ */
+function applyTowerPriority(
+  errors: PullError[], players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[], tower: LoopPriority | undefined,
+): PullError[] {
+  const same = errors.filter((e) => e.ruleId === TOP1_TOWER_RULE_ID && e.name === SAME_TOWER_NAME);
+  if (!tower || !same.length) return errors;
+  const rounds = readProgramLoop(players, deathEvents, enemyCasts) ?? [];
+  const drop = new Set<PullError>();
+  const rewrite = new Map<PullError, PullError>();
+  for (const t of [...new Set(same.map((e) => e.timestamp))]) {
+    const pair = same.filter((e) => e.timestamp === t);
+    const rd = rounds.find((r) => Math.abs(r.t - t) <= 1500);
+    if (pair.length !== 2 || !rd) continue;
+    const soaked = new Set(rd.soaks.filter((s) => pair.some((e) => e.player === s.name)).map((s) => s.card));
+    if (soaked.size !== 1) continue;
+    const s = [...soaked][0];
+    const held = rd.holders.map((x) => [0, 1, 2, 3].find((c) => offCardinal(x.bearing, c) <= HOLDER_SPOT_DEG));
+    if (held.length !== 2 || held.some((c) => c === undefined || c === s) || held[0] === held[1]) continue;
+    const empty = [0, 1, 2, 3].filter((c) => c !== s && !held.includes(c));
+    if (empty.length !== 1) continue;
+    const [a, b] = pair.map((e) => e.player!);
+    const verdicts = new Set<string>();
+    for (const { order, start } of tower.fits) {
+      const rank = new Map(order.map((n, i) => [n, i]));
+      if (!rank.has(a) || !rank.has(b)) { verdicts.add("?"); continue; }
+      const [first] = [s, empty[0]].sort((x, y) => scanPos(x, start) - scanPos(y, start));
+      const aFirst = rank.get(a)! < rank.get(b)!;
+      // The earlier one in the fit's order owns the first tower of the scan.
+      const aOwnsEmpty = (aFirst ? first : (first === s ? empty[0] : s)) === empty[0];
+      verdicts.add(aOwnsEmpty ? a : b);
+    }
+    if (verdicts.size !== 1 || verdicts.has("?")) continue;
+    const wrong = [...verdicts][0];
+    for (const e of pair) {
+      if (e.player !== wrong) { drop.add(e); continue; }
+      rewrite.set(e, {
+        ...e,
+        name: "Wrong Tower",
+        description: `${e.description.replace(/ Either could have moved\./, "")} By the tower priority (${tower.agree}/${tower.rounds} rounds), ${wrong}'s was the ${CARDINAL[empty[0]]} tower, left empty; the other was in theirs.`,
+      });
+    }
+  }
+  if (!drop.size && !rewrite.size) return errors;
+  return errors.filter((e) => !drop.has(e)).map((e) => rewrite.get(e) ?? e);
 }
 
 function applySplits(

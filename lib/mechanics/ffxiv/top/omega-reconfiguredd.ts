@@ -108,6 +108,32 @@
 // Code Smells; the Regression statuses end at the breaks. Tower helpers
 // log their spot at the resolution. Loading 1003452 right / 1003453 left.
 // Built in replay.ts.
+// VOD review (2026-10-30, KCX2qW4khczmZ9T1, the user's static: GNB DRK SCH
+// SGE MNK SAM DNC RDM):
+// - Hand-offs: the taker walks to the holder, the holder stays put. Over
+//   176 cycle 1-3 hand-offs in all 15 TOP reports on disk the holder's net
+//   move from the resolution (+0.5s) to the hand-off was median 0.1y, p95
+//   2.9y, max 5.3y (KCX2 Pull 38 C1). Pull 38 C3 (6:17-6:25): the DNC walked
+//   9.9y in to the GNB (6.5s late: "that pass was on the DNC"); the DRK
+//   stayed (1.9y) and the SCH walked toward the GNB instead, taking the
+//   GNB's red by contact 6:25.8 (SCH 10.2y in 3s, GNB 7.3y) and the DRK's
+//   rot ran out unpassed: both on the SCH ("SCH would be responsible for
+//   picking up the rot from DRK").
+// - Clips, Pull 35 5:43.0 (cycle 1): the SCH took the MNK's red 4.7s after
+//   the resolution and stayed 1.5y from it; the RDM took the SAM's blue,
+//   then walked from 8.9y to 4.0y of the DRK; the GNB took the DRK's blue
+//   at +3.0s, stood 0.1y from it until 1.5s before the expiry, then stepped
+//   to 4.9y and was still hit. MNK, DRK and SAM stayed put. "RDM and SCH
+//   made the mistakes here": the RDM and SCH clips are theirs; the GNB's is
+//   open (below). Neither Remote pair (GNB/RDM) nor Local broke before the
+//   deaths; the timeout came at 5:45.3 with three of the four dead.
+// - Transition (Pull 11): the MNK's 4:49 ring death confirmed ("going in far
+//   too early for the ring"; no uptime). The 5:01.9 arm deaths (SCH, DNC)
+//   after it: "the group is mostly just progging here", no rule.
+// - Raises date by Weakness (fru/common.ts raisedAt): Pull 38's SCH, raised
+//   0.7s before Hello World but first acting 6.1s later, read as dead at the
+//   duty handout and cut the pull at 5:11.1; hjgk42MDf81arFVY Pull 30's SCH
+//   the same (5:11.2).
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-top3-avoidable (Major on death, else Minor): rings, arms, centre.
@@ -117,9 +143,12 @@
 // ffxiv-top3-tower (targeted: each cycle's four carriers): an empty tower
 //   names its color's carrier who didn't take it, or both carriers in one
 //   tower; a tower taken without its rot (Wrong Tower).
-// ffxiv-top3-rot-pass: the receiver and the owner whose hit they shared,
-//   when an empty tower or uncleansed defect traces back to a missing or
-//   late hand-off.
+// ffxiv-top3-rot-pass: when an empty tower or uncleansed defect traces back
+//   to a missing or late hand-off, the taker; the holder (the owner whose hit
+//   they shared) instead when they walked over HOLDER_MOVED (7y) from the
+//   resolution to the hand-off (user, 2026-10-30, KCX2qW4khczmZ9T1 Pull 38
+//   6:23.8 / 6:25.8: "The person who takes the rot is the one who should be
+//   moving"; the DNC walked 9.9y in, the DRK stayed). Both without positions.
 // ffxiv-top3-stack (targeted: Remote players, cycles 1-3): in no stack.
 // ffxiv-top3-defamation: an extra player in a defamation (the extras; the
 //   owner when it hit 3+; both owners when they hit each other).
@@ -127,9 +156,17 @@
 //   before the towers or before the resolution's vulnerability ended, a Local
 //   break within 1s of the Remote one, a fourth-cycle Remote break with the
 //   Local pair (both partners named); a timeout with both alive.
-// ffxiv-top3-rot-clip: a rot explosion on someone else (victim and the
-//   carrier near them). ffxiv-top3-rot-contact: a rot gained outside a
-//   hand-off (receiver and giver: the swap partner or nearest holder).
+// ffxiv-top3-rot-clip: a rot explosion on someone else. A victim who took
+//   that color in the carrier's last 10s is the new holder and steps away:
+//   the victim alone when the carriers stayed within HOLDER_MOVED over the
+//   5s before the expiry, the carriers who walked further alone, else both
+//   (user, 2026-10-30, KCX2 Pull 35 5:43.0: "RDM and SCH made the
+//   mistakes"). Victim and the carrier near them when the victim held no
+//   such rot. ffxiv-top3-rot-contact: a rot gained outside a hand-off: a
+//   swap names both; else the receiver or the nearest holder, whichever
+//   walked further over the 3s before (KCX2 Pull 38 6:25.8: the SCH 10.2y,
+//   the GNB 7.3y; the only non-swap contact on disk, so thin), both without
+//   positions.
 // ffxiv-top3-monitor: a player picked twice, all alive: a circle over two
 //   (both), else the living players no cannon picked, else player-less.
 // ffxiv-top3-hello-world (Raid): empty tower, uncleansed defect, timeout,
@@ -145,7 +182,7 @@
 //   mechanic Raid.
 // Not built: Critical Error (never failed); raw-damage deaths (Hello
 // World's raidwide, Patch with correct timing, autos); which partner of a
-// pair moved (positions not modeled); the monitor layout and facing (no
+// tether pair moved (rots use displacement, above); the monitor layout and facing (no
 // NAUR slot model yet, so the nine-cast doubles stay player-less).
 //
 // -- GUIDE-DERIVED MODEL (2026-10-14) --
@@ -435,6 +472,21 @@
 //    not an eight-slot plan. Obtain actual slots, markers and chosen layout.
 // 8. Identify center-hazard spell/removal, status namespace and Damage
 //    Down on each avoidable, plus actor reuse/phase transition signals.
+// 9. (2026-10-30) KCX2 Pull 35 5:43.0: the GNB's clip by the DRK's blue is
+//    named on the GNB (new holder, DRK still), but the user named only the
+//    RDM and SCH. The GNB stood on the DRK until 1.5s before the expiry and
+//    reached 4.9y; no signal on disk separates it from the RDM (4.0y) and
+//    SCH (1.5y) without fitting to this pull. Ask: was the GNB's death the
+//    RDM's (e.g. its walk south collapsing the Remote tether)?
+// 10. (2026-10-30) Arm deaths after a ring death (KCX2 Pull 11 5:01.9, SCH
+//    and DNC; the user: "Pull is a bit of a mess at this point, since the
+//    MNK is dead... mostly just progging"): still each a Major avoidable.
+//    No rule built; KCX2 Pull 38's SCH died to an arm 4:59 with nobody dead
+//    before and the pull still went to cycle 3, so "fallout after a death"
+//    isn't a safe rule yet.
+// 11. (2026-10-30) Remote tethers never broken before deaths (Pull 35: GNB
+//    and RDM, 6.7s after the cast against clean +1.1-3.5s): the timeout
+//    error needs both alive, so no one is named. Unbuilt.
 
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
@@ -527,11 +579,31 @@ const RESET_AFTER_DEATH_MS = 10_000;
 const SILENT_HIT_MS       = 3500;
 const CONTACT_RANGE       = 800; // centi-yalms: the nearest holder of a jumped rot
 const CLIP_RANGE          = 800; // a rot explosion is 5y; positions are interpolated
+// Hand-offs: the taker walks to the rot holder; the holder stays put (user,
+// 2026-10-30, KCX2 Pull 38 6:17-6:25: "The person who takes the rot is the
+// one who should be moving. The DNC should have stayed still and allowed the
+// GNB to take the rot"). A holder whose net displacement from the resolution
+// (+0.5s) to the hand-off exceeds this walked away from their spot and owns
+// the failed hand-off; otherwise the taker does. Clean holders over all 15
+// reports on disk (176 cycle 1-3 hand-offs): median 0.1y, p95 2.9y, max 5.3y
+// (KCX2 Pull 38 C1); failures: the DNC 9.9y (Pull 38 C3, holder's fault),
+// the DRK 2.0y and the MNK 0.4y (Pull 38 C3, Pull 35 C1: taker's fault).
+const HOLDER_MOVED        = 700;
+const MOVE_OPTS           = { windowMs: 2000, maxSpanMs: 3000 };
+// A clip by an expiring rot: the carrier's stillness over this long before
+// the expiry decides it the same way (the new holder steps away).
+const CLIP_LOOKBACK_MS    = 5000;
 const ORDINAL = ["first", "second", "third", "fourth"];
 
 const sec = (ms: number) => (ms / 1000).toFixed(1);
 const heldAt = (ivs: Interval[], t: number) => ivs.some((i) => i.start <= t && i.end > t);
 const names = (ns: string[]) => joinNames(uniq(ns));
+/** Net displacement (centi-yalms) between two moments, undefined without positions. */
+function movedBy(p: PlayerInfo, from: number, to: number): number | undefined {
+  const a = interpolatePlayerPosition(p, from, MOVE_OPTS), b = interpolatePlayerPosition(p, to, MOVE_OPTS);
+  return a && b ? Math.hypot(b.x - a.x, b.y - a.y) : undefined;
+}
+const yd = (cy: number) => `${(cy / 100).toFixed(1)}y`;
 
 /** Phase 3: the transition's first cast to Phase 4's first (or the pull's end). */
 function phase3Window(casts: EnemyEvent[]): { start: number; end: number } {
@@ -722,10 +794,28 @@ function detectHelloWorld(players: PlayerInfo[], life: Life, deaths: DeathEvent[
   const rotIv = (n: string, c: Color) => debuffIntervals(P(n), COL[c].rot);
   const passError = (cy: Cycle, receiver: string, color: Color, why: string, t: number) => {
     const giver = passGiver(cycles, cy, receiver, color, dColor);
-    for (const n of uniq([receiver, ...(giver ? [giver] : [])])) {
+    // Who failed it: the holder if they walked off their spot during the
+    // hand-off window (HOLDER_MOVED), else the taker; both without positions.
+    const prev = cycles[cy.k - 2];
+    let blamed = uniq([receiver, ...(giver ? [giver] : [])]);
+    let who = `Hand-off between ${giver ? names([giver, receiver]) : receiver}; either could have missed it.`;
+    if (giver && prev) {
+      const from = prev.res + 500;
+      const held = rotIv(giver, color).find((iv) => iv.start <= prev.res && iv.end > prev.res);
+      const to = Math.min(t > prev.res ? t : Infinity, held?.end ?? Infinity, prev.res + PASS_WINDOW_MS);
+      const m = life.alive(P(giver), to) ? movedBy(P(giver), from, to) : undefined;
+      if (m !== undefined && m > HOLDER_MOVED) {
+        blamed = [giver];
+        who = `${giver} held the rot but walked ${yd(m)} off their spot during the hand-off; the holder stays put and ${receiver} comes to them.`;
+      } else if (m !== undefined) {
+        blamed = [receiver];
+        who = `${giver} held the rot in place (moved ${yd(m)}); ${receiver}, the taker, had to walk to them and take it in time.`;
+      }
+    }
+    for (const n of blamed) {
       errors.push(playerError(P(n), {
         ruleId: TOP3_ROT_PASS_RULE_ID, severity: "Major", name: "Rot Hand-off Failed",
-        description: `${why} Hand-off between ${giver ? names([giver, receiver]) : receiver}; either could have missed it. ${PASS_WHY}`,
+        description: `${why} ${who} ${PASS_WHY}`,
         timestamp: t, abilityId: COL[color].rot, abilityName: ROT_NAME[color],
       }));
     }
@@ -956,10 +1046,27 @@ function detectRotClips(players: PlayerInfo[], life: Life, start: number, end: n
         const carriers = close.length ? close : expiring;
         if (!carriers.length) continue;
         const died = !!life.diedFrom(v, e.timestamp);
-        for (const p of [v, ...carriers]) {
+        // A victim who took this color within the carrier's last 10s is the
+        // new holder: they step away, the old carrier stays (user,
+        // 2026-10-30, KCX2 Pull 35 5:43.0: "RDM and SCH made the mistakes
+        // here": the SCH took the MNK's red 4.8s late and stayed 1.5y from
+        // it; the RDM walked from the SAM 8.9y to 4.0y of the DRK). The
+        // carriers' moves over the 5s before the expiry (HOLDER_MOVED): all
+        // still, the victim alone; any walked, those carriers alone.
+        const exp = Math.min(...carriers.map((p) => debuffIntervals(p, COL[c].rot).find((iv) => iv.end >= e.timestamp - 1000 && iv.end <= e.timestamp + 300)?.end ?? e.timestamp));
+        const newHolder = debuffIntervals(v, COL[c].rot).some((iv) => iv.start < e.timestamp && iv.start >= exp - 10_000);
+        const moves = carriers.map((p) => movedBy(p, exp - CLIP_LOOKBACK_MS, exp));
+        const walked = carriers.filter((_, i) => (moves[i] ?? 0) > HOLDER_MOVED);
+        const still = moves.every((m) => m !== undefined && m <= HOLDER_MOVED);
+        const blamed = !newHolder ? [v, ...carriers] : walked.length ? walked : still ? [v] : [v, ...carriers];
+        const why = !newHolder ? "Either could have moved."
+          : walked.length ? `${names(walked.map((q) => q.name))} walked off their spot into the new holder; the old carrier stays put.`
+          : still ? `${v.name} had just taken the ${c} rot and didn't step away from the old carrier, who stayed put; the new holder steps away.`
+          : "Either could have moved.";
+        for (const p of blamed) {
           errors.push(playerError(p, {
             ruleId: TOP3_ROT_CLIP_RULE_ID, severity: died ? "Major" : "Minor", name: "Rot Explosion Clipped",
-            description: `${names(carriers.map((q) => q.name))}'s ${c} rot ran out next to ${v.name} and hit them (${realAmount(e) > 0 ? kFmt(realAmount(e)) : "lethal"})${died ? `; ${v.name} died` : ""}. Either could have moved. ${CLIP_WHY}`,
+            description: `${names(carriers.map((q) => q.name))}'s ${c} rot ran out next to ${v.name} and hit them (${realAmount(e) > 0 ? kFmt(realAmount(e)) : "lethal"})${died ? `; ${v.name} died` : ""}. ${why} ${CLIP_WHY}`,
             timestamp: e.timestamp, abilityId: e.abilityId, abilityName: e.abilityName,
           }));
         }
@@ -992,12 +1099,22 @@ function detectRotContact(players: PlayerInfo[], cycles: Cycle[], casts: EnemyEv
         .filter((x) => x.q).map((x) => ({ p: x.p, d: Math.hypot(x.q!.x - at.x, x.q!.y - at.y) })).sort((a, b) => a.d - b.d)[0];
       if (near && near.d <= CONTACT_RANGE) giver = near.p;
     }
-    const who = giver ? [g.p, giver] : [g.p];
-    who.forEach((p) => done.add(p));
+    const pair = giver ? [g.p, giver] : [g.p];
+    pair.forEach((p) => done.add(p));
+    // Not a swap: whoever walked further over the 3s before the contact walked
+    // into the other (user, 2026-10-30, KCX2 Pull 38 6:25.8: "The person who
+    // takes the rot is the one who should be moving": the SCH walked 10.2y into
+    // the GNB, who moved 7.3y taking the DNC's rot; the only non-swap contact
+    // on disk). Both without positions.
+    let who = pair;
+    if (giver && !swap) {
+      const mr = movedBy(g.p, g.t - 3000, g.t), mg = movedBy(giver, g.t - 3000, g.t);
+      if (mr !== undefined && mg !== undefined) who = [mr >= mg ? g.p : giver];
+    }
     for (const p of who) {
       errors.push(playerError(p, {
         ruleId: TOP3_ROT_CONTACT_RULE_ID, severity: "Major", name: "Rot Spread by Contact",
-        description: `${swap ? `${names(who.map((q) => q.name))} touched and swapped rots` : `${g.p.name} picked up the ${g.c} rot${giver ? ` from ${giver.name}` : ""}`} outside a hand-off, leaving the rotation with the wrong carriers. ${CONTACT_WHY}`,
+        description: `${swap ? `${names(pair.map((q) => q.name))} touched and swapped rots` : `${g.p.name} picked up the ${g.c} rot${giver ? ` from ${giver.name}` : ""}`}${who.length === 1 && giver && !swap ? ` (${who[0].name} walked into the other)` : ""} outside a hand-off, leaving the rotation with the wrong carriers. ${CONTACT_WHY}`,
         timestamp: g.t, abilityId: COL[g.c].rot, abilityName: ROT_NAME[g.c],
       }));
     }

@@ -3,6 +3,9 @@
 // Helpers shared by the Futures Rewritten phase modules (fatebreaker.ts,
 // usurper-of-frost.ts, oracle-of-darkness.ts, enter-the-dragon.ts, pandora.ts): who was alive when, hits on the living, cast and
 // aura lookups, and name formatting. Moved out of fatebreaker.ts unchanged.
+// Also used by TEA (tea/*) and every TOP module. buildLife dates a raise by
+// the Weakness / Brink of Death (+1.5s settle) or the first cast / real hit,
+// whichever is first (2026-10-30; raisedAt below).
 
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
@@ -34,17 +37,42 @@ export type Life = {
  */
 export const bodyHit = (e: PlayerEvent) => e.healthBefore === 0 || (e.healthAfter === 0 && !((e.amount ?? 0) > 0));
 
+// Weakness / Brink of Death: applied the moment a raise is accepted.
+export const WEAKNESS = 1000043;
+export const BRINK_OF_DEATH = 1000044;
+// A raised player who hasn't acted yet counts as back this long after the
+// Weakness: they get up where their body lay, often inside the hazard that
+// killed them. Each of these hits came 1.1-1.9s after the Weakness and was
+// the player's first event, so blaming it would be new noise: FRU
+// JZ1KXhDbqkNH3jxR Pull 9 4:02.8 (Hallowed Ray, 1.1s), TEA
+// 1NG4Zah79yKYHCDv Pull 66 2:04.2 and HwjvVh3TNAZmMQyq Pull 17 2:05.1 (Hawk
+// Blaster, 1.5s / 1.9s), 6pzyKv8fnYBZ2XGa Pull 3 1:26.9 (a tank raised 1.8s
+// before Drainage, whose ruling excuses it as tank-dead).
+const RAISE_SETTLE_MS = 1500;
+
 /**
- * When a dead player was raised: their next cast or real hit. Not common.ts's
- * rezzedAt, which counts body hits as a sign of life (A4: the OT's body took
- * the second Cyclonic Break's cones and read as raised).
+ * When a dead player was raised: their next cast or real hit, or their
+ * Weakness / Brink of Death + RAISE_SETTLE_MS if that's earlier. Not
+ * common.ts's rezzedAt, which counts body hits as a sign of life (A4: the
+ * OT's body took the second Cyclonic Break's cones and read as raised). The
+ * cast/hit date alone ran late by however long the raised player waited to
+ * act: 0.1-25.8s after the Weakness on disk, median 2.6s (TOP KCX2 Pull 38:
+ * the SCH's Weakness 5:10.4, 0.7s before Hello World, first cast 5:16.5, read
+ * as dead at the duty handout and cut the pull off at Hello World).
  */
 function raisedAt(p: PlayerInfo, deathT: number, nextDeathT: number): number | undefined {
+  const weak = p.debuffs
+    .filter((e) => (e.abilityId === WEAKNESS || e.abilityId === BRINK_OF_DEATH) && e.debuffStatus === "applied")
+    .map((e) => e.timestamp)
+    .filter((x) => x > deathT && x < nextDeathT)
+    .sort((a, b) => a - b)[0];
   const t = [...p.damageTaken.filter((e) => !bodyHit(e)), ...p.casts]
     .map((e) => e.timestamp)
     .filter((x) => x > deathT + 2000 && x < nextDeathT)
     .sort((a, b) => a - b)[0];
-  return t;
+  if (weak === undefined) return t;
+  const settled = Math.min(weak + RAISE_SETTLE_MS, nextDeathT);
+  return t === undefined ? settled : Math.min(settled, t);
 }
 
 export function buildLife(players: PlayerInfo[], deaths: DeathEvent[]): Life {

@@ -154,6 +154,24 @@
 //   earlier previous holder's tether (247 of 254 clean hand-offs over B, C
 //   and D). D36 0:38.1: the MNK took the DNC's, the SCH's by the pairing,
 //   leaving the RDM's; the SCH then took it from the MNK. User: the MNK.
+// Report E = KCX2qW4khczmZ9T1 (the user's static, same roster and conga).
+// VOD review 2026-10-30 (user); findings:
+// - Tower priority: each round's two towers sit on two cardinals and, by
+//   a clockwise scan from north, the EARLIER player in the reversed conga
+//   (SCH DNC MNK DRK GNB SAM RDM SGE; i.e. the later one in SGE..SCH)
+//   takes the first tower. Learned per report (pantokrator-conga.ts) from
+//   rounds with each tower soaked by one In Line player: one fit, E
+//   129/129, B 200/201, C 152/152, D 156/156. E17 0:37.7: GNB and SGE
+//   both in the south tower, GNB's was the empty east one (user: "GNB is
+//   incorrect here. SGE was taking the correct tower").
+// - E14 1:33.2: the RDM (In Line 2) left their line stack and stood 1.0y
+//   from the SAM's set-3 missile drop: the RDM's fault, the SAM's drop
+//   was correct (user).
+// - E21 1:36.4: the SAM died to a puddle between sets 3 and 4; the RDM and
+//   SGE then shared the set-4 line as two and died: "the pull is
+//   effectively over at the time the SAM died" (user). Dying AT set 4 is
+//   the recoverable case (E22, E39, E41 reached P2), as is one death at
+//   set 4 after a loss at set 3 (D1 played on to Diffuse).
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-top1-avoidable (Major on Damage Down or death, else Minor): Flame
@@ -162,7 +180,12 @@
 //   round's In Line players still holding Looper in no tower, or both in
 //   one tower; a Looper holder of another number soaking early (Major,
 //   whether or not a tower failed). Later rounds are fallout. Targeted:
-//   every round reports its two In Line players.
+//   every round reports its two In Line players. Both in one tower ("Same
+//   Tower", both named): pantokrator-conga.ts keeps the one whose tower,
+//   by the report's learned tower priority, was the empty one ("Wrong
+//   Tower"; user, E17 0:37.7); the empty cardinal is the one neither the
+//   soaked tower nor a Blaster holder (within 30 degrees) took. Both stay
+//   named with no priority or when the holders don't pin it (B33).
 // ffxiv-top1-blaster (Major on Doom or death, else Minor), all eight
 //   alive: a Blaster hitting both holders (both named; the cross-pull
 //   holder priority keeps the one off their assigned cardinal, "Wrong
@@ -192,12 +215,16 @@
 // ffxiv-top1-tower "Tower Out of Turn" skips a player with no duty that
 //   round who covered for a tower owner stuck in a Blaster (user, B44).
 // ffxiv-top1-missile (Major on death, else Minor): a missile hitting
-//   others (the carrier; with one other, both), or the carrier in a line.
+//   others (the carrier; with one other, both, unless that other is no
+//   carrier of the set and in no line: then only them, "Stood by a
+//   Missile", having left their stack; user, E14 1:33.2; not with the
+//   groups broken), or the carrier in a line.
 //   One per carrier and set (a dead carrier's missile can land on the other).
 // ffxiv-top1-line "Pantokrator One Short" (Raid, player-less): a player
 //   alive at Pantokrator but dead at set 1, 2 or 3, when a later set's line
 //   or missile then killed someone, not in a P1 clear; at their fatal hit
-//   (user, D2).
+//   (user, D2). Dead before set 4: only when set 4 killed two or more
+//   (user, E21 1:36.4; D1, one killed, played on).
 // ffxiv-top1-line, groups broken: a group holding both players of an In
 //   Line number (Major, both named; the conga keeps the one who didn't
 //   flex) plus a Raid cutoff at the first set, and no line errors after
@@ -743,7 +770,7 @@ function detectProgramLoop(
       }
       for (const p of doubled) {
         errors.push(playerError(p, {
-          ruleId: TOP1_TOWER_RULE_ID, severity: "Major", name: "Same Tower",
+          ruleId: TOP1_TOWER_RULE_ID, severity: "Major", name: SAME_TOWER_NAME,
           description: `Both In Line ${rd.r} players (${namesOf(doubled)}) stood in one round ${rd.r} tower, leaving the other empty: Obliteration gave the raid Doom. Either could have moved.`,
           timestamp: rd.t, abilityId: OBLITERATION, abilityName: "Storage Violation Obliteration",
         }));
@@ -1097,6 +1124,9 @@ export function readPantokrator(players: PlayerInfo[], deathEvents: DeathEvent[]
   };
 }
 
+/** The error both In Line players of a round get when they shared one tower (pantokrator-conga.ts narrows it by the tower priority). */
+export const SAME_TOWER_NAME = "Same Tower";
+
 /** The error both Blaster holders of one round get (pantokrator-conga.ts narrows it to one). */
 export const HOLDERS_TOGETHER_NAME = "Tether Holders Together";
 
@@ -1105,9 +1135,13 @@ export const HOLDERS_TOGETHER_NAME = "Tether Holders Together";
  * priority (pantokrator-conga.ts): per round, the free cardinals and where
  * each of the round's In Line holders stood when their Blaster went off.
  * `clean`: each Blaster hit only its own holder, all eight alive.
+ * For the tower priority: `soaks`, the round's own In Line players in a
+ * tower and that tower's cardinal (from their own hit); `towerClean`, two
+ * towers each soaked by exactly one of them, no Obliteration, all alive.
  */
 export function readProgramLoop(players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[]): {
   t: number; free: number[]; holders: { name: string; bearing: number }[]; clean: boolean;
+  soaks: { name: string; card: number }[]; towerClean: boolean;
 }[] | undefined {
   const loop = castsOf(enemyCasts, PROGRAM_LOOP, Infinity)[0];
   if (!loop) return undefined;
@@ -1116,7 +1150,13 @@ export function readProgramLoop(players: PlayerInfo[], deathEvents: DeathEvent[]
   const num = numbersIn(players, loop.timestamp, loop.timestamp + 10_000);
   return loopRounds(enemyCasts, p2).flatMap((rd) => {
     const cards = roundCardinals(players, life, rd);
-    if (!cards) return [];
+    const towerHits = rd.casts.filter((c) => c.abilityId === TOWER).map((c) => instanceHits(players, life, c));
+    const soaks = towerHits.flatMap((hs) => hs.filter((x) => num.get(x.p) === rd.r && x.e.x !== undefined && x.e.y !== undefined)
+      .map((x) => ({ name: x.p.name, card: cardinalOf(compassOf(x.e.x!, x.e.y!)) })));
+    if (!cards && !soaks.length) return [];
+    const towerClean = allAlive(players, life, rd.t - 500) && !rd.casts.some((c) => c.abilityId === OBLITERATION)
+      && towerHits.length === 2 && towerHits.every((hs) => hs.filter((x) => num.get(x.p) === rd.r).length === 1)
+      && soaks.length === 2 && soaks[0].name !== soaks[1].name && soaks[0].card !== soaks[1].card;
     const h = ((rd.r + 1) % 4) + 1;
     const blasts = rd.casts.filter((c) => c.abilityId === BLASTER).map((c) => instanceHits(players, life, c));
     const holders = uniq(blasts.flat().filter((x) => num.get(x.p) === h && x.e.x !== undefined && x.e.y !== undefined).map((x) => x.p))
@@ -1125,7 +1165,7 @@ export function readProgramLoop(players: PlayerInfo[], deathEvents: DeathEvent[]
         return { name: p.name, bearing: compassOf(e.x!, e.y!) };
       });
     const clean = allAlive(players, life, rd.t - 500) && blasts.length === 2 && blasts.every((b) => b.length === 1 && num.get(b[0].p) === h);
-    return [{ t: rd.t, free: cards.free, holders, clean }];
+    return [{ t: rd.t, free: cards?.free ?? [], holders, clean: !!cards && clean, soaks, towerClean }];
   });
 }
 
@@ -1191,11 +1231,21 @@ function detectPantokrator(players: PlayerInfo[], life: Life, deaths: DeathEvent
         continue;
       }
       const died = m.hit.filter((p) => diedOf(p, life, deaths, s.t) || deaths.some((d) => d.player === p.name && !d.killingAbilityGameId && d.timestamp > s.t && d.timestamp - s.t <= KNOCK_DEATH_MS));
-      const blamed = stayed || others.length >= 2 ? [carrier] : [carrier, ...others];
+      // One other, not a carrier this set and in no line: every non-carrier
+      // belongs in a line stack, so they left theirs for the drop and the
+      // carrier, out of the stacks, is excused (user, 2026-10-30,
+      // KCX2qW4khczmZ9T1 Pull 14 1:33.2: "The RDM should not have been
+      // there. The SAM was correct"; the RDM, In Line 2, stood 1.0y from the
+      // SAM's drop with both lines taken without them).
+      // Not with the groups broken: nobody's stack is clear then.
+      const strayed = !doubled.length && !stayed && others.length === 1 && num.get(others[0]) !== s.k && s.lines.length > 0 && !inLine(others[0]);
+      const blamed = stayed || others.length >= 2 ? [carrier] : strayed ? others : [carrier, ...others];
       for (const p of blamed) {
         errors.push(playerError(p, {
           ruleId: TOP1_MISSILE_RULE_ID, severity: died.length ? "Major" : "Minor", name: p === carrier ? "Missile on Others" : "Stood by a Missile",
-          description: `Set ${s.k}: ${carrier.name}'s missile (In Line ${s.k}) also hit ${namesOf(others)}${stayed ? "; the carrier was still in the line stack" : ""}${blamed.length > 1 ? "; either could have moved" : ""}.${died.length ? ` ${fateOf([carrier, ...others], [], died)}.` : ""} ${MISSILE_WHY}`,
+          description: strayed
+            ? `Set ${s.k}: stood by ${carrier.name}'s missile drop (In Line ${s.k}) instead of in a line stack, and it hit them.${died.length ? ` ${fateOf([carrier, ...others], [], died)}.` : ""} ${MISSILE_WHY}`
+            : `Set ${s.k}: ${carrier.name}'s missile (In Line ${s.k}) also hit ${namesOf(others)}${stayed ? "; the carrier was still in the line stack" : ""}${blamed.length > 1 ? "; either could have moved" : ""}.${died.length ? ` ${fateOf([carrier, ...others], [], died)}.` : ""} ${MISSILE_WHY}`,
           timestamp: s.t, abilityId: MISSILE, abilityName: "Guided Missile Kyrios",
         }));
       }
@@ -1297,16 +1347,27 @@ function detectPantokrator(players: PlayerInfo[], life: Life, deaths: DeathEvent
   const pantoT = castsOf(casts, PANTOKRATOR, end)[0]?.timestamp;
   const present = pantoT === undefined ? [] : players.filter((p) => life.alive(p, pantoT));
   const cleared = casts.some((c) => P2_CASTS.includes(c.abilityId));
+  // Dead before set 4 counts too: a player dying AT set 4 is the
+  // recoverable case (KCX2qW4khczmZ9T1 Pulls 22, 39, 41 reached P2), but
+  // one already dead when it goes off leaves a line one short (user,
+  // 2026-10-30, KCX2qW4khczmZ9T1 Pull 21 1:36.4: the SAM's puddle death,
+  // then the RDM and SGE died sharing the set-4 line: "The pull is
+  // effectively over at the time the SAM died").
   if (present.length === players.length && !doubled.length && !cleared) {
-    for (const [k, s] of sets.slice(0, 3).entries()) {
+    for (const [k, s] of sets.slice(0, 4).entries()) {
       const missing = present.filter((p) => !life.alive(p, s.t - 500));
       if (!missing.length) continue;
       const victims = uniq(sets.slice(k).flatMap((x) => [...x.lines, ...x.missiles]
         .flatMap((l) => l.hit.filter((p) => !missing.includes(p) && life.diedFrom(p, x.t)))));
-      if (victims.length) {
+      // Set 4, the last: only when it killed both left sharing the line,
+      // three down before the final volley (Pulls 21 and 25 there; Pull 21
+      // the RDM and SGE). One killed is played on: hjgk42MDf81arFVY Pull 1
+      // 1:33.6, the SGE dead at set 3 and the RDM at set 4, went on to the
+      // Diffuse death the user ruled on (2026-10-28).
+      if (victims.length >= (k === 3 ? 2 : 1)) {
         const fatal = Math.min(...missing.map((p) => fatalHitT(p, life, s.t)));
         errors.push(raidMarker(TOP1_LINE_RULE_ID, "Pantokrator One Short",
-          `${namesOf(missing)} died before set ${s.k}, so their group was short for the rest of Pantokrator; ${namesOf(victims)} died to the later sets. A set short before the fourth is unrecoverable; treated as the cutoff.`,
+          `${namesOf(missing)} died before set ${s.k}, so their group was short for the rest of Pantokrator; ${k === 3 ? `${namesOf(victims)} died to set 4: three or more down before the final volley; treated as the cutoff.` : `${namesOf(victims)} died to the later sets. A set short before the fourth is unrecoverable; treated as the cutoff.`}`,
           fatal + RAID_MARKER_SORT_OFFSET_MS, LINE, "Condensed Wave Cannon Kyrios"));
       }
       break;

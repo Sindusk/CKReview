@@ -187,6 +187,17 @@ Topic (when it applies):
 - **Read "anyone dead" at the snapshot, not the cast start.** A player
   raised during a long cast is alive for its resolution: TEA's Temporal
   Stasis check at the cast skipped a pull whose tank was back 4s into it.
+- **Date a raise by its Weakness / Brink of Death, not the first cast.**
+  A raised player's first action lags the Weakness by 0.1-26s (median
+  2.6s), so "next cast" dating called a player raised before Hello World
+  dead at it (TOP P3). Keep a ~1.5s settle after the Weakness: a player
+  can't act on the first hit after the raise (fru/common.ts raisedAt).
+- **A hand-off failure is the mover's.** The taker walks to the holder,
+  who stays still; blame the holder only if they walked off their spot
+  (TOP P3 rots; user, VOD).
+- **A debuff that decides a hit is read at the cast, not the hit.** TOP
+  P2's glitch Vulnerability Up came off between the Fire cast and its
+  hit; the damage followed the cast.
 - **An assignment by party-list order isn't in the log.** Healer cleanse
   splits follow it, so "the healer who cleansed fewer" is usually the
   wrong one; keep such misses player-less (TEA Throttle; user).
