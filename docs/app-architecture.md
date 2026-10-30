@@ -164,7 +164,8 @@ file's header comment. Mechanic detection has its own guide:
     client-side, so older reviews show "—" until they are resynced.
   - Sessions are ordered by `addedAt`.
 - **Auth** (`lib/auth.ts`, `lib/usersDb.ts`): one account across every
-  consistencykings.com app. They share the `app_user`/`session` users
+  consistencykings.com app. The full design, security properties and how
+  another app joins are in [shared-auth.md](shared-auth.md). They share the `app_user`/`session` users
   database and the parent-domain `ck_session` cookie, so data keyed by
   `app_user.id` (statics here, the portfolio in Stonks) follows the account.
   Every statics route checks the logged-in user (401) and static membership
