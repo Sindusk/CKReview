@@ -1,8 +1,7 @@
-// The Omega Protocol probes for VOD-question evidence, so a session doesn't
-// rewrite them. Players print as jobs (job-labels.js), never names.
-//
-//   node .claude/skills/refine-module/tools/top-probes.js fire-spots <code> [pulls] [--summary]
-//   node .claude/skills/refine-module/tools/top-probes.js blaster-trace <code> [pulls]
+// TOP (Omega) VOD-question probes: P2 Fire spots, P1 Program Loop Blaster trace. Jobs, never names.
+//   node tools/ffxiv/top/top-probes.js fire-spots <code> [pulls] [--summary]
+//   node tools/ffxiv/top/top-probes.js blaster-trace <code> [pulls]
+// (more TOP probes: omega-probes.js, omega-mf-probes.js, omega-reconfigured-probes.js beside this)
 //
 // [pulls]: the app's pull numbers, e.g. 15,18,30-33 (default: every pull).
 //
@@ -28,8 +27,9 @@
 // Run from the repo root. Read-only, works on fetched sampledata only.
 
 const path = require('path');
-const { pulls, mmss, requireTsFromRoot } = require(path.resolve(__dirname, '../../build-module/tools/probe-pulls.js'));
-const { jobLabels } = require('./job-labels');
+const SK = path.resolve(__dirname, '../../../.claude/skills');
+const { pulls, mmss, requireTsFromRoot } = require(path.join(SK, 'build-module/tools/probe-pulls.js'));
+const { jobLabels } = require(path.join(SK, 'refine-module/tools/job-labels.js'));
 
 const BOSS = 'The Omega Protocol';
 const [cmd, code, pullArg] = process.argv.slice(2);

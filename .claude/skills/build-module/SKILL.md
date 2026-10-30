@@ -99,8 +99,13 @@ For each mechanic in the model:
 - `window <pull> <from> <to> <ids>`: one moment in detail.
 - `hits`, `bursts`, `soakers`, `adds`, `after` when the shape calls for it.
 
-When the CLI can't answer, write a probe in the session scratchpad with
-the Write tool (the shell gate blocks heredoc and redirect writes):
+When the CLI can't answer, first check the fight's own tools:
+`python -I tools/docs.py tools <game>/<area>` (tools/ mirrors
+lib/mechanics; tools/README.md). A probe you'd run again goes there, in
+tools/<game>/<area>/ beside the module it serves, with its purpose and
+usage lines first, jobs not names, compact output (user, 2026-10-30). A
+true one-off can go in the session scratchpad. Write either with the
+Write tool (the shell gate blocks heredoc and redirect writes):
 
 ```js
 const { pulls, mmss } = require('<repo>/.claude/skills/build-module/tools/probe-pulls.js');

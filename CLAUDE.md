@@ -138,13 +138,20 @@ Standing preferences, each learned from a real correction.
 
 ## Quick facts
 
+- **Read docs and code through `python -I tools/docs.py`** (user,
+  2026-10-30): a module's DIGEST, one header section, a function, where a
+  rule id is emitted, filtered rulings, a PITFALLS section, the fight's
+  tools (`help` lists it). It prints only the block asked for; `check`
+  lists modules missing a DIGEST.
 - **Sample data:** `sampledata/` is gitignored. Fetch it with
   `node scripts/fetch-{ff,wow}-report.js <code-or-URL>`; setup is in
   docs/dev-tooling.md. `--meta-only` prints a report's title and fights
   without fetching pulls: identify the boss by fight name, not title.
 - **Per-boss pull view:** `.claude/skills/refine-module/tools/pull-errors.js`
-  (matches the app; `--jobs` prints jobs, not names); TOP probes in
-  `top-probes.js` beside it.
+  (matches the app; `--jobs` prints jobs, not names); fight probes in
+  `tools/<game>/<area>/` (list: `python -I tools/docs.py tools [area]`; check it
+  before writing a probe, and put one you'd reuse there, not in the scratchpad;
+  see tools/README.md).
 - **Validation:** before considering any mechanic change done, run
   `node scripts/validate.js --check` (compares mechanic output against
   local `expectations/` baselines and rulings) and `npx tsc --noEmit`.

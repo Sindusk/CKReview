@@ -3,6 +3,76 @@
 // Entry point: detectOmegaReconfiguredErrors. Self-gates on the transition's
 // first cast (31561) and runs to Phase 4's first cast (31559).
 //
+// ── DIGEST (read first; detail in the sections it names) ─────────────────
+// What: TOP P3 (~4:29-4:45 into the pull to +177.6s): transition (rings, arms,
+//   centre, Sniper shares), Hello World (4 Latent Defect cycles: towers, rots,
+//   defamation/stack, Remote/Local tethers, Patch), Critical Error (nothing
+//   detectable), Oversampled Wave Cannon monitors, Ion Efflux. Self-gates on
+//   cast 31561; ends at 31559. Owns all of P3; P2 and P4 are neighbours.
+// Rules (ruleId, severity: meaning; targeted = exposure when assigned):
+//   ffxiv-top3-avoidable   Major on death else Minor  rings, arms, centre
+//   ffxiv-top3-sniper      Major if a death follows, else Minor  at marker
+//     expiry: spread over 2+, shares together, unmarked player in no share
+//   ffxiv-top3-tower       Major, targeted (4 carriers/cycle)  empty tower,
+//     both carriers in one, tower taken without its rot
+//   ffxiv-top3-rot-pass    Major  missed/late hand-off behind an empty tower
+//     or uncleansed defect: the taker, or the holder if they moved > HOLDER_MOVED
+//   ffxiv-top3-stack       Major, targeted (Remote, cycles 1-3)  in no stack
+//   ffxiv-top3-defamation  Major if a death follows, else Minor  extra player
+//     in a defamation (extras/owner)
+//   ffxiv-top3-patch       Major (early break Minor if none died), targeted
+//     (4 tethered)  early/overlapping breaks, 4th-cycle Remote with Local
+//     pair, timeout with both alive
+//   ffxiv-top3-rot-clip    Major if victim died else Minor  rot explosion on
+//     someone else (new holder steps away; who is named depends on movement)
+//   ffxiv-top3-rot-contact Major  rot gained outside a hand-off (swap: both;
+//     else receiver or nearest holder, whoever walked further)
+//   ffxiv-top3-monitor     Major if a death follows, else Minor  picked twice,
+//     all alive: circle over two, or the unpicked living, else player-less
+//   ffxiv-top3-hello-world Raid  empty tower, uncleansed defect, timeout,
+//     missed requirement, early break or resolution killing 3+
+//   ffxiv-top3-transition  Raid  dead 3s after Hello World's cast, or killed
+//     by its raidwide
+//   ffxiv-top3-wall (Major) / -enrage / -called-wipe / -collapse  generic Raid,
+//     only before the mechanic Raid (collapse: 4 dead, pull over within 20s)
+// Cutoffs: only the earliest mechanic Raid is kept. Over 29 P3 wipes: uncleansed
+//   defect 10, empty tower 5, Patch overlap 5, collapse 3, resolution killed 3+
+//   2, enrage 2, Dead at Hello World 2. Raises date by Weakness (fru/common.ts
+//   raisedAt): a player raised just before Hello World but not yet acting
+//   reads dead at the duty handout (KCX2 Pull 38 SCH, cut at 5:11.1).
+// Key thresholds: HOLDER_MOVED 700 (7y): clean holders median 0.1y, p95 2.9y,
+//   max 5.3y of 176 hand-offs; failures DNC 9.9y (holder), DRK 2.0y / MNK
+//   0.4y (taker). CLIP_LOOKBACK_MS 5000, CLIP_RANGE/CONTACT_RANGE 8y. Clean
+//   hand-off 0.6-4.0s after resolution; LATE_PASS_MS 4600 (4.8/5.4/6.9s left
+//   a defect). Remote break clean 0.13-1.5s after the resolution Magic
+//   Vulnerability Up ends (0.09s early: five died); Local 1.8-3.5s after
+//   Remote (BREAK_GAP_MS 1000); cycle 4 Local first (REMOTE4_EARLY_MS 1000).
+//   Rot 27s, defect 10s, cycle ~21s. Monitors clean: all eight once.
+// Strategy/assumptions: NAUR; duty rotation Defamation+rot -> Remote ->
+//   Stack+rot -> Local, rot colour stays with the duty; owner hands its rot
+//   to the partner who shared its hit. User rule: the taker moves to the rot
+//   holder, the holder stays still. No Damage Down in P3.
+// Sections (Grep the heading text):
+//   "VERIFIED AGAINST LOGS (2026-10-14)"  reports, clock, ids, findings, VOD
+//   "RULES IMPLEMENTED"  rule list incl. not-built
+//   "GUIDE-DERIVED MODEL (2026-10-14)"  pre-log research (logs win)
+//   "SOURCES CHECKED 2026-10-14"  guides used
+//   "SHAPE AND CLOCK"  "TRANSITION: WAVE REPEATER / COLOSSAL BLOW / CENTER HAZARD"
+//   "TRANSITION: SNIPER / HIGH-POWERED SNIPER CANNON"
+//   "HELLO, WORLD: STATUS KEY AND ROTATING DUTIES"
+//   "HELLO WORLD: COLORED TOWERS AND ROT EXPIRY"
+//   "HELLO WORLD: DEFAMATION / STACK AND DEBUGGERS"
+//   "HELLO WORLD: REGRESSION / PATCH"  "CRITICAL ERROR"
+//   "OVERSAMPLED WAVE CANNON / MONITORS"  "STRATEGY AGREEMENT"
+//   "WHAT ENDS A PULL"  "OPEN QUESTIONS / SOURCE DISAGREEMENTS FOR LOG VERIFICATION"
+// Open items: the OPEN QUESTIONS list (11): Overflow Debugger consumption,
+//   Patch stack count, monitor targeting, hazard spell id; 9: settled (the
+//   GNB's own clip in KCX2 Pull 35, as detected); 10: arm deaths
+//   after a ring death unbuilt; 11: never-broken Remote tethers leave no one
+//   named. Not built: Critical Error, raw-damage deaths, which tether partner
+//   moved, monitor layout/facing.
+// ── END DIGEST ───────────────────────────────────────────────────────────
+//
 // -- VERIFIED AGAINST LOGS (2026-10-14) --
 // Four reports of one static (not the user's; no VOD; NAUR strats; omega.ts
 // group A's eight jobs: WAR MT, DRK OT, WHM H1, SCH H2, PCT R1, DNC R2, RDM
@@ -125,7 +195,7 @@
 //   at +3.0s, stood 0.1y from it until 1.5s before the expiry, then stepped
 //   to 4.9y and was still hit. MNK, DRK and SAM stayed put. "RDM and SCH
 //   made the mistakes here": the RDM and SCH clips are theirs; the GNB's is
-//   open (below). Neither Remote pair (GNB/RDM) nor Local broke before the
+//   its own too (follow-up: "should have been further north"). Neither Remote pair (GNB/RDM) nor Local broke before the
 //   deaths; the timeout came at 5:45.3 with three of the four dead.
 // - Transition (Pull 11): the MNK's 4:49 ring death confirmed ("going in far
 //   too early for the ring"; no uptime). The 5:01.9 arm deaths (SCH, DNC)
@@ -472,12 +542,9 @@
 //    not an eight-slot plan. Obtain actual slots, markers and chosen layout.
 // 8. Identify center-hazard spell/removal, status namespace and Damage
 //    Down on each avoidable, plus actor reuse/phase transition signals.
-// 9. (2026-10-30) KCX2 Pull 35 5:43.0: the GNB's clip by the DRK's blue is
-//    named on the GNB (new holder, DRK still), but the user named only the
-//    RDM and SCH. The GNB stood on the DRK until 1.5s before the expiry and
-//    reached 4.9y; no signal on disk separates it from the RDM (4.0y) and
-//    SCH (1.5y) without fitting to this pull. Ask: was the GNB's death the
-//    RDM's (e.g. its walk south collapsing the Remote tether)?
+// 9. SETTLED (user, 2026-10-30 follow-up) KCX2 Pull 35 5:43.0: the GNB's
+//    clip by the DRK's blue is the GNB's own ("The GNB should have been
+//    further north"), as detected; ruled.
 // 10. (2026-10-30) Arm deaths after a ring death (KCX2 Pull 11 5:01.9, SCH
 //    and DNC; the user: "Pull is a bit of a mess at this point, since the
 //    MNK is dead... mostly just progging"): still each a Major avoidable.

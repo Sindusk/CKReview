@@ -18,7 +18,7 @@ validation harness (`scripts/validate.js`, `expectations/`), see
   included; `--jobs` prints jobs instead of names; `--roster` prints only
   name -> job for the report, from disk, to map names in the user's VOD
   answers) and, for The Omega
-  Protocol, `top-probes.js fire-spots|blaster-trace`. Usage in each header.
+  Protocol, the probes in `tools/ffxiv/top/` (`python -I tools/docs.py tools ffxiv`). Usage in each header; layout in tools/README.md.
 - **Validation output:** `validate.js --check --diff-only` prints only the
   CHECK lines, diffs, ruling violations and the summary.
 - **Replay tools** (read-only, any saved replay): `replay-inventory.js`

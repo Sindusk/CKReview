@@ -2,6 +2,70 @@
 // Entry point: detectOmegaErrors. Self-gates on Program Loop and stops at
 // the first Phase 2 cast; the fallback model (fallback.ts MODULE_PHASES)
 // covers the later phases and stays out of P1.
+// ── DIGEST (read first; detail in the sections it names) ─────────────────
+// What: TOP Phase 1 (Program Loop, Pantokrator, final Diffuse/Wave Cannon
+//   volley), from combat start to the first P2 cast (Firewall ~+2:14). Self-
+//   gates on Program Loop; later phases belong to fallback.ts / omega-mf.ts.
+//   Owns every per-pull P1 rule. Cross-pull calls that need the whole report
+//   (learned conga, tower and tether priority, line "Didn't Cross") live in
+//   pantokrator-conga.ts, which rewrites this module's errors.
+// Rules (ruleId, severity: meaning):
+//   ffxiv-top1-avoidable     Major on Damage Down/death, else Minor  Flame
+//     Thrower, Ballistic Impact
+//   ffxiv-top1-tower         Raid + Major  In Line player with Looper in no
+//     tower / both in one ("Same Tower", conga keeps "Wrong Tower") / another
+//     number soaking early; "Tower Out of Turn" skips a covering player
+//   ffxiv-top1-blaster       Major on Doom/death, else Minor  Blaster clips,
+//     "Wrong Tether Spot", "Took Another's Tether", "Died From a Blaster Clip"
+//   ffxiv-top1-missile       Major on death, else Minor  missile hit others
+//     or carrier in a line; "Stood by a Missile" (stray, E14 1:33.2)
+//   ffxiv-top1-line          Major on death, else Minor  a member in no line,
+//     both marked in one line, "Didn't Cross", "Left the Group"; groups
+//     broken: Major + Raid; "Pantokrator One Short" Raid, player-less
+//   ffxiv-top1-diffuse       Major on death, else Minor  farthest non-tank
+//     hit, tank missed; "Tank Cones Without Invuln" (Raid if 3+ die next)
+//   ffxiv-top1-wave-cannon   line hit 2+ players, all six non-tanks alive
+//   ffxiv-top1-wall          Major  silent death nothing explains
+//   ffxiv-top1-enrage / -called-wipe / -collapse  Raid, earliest only, only
+//     before any mechanic Raid
+// Cutoffs: first Raid error. Collapse 4 dead + over within 20s; called wipe
+//   3+ silent deaths within 10-12s of end; enrage; empty tower (Obliteration).
+//   Reports A: 14 P1 clears have none; every wipe has a mechanic error first.
+//   3+ silent deaths before the first towers = reset, no errors (C20, B64).
+// Key thresholds: clock (+-0.5s): loop +0:15, towers +0:29.1/38.2/47.2/56.1,
+//   Pantokrator +1:09.3, sets +1:21.4/27.4/33.4/39.4, Diffuse +1:48.1 x5 2.1s
+//   apart. LATE_STEAL_MS 3000 (late take excused). HOLDER_SPOT_DEG 30 /
+//   WAITER_SPOT_DEG 20 off cardinal (clean holders 0-28). GROUP_TOGETHER 500.
+//   Clean Blaster: nobody within 16.3y; victims 1.6-22y, so radius cannot
+//   name them. Clean lines hit exactly three. Tether hand-offs pair by conga
+//   247/254. Learned tower priority (2026-10-30) fits E 129/129, B 200/201,
+//   C 152/152, D 156/156; holder priority B 170/175. Conga fits A 55/55.
+//   Stray missile: one other player, no carrier, in no line (E14, 1.0y from
+//   drop). One Short: dead at set 1-3 and a later set killed someone (at the
+//   fatal hit); dead before set 4 only if set 4 killed 2+ (E21 yes, D1 one
+//   killed no); dying AT set 4 is recoverable (E22, E39, E41, D1).
+// Strategy/assumptions: NAUR strats; conga H1 R1 M1 MT OT M2 R2 H2 (per
+//   report, learned over names); Pantokrator groups split by it; Diffuse
+//   taken by both tanks under invulns; Living Dead/Superbolide timing.
+// Sections (Grep the heading text):
+//   "VERIFIED AGAINST LOGS"  reports A-E, clocks, IDs, VOD findings
+//   "RULES IMPLEMENTED"  full rule conditions and user calls
+//   "GUIDE-DERIVED MODEL"  strategy-guide model
+//   "SOURCES CHECKED 2026-10-14"  guides consulted
+//   "SHAPE, CLOCK AND LOG VOCABULARY"  CB offsets
+//   "PROGRAM LOOP: TOWERS, TETHERS AND HP PENALTY"  loop model
+//   "PANTOKRATOR: ROTATING CONES AND BAITED PUDDLES"  cones, puddles
+//   "PANTOKRATOR: FOUR MISSILE / CONDENSED LINE SETS"  sets
+//   "DIFFUSE WAVE CANNON KYRIOS / WAVE CANNON KYRIOS"  final volley
+//   "STRATEGY VARIANCE AND AGREEMENT"  guide disagreements
+//   "WHAT ENDS A PULL"  end conditions
+//   "OPEN QUESTIONS / SOURCE DISAGREEMENTS FOR LOG VERIFICATION"  7 items
+// Open items: three-total vs three-other line split (Q1); Blaster visual vs
+//   31498 IDs; all-eight-unique tower spots; Doom/Ruin removal; cone
+//   reselect/angle; +127.7 vs +130 enrage. Not built: who stood where in a
+//   clip, merged line's group, tank invulns, healing deaths. Pull 14 1:18.9
+//   (B) unruled; A46/A55 lines unreviewed on VOD.
+// ── END DIGEST ───────────────────────────────────────────────────────────
 //
 // -- VERIFIED AGAINST LOGS (2026-10-14) --
 // One report, 111 pulls, 14 P1 clears, no full kill. Cited as A23 +0:38.2
@@ -689,7 +753,7 @@ function roundCardinals(players: PlayerInfo[], life: Life, rd: Round): { towers:
   return { towers, free: [0, 1, 2, 3].filter((c) => !towers.includes(c)) };
 }
 
-/** The four Program Loop rounds: two towers and two Blasters each, ~9s apart. Exported for the refine-module probes (top-probes.js). */
+/** The four Program Loop rounds: two towers and two Blasters each, ~9s apart. Exported for the TOP probes (tools/ffxiv/top/top-probes.js). */
 export function loopRounds(casts: EnemyEvent[], end: number): Round[] {
   return clusterByGap(castsOf(casts, [TOWER, OBLITERATION, BLASTER], end), (c) => c.timestamp, ROUND_GAP_MS)
     .slice(0, 4).map((g, i) => ({ r: i + 1, t: g[0].timestamp, casts: g }));

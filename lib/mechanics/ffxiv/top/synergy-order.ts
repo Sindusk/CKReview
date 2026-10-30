@@ -203,7 +203,7 @@ const OVERLAP_MOVED = 150;
 const OVERLAP_STILL = 100;
 
 // slotKey, expectedRows and eyeFrame are exported for the refine-module
-// probes (.claude/skills/refine-module/tools/top-probes.js fire-spots).
+// probes (tools/ffxiv/top/top-probes.js fire-spots).
 export const slotKey = (read: SynergyRead, rank: number) => `${read.remote ? "R" : "M"}${rank}`;
 
 /** The expected row (0 = early) of every pair member, by the order. */

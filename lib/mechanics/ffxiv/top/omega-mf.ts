@@ -3,6 +3,65 @@
 // the first Phase 3 cast. synergy-order.ts (cross-pull) narrows the glitch
 // pair errors to one partner.
 //
+// ── DIGEST (read first; detail in the sections it names) ─────────────────
+// What: TOP Phase 2 (Omega-M and Omega-F), from the Firewall cast to the
+//   first Phase 3 cast; self-gates on Firewall (no other fight casts it).
+//   Covers Solar Ray, Party Synergy (glitch pairs, clones, Optical Laser,
+//   Fire, Spotlight stacks) and Limitless Synergy (Bladedance, Arrow, Beyond
+//   Defense, Pile Pitch, meteors). Owns the per-pull reads; synergy-order.ts
+//   (cross-pull learned slots/rows) only narrows glitch/fire/stack errors to
+//   one partner. Firewall group swaps are not built.
+// Rules (ruleId, severity: meaning; exposure default = everyone unless noted):
+//   ffxiv-top2-avoidable      Major on death else Minor  laser, clones, Arrow,
+//     lone non-tank in a Bladedance cone (no Damage Down in P2)
+//   ffxiv-top2-solar-ray      both tanks  both Solar Rays on one tank
+//   ffxiv-top2-glitch         pair under glitch Vulnerability Up at the Fire
+//   ffxiv-top2-fire           players in a shared Fire (Fire Overlap)
+//   ffxiv-top2-stack          Spotlight: pair in one stack, both marks
+//     together, or a player in both/none
+//   ffxiv-top2-synergy        Raid  dead at the Fire; Fire killed 2+ or
+//     Spotlight 3+; clones killed 4+
+//   ffxiv-top2-bladedance     both tanks (Raid at 3+ non-tank deaths)
+//   ffxiv-top2-beyond-defense both tanks  jumped only non-tanks (Raid 3+ died)
+//   ffxiv-top2-pile-pitch     jumped player (Doom, Major); "Pile Pitch Not
+//     Shared" Major on death else Minor
+//   ffxiv-top2-wall           Major  silent death nothing explains
+//   ffxiv-top2-enrage / -called-wipe / -collapse  Raid, earliest only
+// Cutoffs (first Raid error): Party Synergy 3 deaths at Spotlight/clones, the
+//   Fire/laser killing 2 (FIRE_RAID_DEATHS, user 2026-10-30 report G Pull 10
+//   2:54.6: "the pull was over"; G Pulls 18, 26, 30, 39 same), Laser Shower
+//   enrage, called wipe (3 silent deaths in 10s / 12s of end), Bladedance 3+,
+//   Beyond Defense 3+, collapse (4 dead, pull over within 20s).
+// Key thresholds: vuln is read at the Fire CAST (snapshot): holding it at the
+//   cast = 73k+ Fire (lethal), not holding = 31k or less (all 4 reports; G10
+//   MNK/DNC died, G20 DRK/RDM took 20.7k/30.9k). Fire overlap (synergy-order):
+//   OVERLAP_MOVED 150 (moved 1.5y+ toward others) vs OVERLAP_STILL 100 (others
+//   under 1.0y) names the mover (F15, F18, F33, G8). Pile Pitch: target hit
+//   with at most 2 (PILE_ALONE_MAX) shared, all eight alive 0.5s before jump
+//   and Pile Pitch (E40; E31 raised tank = fallout). Clean Synergy pairs:
+//   131/131 split across the eye's line; slots ~10y apart, 11-19y off axis.
+// Strategy/assumptions: Firewall 4:4 fixed by player; conga order SGE RDM SAM
+//   GNB DRK MNK DNC SCH (user); Spotlight four per stack; one tank per
+//   Bladedance cone; one tank takes Beyond Defense; Pile Pitch targets one of
+//   the two closest, so the jumped player must leave the stack.
+// Sections (Grep the heading text):
+//   "VERIFIED AGAINST LOGS (2026-10-14)"  clock, log IDs, reports A-G findings
+//   "RULES IMPLEMENTED"  rule text and "Not built"
+//   "GUIDE-DERIVED MODEL (2026-10-14)" / "SOURCES CHECKED 2026-10-14"
+//   "SHAPE, ACTORS AND CLOCK" / "FIREWALL / PACKET FILTER"
+//   "SOLAR RAY AND TWO-BOSS AUTOATTACKS"
+//   "PARTY SYNERGY: CLONES AND GLITCH"
+//   "PARTY SYNERGY: OPTICAL LASER / FIRE / SPOTLIGHT"
+//   "LIMITLESS SYNERGY: ARROW AND BLADEDANCE"
+//   "LIMITLESS: BEYOND DEFENSE / PILE PITCH / METEORS"
+//   "STRATEGY AGREEMENT / WHAT ENDS A PULL"
+//   "OPEN QUESTIONS / SOURCE DISAGREEMENTS FOR LOG VERIFICATION"
+// Open items: which glitch partner was late (G10 MNK/DNC, G18) is not
+//   separable from the log, so both stay named; Firewall swaps, meteor/Cosmo
+//   Memory survival, B5/C27 mover, second Remote Glitch threshold (34 vs
+//   35y) unbuilt; open questions 1, 3-6 unresolved.
+// ── END DIGEST ───────────────────────────────────────────────────────────
+//
 // -- VERIFIED AGAINST LOGS (2026-10-14) --
 // Three reports of one static (not the user's; no VOD; NAUR strats; the
 // same eight jobs as omega.ts's group A: WAR MT, DRK OT, WHM H1, SCH H2, PCT

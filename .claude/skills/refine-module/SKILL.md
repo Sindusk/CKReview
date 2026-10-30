@@ -28,22 +28,33 @@ applies throughout:
 - commit and push without asking; never deploy;
 - no character names in code or docs: use jobs (`--jobs` on the tools).
 
-**Subagent types.** Analyst and implementers: the Agent tool with
-`subagent_type: refine-worker` (`.claude/agents/refine-worker.md`: Opus,
-only Read/Edit/Write/Bash/Grep/Glob and a short system prompt, so each
-agent starts far below a `general-purpose` agent's ~56k tokens of system
-prompt and tool definitions). Don't pass `model`: the per-call value
-overrides the agent file. Haiku (`Explore`) only for a lookup that needs
-more than one Grep across files nobody will edit. Never the Workflow tool
-unless the user asks for it.
+**Subagent types** (user, 2026-10-30). Both have only
+Read/Edit/Write/Bash/Grep/Glob and a short system prompt, so each starts
+far below a `general-purpose` agent's ~56k tokens:
+- **Analyst:** `subagent_type: refine-worker` (Opus, high effort).
+- **Implementers:** `subagent_type: refine-worker-light` (Sonnet), every
+  group, as a trial. Judge it at the end of the session: did each fix
+  match the user's answers on the first try (no send-back, no wrong
+  verdict in step 5.1)? Log the verdict with the cost. If a Sonnet fix is
+  wrong, the next session sends that kind of group to `refine-worker`.
 
-**What agents read** (the briefs say it; check yours do): each module
-header starts with a DIGEST (README "The DIGEST block"). Agents read the
-DIGEST, then only the header sections it names for their rules (Grep the
-heading, Read with offset/limit), never a whole file over ~40 KB;
-PITFALLS.md by its Index and the named sections only; and
-`expectations/rulings.json` (250 KB) only through a node one-liner that
-filters by report or boss, never whole.
+Don't pass `model`: the per-call value overrides the agent file. Haiku
+(`Explore`) only for a lookup that needs more than one Grep across files
+nobody will edit. Never the Workflow tool unless the user asks for it.
+
+**What agents read** (the briefs say it; check yours do): everything
+through `python -I tools/docs.py` (`help` lists it). It prints a module's
+DIGEST, one header section by heading, a function, where a rule id is
+emitted, filtered rulings, a PITFALLS section, and the fight's tools.
+Never a whole file over ~40 KB, never `expectations/rulings.json` whole.
+A module with no DIGEST gets one before its first refine (`docs.py
+check` lists them).
+
+**What agents run:** the fight's tools first (`docs.py tools
+<game>/<area>`; tools/ mirrors lib/mechanics, see tools/README.md). A
+probe worth running again goes into tools/, not the scratchpad (user,
+2026-10-30). Output is capped: probes and `validate.js` through `| head
+-c 3000`, `tsc` through `| head -20`.
 
 Brief templates: [briefs.md](briefs.md). Fill every `<…>`; a subagent
 knows only its brief.
@@ -127,26 +138,29 @@ Sort the encodable answers:
 Group the answers by the files the fix would touch. **Merge tiny groups**
 (one answer each) into one implementer when their files don't need
 separate review; every implementer pays its startup and its reading. One
-implementer per group; run them in parallel only when their files don't
-overlap, otherwise one after another. Send briefs.md's **Implementer**
-brief with the user's answers for that group **verbatim** (names mapped
-to jobs from `--roster`) and the matching evidence entries.
+implementer per group (`refine-worker-light`, Sonnet; see Subagent
+types). Send briefs.md's **Implementer** brief with the user's answers
+for that group **verbatim** (names mapped to jobs from `--roster`).
+**Brief by reference:** give the evidence file's path and the question
+numbers, not pasted evidence; the implementer reads them itself, and
+input costs less than the main thread writing it.
 
-- **Type:** `refine-worker` (Opus) by default.
-- **A/B trial, `refine-worker-light` (Sonnet):** a group of 1–2 answers
-  whose modules are small (header under ~15 KB, file under ~60 KB) goes
-  to `refine-worker-light`. Mark the group "(light)" when you list the
-  implementers. Judge the trial at the end of the session: did the light
-  implementers' fixes match the user's answers on the first try (no send
-  back, no wrong verdict in step 5.1)? Log the outcome with the cost
-  (below). Expectation: Sonnet costs the same per cache-read token as
-  Opus ($0.20/M) and half on input, output and cache writes, so a light
-  implementer should cost ~30–45% less if it doesn't need more turns. A
-  wrong fix costs more than that; drop the trial if one happens.
+**Waves, so each `--check` shows only its own diff** (2026-10-30: a
+shared-helper change running beside two module fixes made both explain
+diffs that weren't theirs and cost a send-back):
+- A fix that touches a shared helper (a `common.ts`, `player-position`,
+  `error-rules`, anything several modules import) runs **first and
+  alone**.
+- After each wave, review its summaries (step 5.1), run its scoped
+  `--check`, and `--update` those folders, so the next wave starts from
+  a clean baseline. Rulings still wait for step 5.3.
+- Within a wave, run implementers in parallel only when their files
+  don't overlap and none of them touches shared code.
 
 Implementers never edit `expectations/rulings.json`, never run
-`--update`, never commit. Each returns its diff summary (every `+ - ~`
-line explained) and the clean/failure threshold values it used.
+`--update`, never commit. Each returns briefs.md's short report: its
+diff summary (every `+ - ~` line explained), the thresholds it used, and
+the ruling pins as JSON lines.
 
 ## 5. Validate and record (main thread)
 
@@ -179,8 +193,10 @@ line explained) and the clean/failure threshold values it used.
 Reply with what changed per answer and which pulls' cutoffs moved. Then
 send a short numbered follow-up list in the same format, about the pulls
 in the same VOD where the new rules made a call the user hasn't seen yet
-(the implementers' summaries name them), again none after a pull's "pull
-is over" point. Stop when the user says to.
+(the implementers' summaries name them). Check each item against the
+evidence file's "pull is over" table before sending: on 2026-10-30 a
+follow-up about Pull 20 5:40 fell after that pull's 4:56 over point and
+the user dismissed it. Stop when the user says to.
 
 ## Cost
 
@@ -193,7 +209,7 @@ finds the session under `~/.claude/projects/`, dedupes by `message.id`
 and prints one row per agent (requests, tokens, first and average
 context, cost) plus the total, and Splitrail's figure once Splitrail has
 scanned the session. Append one line to [cost-log.md](cost-log.md):
-date, boss, questions asked, answers encoded, implementers (how many
-light), total cost, cost per answer, main/analyst/implementer split, and
-the light trial's verdict. Compare per answer with earlier lines before
+date, boss, questions asked, answers encoded, implementers (and
+send-backs), total cost, cost per answer, main/analyst/implementer split,
+and the Sonnet implementer trial's verdict. Compare per answer with earlier lines before
 changing this skill's procedure.

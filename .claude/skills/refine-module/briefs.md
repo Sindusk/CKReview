@@ -1,10 +1,12 @@
 # refine-module brief templates
 
 Copy a template into the Agent call's prompt and fill every `<…>`.
-- Analyst and Opus implementers: `subagent_type: refine-worker`.
-- Small implementer groups (1–2 answers, small modules; SKILL.md step 4's
-  A/B trial): `subagent_type: refine-worker-light`.
+- Analyst: `subagent_type: refine-worker` (Opus, high effort).
+- Implementers: `subagent_type: refine-worker-light` (Sonnet; SKILL.md's
+  Subagent types trial).
 - Don't pass `model`; the agent file sets it.
+- Keep the brief short: evidence goes by file path and question number,
+  never pasted.
 
 Paths are from the repo root (`<repo root>`: its absolute path);
 `<scratchpad>` is the session scratchpad's absolute path. Subagents' cwd
@@ -14,21 +16,24 @@ resets between commands, so give absolute paths.
 block verbatim.
 
 ```
-Reading rules (token budget; these files are large):
-- Module headers: read the DIGEST block at the top of each module first
-  (from "── DIGEST" to "── END DIGEST", usually the first ~80 lines). Then
-  read only the header sections the DIGEST names for the rules in your
-  task: Grep the quoted heading text with -n, then Read with offset/limit
-  around it. Never Read a file over ~40 KB whole (phase1.ts is 275 KB).
-- lib/mechanics/PITFALLS.md: Read its Index (the top), then only the
-  sections named in your task or that the Index points to for this
-  mechanic kind, by offset/limit.
-- lib/mechanics/README.md: only "## Attribution philosophy" (and severity
-  definitions), by offset/limit.
-- expectations/rulings.json (250 KB): never Read it. Filter with node,
-  e.g. node -e "const {rulings}=require('<repo root>/expectations/rulings.json');
-  console.log(JSON.stringify(rulings.filter(x=>x.boss==='<fight>'
-  || x.report==='<code>'),null,1))"
+Reading and output rules (every output stays in your context, so each
+token you pull in is paid for again on every later request):
+- Read through python -I tools/docs.py (run from <repo root>):
+    digest <module>                    the module's DIGEST: read it first
+    <module> "<heading>" [--grep re]   one header section the DIGEST names
+    fn <module> <name>                 one function / const, whole
+    rule <ruleId>                      where a rule is emitted + header lines
+    rulings --report <code> [--pull N] [--rule <prefix>]   filtered rulings
+    pitfalls / pitfalls "<heading>" / pitfalls --grep <re>
+    <README.md> "Attribution philosophy"
+    tools <game>/<area>                the fight's existing probes
+  Read a file directly only by offset/limit to place an Edit. Never a file
+  over ~40 KB whole, never expectations/rulings.json, never the same
+  range twice.
+- Cap output: probes and validate.js | head -c 3000 (or a tool's summary
+  mode); npx tsc --noEmit 2>&1 | head -20; one line per pull or player.
+- A probe you'd run again goes in tools/<game>/<area>/ (tools/README.md),
+  not the scratchpad; check docs.py tools first.
 ```
 
 ## Analyst
@@ -75,9 +80,9 @@ Then:
 5. Probes, before asking anything the log could settle:
    scripts/analyze-report.js (timeline, window, resolutions, nokb, sweep),
    .claude/skills/build-module/tools/probe-pulls.js from a probe in
-   <scratchpad>, and for The Omega Protocol
-   .claude/skills/refine-module/tools/top-probes.js (fire-spots,
-   blaster-trace). Print jobs, never names.
+   <scratchpad> (only after `python -I tools/docs.py tools <area>` shows
+   no tool for it; a probe you'd reuse goes in tools/, see tools/README.md),
+   and for The Omega Protocol tools/ffxiv/top/*.js. Print jobs, never names.
 
 Look for the calls the module isn't sure of, before each pull's "pull is
 over" point:
@@ -106,7 +111,11 @@ Return (your final message, nothing else):
     the log shows, and the candidate signals with their values for each
     job involved (positions, distances, timings, aura windows), plus the
     clean range of each signal across the report. Compact: tables or one
-    line per job, no tool dumps.
+    line per job, no tool dumps. Give each question its own "## Q<n>"
+    heading so implementers can read one with
+    python -I tools/docs.py <evidence path> "Q<n>".
+Keep (i) and the rest of your final message under ~6000 characters; the
+detail belongs in the evidence file.
 
 Budget: about 120 tool calls. If you reach it, stop and return
 "OVER BUDGET" with what you've finished, the list so far, and what's
@@ -132,17 +141,17 @@ pull-errors.js --roster): <job map lines relevant to these answers, e.g.
 The user's VOD answers for this group, verbatim (names replaced by jobs):
 <answers>
 
-The analyst's evidence for these questions (<evidence file path>):
-<the matching entries>
+The analyst's evidence: <evidence file path>, questions <Q numbers>
+(read each with python -I tools/docs.py <evidence file path> "Q<n>", and
+its "Pull is over" table the same way).
 
 <reading rules>
 
 Read first:
-1. The DIGEST of each module you'll edit, then the header sections it
-   names for the rules above (Grep the heading, Read offset/limit), and
-   the code of those rules (Grep the rule id).
-2. PITFALLS.md: the Index, then <the named sections for this mechanic>.
-3. README.md's attribution philosophy.
+1. docs.py digest of each module you'll edit, then the sections it names
+   for the rules above, and those rules' code (docs.py rule / fn).
+2. docs.py pitfalls, then <the named sections for this mechanic>.
+3. README.md "Attribution philosophy".
 
 For each answer:
 - Wrong player or severity: find a log signal that separates the user's
@@ -161,17 +170,22 @@ For each answer:
   VERIFIED for new log facts, and the DIGEST (rule lines, thresholds,
   open items, section names) so it stays true.
 
-Check with, and only with:
-node scripts/validate.js --check <mechanic(s)> <folders> --diff-only
+Check with, and only with (the baseline is current: every diff is yours):
+node scripts/validate.js --check <mechanic(s)> <folders> --diff-only | head -c 3000
 node .claude/skills/refine-module/tools/pull-errors.js <game> <code> "<fight>" --pulls <list> --jobs
-npx tsc --noEmit
+npx tsc --noEmit 2>&1 | head -20
 
-Return (your final message): the files changed; the diff summary, each
-+ - ~ line with its pull, MM:SS and why it changed (intended, or not and
-what you did); the threshold values used with their clean and failure
-extremes; pulls in the VOD where the change makes a call the user hasn't
-seen yet; anything left unsettled.
+Return (your final message, under ~2500 characters, in this shape):
+FILES: <paths>
+DIFF: one line per + - ~ entry: report, Pull X MM:SS, job, rule, why
+  (intended / not, and what you did)
+THRESHOLDS: name = value; clean extreme; failure extreme
+NEW CALLS: VOD pulls where the change makes a call the user hasn't seen
+PINS: one JSON line per confirmed call, ready to paste into a ruling's
+  mustFlag / mustNotFlag ({"ruleId": ..., "player": "<JOB>"}), with the
+  pull
+UNSETTLED: one line each
 
-Budget: about <80> tool calls (<40> for a light group). If you reach it,
-stop and return "OVER BUDGET" with what's done and what's left.
+Budget: about <60> tool calls. If you reach it, stop and return
+"OVER BUDGET" with what's done and what's left.
 ```
