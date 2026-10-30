@@ -16,6 +16,7 @@ type HeaderProps = {
   onManageStatics:      () => void;
   onLogin:              () => void;
   onLogout:             () => void;
+  onAccount:            () => void;
   currentUser:          { username: string; role: string } | null;
   hasActiveSession:     boolean;
 };
@@ -29,6 +30,7 @@ export default function Header({
   onManageStatics,
   onLogin,
   onLogout,
+  onAccount,
   currentUser,
   hasActiveSession,
 }: HeaderProps) {
@@ -63,6 +65,7 @@ export default function Header({
           onManageStatics={onManageStatics}
           onLogin={onLogin}
           onLogout={onLogout}
+          onAccount={onAccount}
           currentUser={currentUser}
           hasActiveSession={hasActiveSession}
         />

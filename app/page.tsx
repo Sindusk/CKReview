@@ -6,7 +6,8 @@ import AddVodDialog, { type AddVodSource } from "../components/AddVodDialog";
 import UsageNoticeDialog, { hasAcceptedUsageNotice } from "@/components/UsageNoticeDialog";
 import SessionFoundDialog from "@/components/SessionFoundDialog";
 import SampleDataFoundDialog from "@/components/SampleDataFoundDialog";
-import LoginDialog from "@/components/LoginDialog";
+import LoginDialog, { AUTH_MESSAGES } from "@/components/LoginDialog";
+import AccountDialog from "@/components/AccountDialog";
 import LogApiSetupDialog, { type LogProvider } from "@/components/LogApiSetupDialog";
 import AddReviewToStaticDialog from "@/components/AddReviewToStaticDialog";
 import ManageStaticsDialog from "@/components/ManageStaticsDialog";
@@ -317,10 +318,32 @@ export default function Home() {
   const [showAddReviewToStaticDialog, setShowAddReviewToStaticDialog] = useState(false);
   const [showManageStaticsDialog, setShowManageStaticsDialog] = useState(false);
 
+  const [showAccountDialog, setShowAccountDialog] = useState(false);
+  const [googleEnabled, setGoogleEnabled] = useState(false);
+  const [authNotice, setAuthNotice] = useState<{ text: string; error: boolean } | null>(null);
+
   useEffect(() => {
+    // A Google round trip comes back with ?auth=<code> (lib/google-auth.ts):
+    // drop it from the address bar, then show its message in whichever
+    // dialog fits — Sign-in methods when logged in, Log In otherwise.
+    const url = new URL(window.location.href);
+    const authCode = url.searchParams.get("auth");
+    if (authCode) {
+      url.searchParams.delete("auth");
+      window.history.replaceState(null, "", url.toString());
+    }
+
     fetch("/api/auth/me")
       .then(res => res.json())
-      .then(data => setCurrentUser(data.user))
+      .then(data => {
+        setCurrentUser(data.user);
+        setGoogleEnabled(Boolean(data.googleEnabled));
+        const notice = authCode ? AUTH_MESSAGES[authCode] : null;
+        if (!notice) return;
+        setAuthNotice(notice);
+        if (data.user) setShowAccountDialog(true);
+        else setShowLoginDialog(true);
+      })
       .catch(() => setCurrentUser(null));
   }, []);
 
@@ -1461,6 +1484,7 @@ export default function Home() {
         onManageStatics={() => setShowManageStaticsDialog(true)}
         onLogin={() => setShowLoginDialog(true)}
         onLogout={handleLogout}
+        onAccount={() => setShowAccountDialog(true)}
         currentUser={currentUser}
         hasActiveSession={sessionId != null}
       />
@@ -1696,8 +1720,16 @@ export default function Home() {
 
       <LoginDialog
         open={showLoginDialog}
-        onClose={() => setShowLoginDialog(false)}
+        onClose={() => { setShowLoginDialog(false); setAuthNotice(null); }}
         onLoggedIn={setCurrentUser}
+        googleEnabled={googleEnabled}
+        notice={authNotice}
+      />
+
+      <AccountDialog
+        open={showAccountDialog}
+        onClose={() => { setShowAccountDialog(false); setAuthNotice(null); }}
+        notice={authNotice}
       />
 
       <LogApiSetupDialog

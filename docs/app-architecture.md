@@ -163,10 +163,26 @@ file's header comment. Mechanic detection has its own guide:
   - `reportStartedAt` (the date the log was recorded) can only be captured
     client-side, so older reviews show "—" until they are resynced.
   - Sessions are ordered by `addedAt`.
-- **Auth** (`lib/auth.ts`, `lib/usersDb.ts`): a username plus a 4-digit PIN.
-  It shares an `app_user`/`session` users database and the `ck_session`
-  cookie with a sibling app. Every statics route checks the logged-in user
-  (401) and static membership (403).
+- **Auth** (`lib/auth.ts`, `lib/usersDb.ts`): one account across every
+  consistencykings.com app. They share the `app_user`/`session` users
+  database and the parent-domain `ck_session` cookie, so data keyed by
+  `app_user.id` (statics here, the portfolio in Stonks) follows the account.
+  Every statics route checks the logged-in user (401) and static membership
+  (403). Two ways in:
+  - **Username + 4-digit PIN.** Signup (`/api/auth/signup`) is separate
+    from login, and PIN attempts are throttled (`lib/login-throttle.ts`).
+    Both are ported from Stonks.
+  - **Google** (`lib/google-auth.ts`). This app hosts Google sign-in for
+    every app on the domain: the others link to
+    `/api/auth/google?return_to=<their page>`. While logged in, the same
+    route *links* Google to the account, which is how a PIN account moves
+    to Google and keeps its data. Account → Sign-in methods
+    (`components/AccountDialog.tsx`) links or unlinks Google and turns the
+    PIN off (only with Google linked) or back on.
+  - Env: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`
+    (registered on the Google client). Behind nginx, add
+    `proxy_set_header X-Real-IP $remote_addr;` so the throttle can count
+    per address.
 
 ## Import conveniences
 

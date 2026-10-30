@@ -13,6 +13,7 @@ export type BurgerMenuProps = {
   onManageStatics:     () => void;
   onLogin:              () => void;
   onLogout:             () => void;
+  onAccount:            () => void;
   currentUser:          { username: string; role: string } | null;
   hasActiveSession:     boolean;
 };
@@ -102,6 +103,7 @@ export default function BurgerMenu({
   onManageStatics,
   onLogin,
   onLogout,
+  onAccount,
   currentUser,
   hasActiveSession,
 }: BurgerMenuProps) {
@@ -167,6 +169,11 @@ export default function BurgerMenu({
   function handleLogout() {
     setOpen(false);
     onLogout();
+  }
+
+  function handleAccount() {
+    setOpen(false);
+    onAccount();
   }
 
   return (
@@ -318,6 +325,12 @@ export default function BurgerMenu({
                 label={currentUser.username}
                 sublabel={currentUser.role}
                 disabled
+              />
+              <MenuItem
+                icon="🔐"
+                label="Sign-in methods"
+                sublabel="Google, PIN"
+                onClick={handleAccount}
               />
               <MenuItem
                 icon="🚪"

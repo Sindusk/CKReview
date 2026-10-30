@@ -11,10 +11,15 @@
 // Security is deliberately light — a 4-digit PIN for a small trusted
 // group — but the PIN is still scrypt-hashed and sessions are random
 // opaque tokens, so nothing sensitive sits in the database in plaintext.
+// PIN attempts are throttled (lib/login-throttle.ts). Google sign-in
+// (lib/google-auth.ts) issues the same sessions; once Google is linked an
+// account may turn its PIN off (pin_hash NULL, app/api/auth/pin).
 
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 import { usersPool, ensureUsersSchemaOnce } from "./usersDb";
+import { USERNAME_MAX_LENGTH } from "./usernames";
 
 const SCRYPT_KEYLEN = 32;
 
@@ -39,7 +44,10 @@ export async function hashPin(pin: string): Promise<string> {
   return `${salt}:${key.toString("hex")}`;
 }
 
-export async function verifyPin(pin: string, pinHash: string): Promise<boolean> {
+// A null hash is an account with no PIN (Google-only, or PIN turned off):
+// no PIN matches it.
+export async function verifyPin(pin: string, pinHash: string | null): Promise<boolean> {
+  if (!pinHash) return false;
   const [salt, keyHex] = pinHash.split(":");
   if (!salt || !keyHex) return false;
   const key = await scryptAsync(pin, salt);
@@ -71,6 +79,27 @@ export async function deleteSession(token: string | null): Promise<void> {
 }
 
 export const SESSION_COOKIE = "ck_session";
+
+// ── PIN login / signup request checks (same rules and wording as Stonks) ──
+
+// Identical for an unknown username and a wrong PIN, so login can't be used
+// to enumerate accounts across every app on the domain.
+export const LOGIN_REJECTION = "Incorrect username or PIN";
+
+export function credentialProblem(username: string, pin: string): string | null {
+  if (!username || username.length > USERNAME_MAX_LENGTH) {
+    return `Username must be 1-${USERNAME_MAX_LENGTH} characters`;
+  }
+  if (!/^\d{4}$/.test(pin)) return "PIN must be exactly 4 digits";
+  return null;
+}
+
+export function throttledResponse(retryAfterSeconds: number): NextResponse {
+  return NextResponse.json(
+    { error: `Too many attempts. Try again in ${retryAfterSeconds} seconds.` },
+    { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } },
+  );
+}
 
 // In production the cookie is set on the parent domain so the same login is
 // visible to every consistencykings.com subdomain app. Locally COOKIE_DOMAIN

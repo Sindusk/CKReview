@@ -5,8 +5,10 @@
 // app so one account/session works across all of them. Deliberately plain
 // `pg` (no Prisma): no single app should own migrations for a shared
 // schema, so the tables are created idempotently on first use instead.
-// Ported from Stonks' lib/usersDb.js — keep the SQL identical if this file
-// is ever copied to another consistencykings.com app.
+// Ported from Stonks' lib/usersDb.js. This copy is ahead of Stonks': it adds
+// the Google sign-in schema (nullable pin_hash, auth_identity), because this
+// app hosts Google sign-in for every consistencykings.com app. Copy this
+// version, not Stonks', into any new app.
 
 import pg from "pg";
 
@@ -46,6 +48,26 @@ export function ensureUsersSchemaOnce(): Promise<void> {
       EXCEPTION
           WHEN duplicate_object THEN NULL;
       END $$;
+
+      -- Google sign-in (lib/google-auth.ts). A Google-only account has no
+      -- PIN, and an account may turn its PIN off once Google is linked, so
+      -- pin_hash is nullable. Stonks' copy of this file still says NOT NULL
+      -- in its CREATE TABLE, which is harmless: the table already exists.
+      ALTER TABLE app_user ALTER COLUMN pin_hash DROP NOT NULL;
+
+      -- One row per external sign-in linked to an account. provider_user_id
+      -- is the provider's stable id (Google's "sub"), never the email, which
+      -- can change. Provider-agnostic so Steam can join later.
+      CREATE TABLE IF NOT EXISTS auth_identity (
+          id               SERIAL PRIMARY KEY,
+          user_id          INTEGER NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+          provider         TEXT NOT NULL,
+          provider_user_id TEXT NOT NULL,
+          email            TEXT,
+          created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+          UNIQUE (provider, provider_user_id),
+          UNIQUE (user_id, provider)
+      );
     `).then(() => undefined);
   }
   return schemaReady;
