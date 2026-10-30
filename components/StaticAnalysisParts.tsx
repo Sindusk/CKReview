@@ -8,7 +8,7 @@
 // of /api/statics/[staticId]/analysis/*. Counting rules live in
 // lib/static-analysis.ts; docs/archive/static-player-analysis-plan.md has the why.
 
-import type { CSSProperties, ReactNode } from "react";
+import { useId, type CSSProperties, type ReactNode } from "react";
 import type { AnalysisPhase, AnalysisSession, MechanicStats } from "@/lib/static-analysis";
 import { SEVERITY_COLOR } from "@/components/SeverityIcon";
 
@@ -246,7 +246,14 @@ function RateBar({ pct }: { pct: number | null }) {
   );
 }
 
-/** Per-session rate, oldest to newest; sessions without chances are skipped. */
+/** Session dot color by raw failure count: the goal is zero, so 0 green, 1 yellow, 2+ red. */
+function failColor(failed: number): string {
+  return failed === 0 ? "#4caf50" : failed === 1 ? "#e6c229" : "#e05252";
+}
+
+/** Per-session rate, oldest to newest; sessions without chances are skipped.
+ *  Dots are colored by that session's failure count, and each segment fades
+ *  between its two dots' colors. */
 export function Sparkline({
   points,
   sessions,
@@ -258,6 +265,7 @@ export function Sparkline({
   width?:   number;
   height?:  number;
 }) {
+  const gid = useId().replace(/:/g, "");
   const indexOf = new Map(sessions.map((s, i) => [s.id, i + 1]));
   const usable = points.filter((p) => p.chances > 0);
   if (usable.length < 2) return <span style={{ color: "var(--ck-text-3)", fontSize: "11px" }}>—</span>;
@@ -269,8 +277,18 @@ export function Sparkline({
     <svg width={width} height={height} style={{ display: "block" }} aria-label="Rate per session">
       <title>{title}</title>
       <line x1={pad} x2={width - pad} y1={height - pad} y2={height - pad} stroke="var(--ck-line-2)" strokeWidth={1} />
-      <polyline points={xs.map((x, i) => `${x},${ys[i]}`).join(" ")} fill="none" stroke="var(--ck-arcane)" strokeWidth={1.5} />
-      {xs.map((x, i) => <circle key={i} cx={x} cy={ys[i]} r={1.8} fill="var(--ck-arcane-text)" />)}
+      <defs>
+        {xs.slice(1).map((x, i) => (
+          <linearGradient key={i} id={`${gid}-${i}`} gradientUnits="userSpaceOnUse" x1={xs[i]} y1={0} x2={x} y2={0}>
+            <stop offset="0" stopColor={failColor(usable[i]!.failed)} />
+            <stop offset="1" stopColor={failColor(usable[i + 1]!.failed)} />
+          </linearGradient>
+        ))}
+      </defs>
+      {xs.slice(1).map((x, i) => (
+        <line key={i} x1={xs[i]} y1={ys[i]} x2={x} y2={ys[i + 1]} stroke={`url(#${gid}-${i})`} strokeWidth={1.5} strokeLinecap="round" />
+      ))}
+      {xs.map((x, i) => <circle key={i} cx={x} cy={ys[i]} r={1.8} fill={failColor(usable[i]!.failed)} />)}
     </svg>
   );
 }
