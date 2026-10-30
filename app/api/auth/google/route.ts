@@ -1,16 +1,20 @@
 // app/api/auth/google/route.ts
 //
-// Starts Google sign-in (or linking, when already logged in) for any
-// consistencykings.com app: GET ?return_to=<page>. See lib/google-auth.ts.
+// Starts Google sign-in or linking for any consistencykings.com app:
+// GET ?intent=login|link&return_to=<page>. Linking needs a logged-in
+// session and is bound to it (linkIntent). See lib/google-auth.ts.
 
 import { NextRequest, NextResponse } from "next/server";
 import { generateCodeVerifier, generateState } from "arctic";
+import { SESSION_COOKIE, getCurrentUser } from "@/lib/auth";
 import {
+  OAUTH_INTENT_COOKIE,
   OAUTH_RETURN_COOKIE,
   OAUTH_STATE_COOKIE,
   OAUTH_VERIFIER_COOKIE,
   googleClient,
   googleConfigured,
+  linkIntent,
   oauthCookieOptions,
   safeReturnTo,
   withAuthOutcome,
@@ -25,6 +29,15 @@ export async function GET(req: NextRequest) {
 
   const returnTo = safeReturnTo(req.nextUrl.searchParams.get("return_to"));
 
+  let intent = "login";
+  if (req.nextUrl.searchParams.get("intent") === "link") {
+    const token = req.cookies.get(SESSION_COOKIE)?.value;
+    if (!token || !(await getCurrentUser())) {
+      return NextResponse.redirect(withAuthOutcome(returnTo, "google-login-required"));
+    }
+    intent = linkIntent(token);
+  }
+
   let url: URL;
   const state = generateState();
   const verifier = generateCodeVerifier();
@@ -34,7 +47,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(withAuthOutcome(returnTo, "google-error"));
   }
   // Always show the account chooser, so someone signed in to several
-  // Google accounts can pick which one to link.
+  // Google accounts can pick which one to use.
   url.searchParams.set("prompt", "select_account");
 
   const response = NextResponse.redirect(url);
@@ -42,5 +55,6 @@ export async function GET(req: NextRequest) {
   response.cookies.set(OAUTH_STATE_COOKIE, state, opts);
   response.cookies.set(OAUTH_VERIFIER_COOKIE, verifier, opts);
   response.cookies.set(OAUTH_RETURN_COOKIE, returnTo, opts);
+  response.cookies.set(OAUTH_INTENT_COOKIE, intent, opts);
   return response;
 }

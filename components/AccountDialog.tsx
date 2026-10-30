@@ -105,7 +105,7 @@ export default function AccountDialog({ open, onClose, notice }: AccountDialogPr
               <span className="ck-dialog-text">{account.googleEmail ?? "Not linked"}</span>
               {account.googleEmail == null ? (
                 googleEnabled && (
-                  <a className="ck-btn ck-btn--sm ck-btn--primary" href={googleStartUrl()} style={{ textDecoration: "none" }}>
+                  <a className="ck-btn ck-btn--sm ck-btn--primary" href={googleStartUrl("link")} style={{ textDecoration: "none" }}>
                     Link Google
                   </a>
                 )

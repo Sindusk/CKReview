@@ -16,6 +16,32 @@ export const usersPool = new pg.Pool({
   connectionString: process.env.USERS_DATABASE_URL,
 });
 
+/**
+ * Runs `fn` in a transaction holding a row lock on the account, and passes
+ * it the account's pin_hash. Every change that removes a sign-in method
+ * (PIN off, Google unlink) goes through this, so two of them can't each
+ * check that the other method still exists and then both succeed, leaving
+ * the account with no way in. `fn` throwing rolls everything back.
+ */
+export async function withAccountLocked<T>(
+  userId: number,
+  fn: (client: pg.PoolClient, pinHash: string | null) => Promise<T>,
+): Promise<T> {
+  const client = await usersPool.connect();
+  try {
+    await client.query("BEGIN");
+    const row = await client.query("SELECT pin_hash FROM app_user WHERE id = $1 FOR UPDATE", [userId]);
+    const result = await fn(client, row.rows[0]?.pin_hash ?? null);
+    await client.query("COMMIT");
+    return result;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 let schemaReady: Promise<void> | null = null;
 
 // Next.js route handlers have no single "startup" hook the way an Express

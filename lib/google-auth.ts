@@ -9,16 +9,18 @@
 // redirect URI serve them all.
 //
 // Flow (app/api/auth/google/route.ts → Google → .../callback/route.ts):
-//   - Start: random state + PKCE verifier in short-lived host-only cookies,
-//     then a redirect to Google asking only for openid/email/profile.
-//   - Callback, already logged in: the Google account is *linked* to the
-//     current account. This is how an existing PIN account moves to Google
-//     with its statics and Stonks portfolio intact — app_user.id doesn't
-//     change, and every app keys its data by that id.
-//   - Callback, logged out: a linked Google account signs in to its
+//   - Start, `?intent=login|link`: random state + PKCE verifier + the
+//     intent (OAUTH_INTENT_COOKIE, bound to the session for a link) in
+//     short-lived host-only cookies, then a redirect to Google asking only
+//     for openid/email/profile.
+//   - Callback, intent "link": the Google account is *linked* to the
+//     account that started it. This is how an existing PIN account moves
+//     to Google with its statics and Stonks portfolio intact —
+//     app_user.id doesn't change, and every app keys its data by that id.
+//   - Callback, intent "login": a linked Google account signs in to its
 //     account; an unknown one creates a new PIN-less account named after
 //     the email (a second account if that person already had a PIN one —
-//     the dialog tells them to log in and link instead).
+//     the dialog tells them to log in and link instead). Never links.
 //   - Outcome goes back to return_to as `?auth=<code>`; the page turns the
 //     code into a message (see AUTH_MESSAGES in components/LoginDialog.tsx).
 //
@@ -30,6 +32,7 @@
 // app's public origin, since behind nginx the request's own Host is
 // 127.0.0.1). The redirect URI must be registered on the Google client.
 
+import crypto from "node:crypto";
 import { Google } from "arctic";
 import { usersPool } from "./usersDb";
 import { usernameBaseFromEmail, validateNewUsername } from "./usernames";
@@ -62,6 +65,23 @@ export function appOrigin(): string {
 export const OAUTH_STATE_COOKIE    = "ck_oauth_state";
 export const OAUTH_VERIFIER_COOKIE = "ck_oauth_verifier";
 export const OAUTH_RETURN_COOKIE   = "ck_oauth_return";
+export const OAUTH_INTENT_COOKIE   = "ck_oauth_intent";
+
+/**
+ * What a round trip was started for, fixed at the start (Sol review,
+ * 2026-10-29). "login" never links, whoever is logged in when Google
+ * returns. "link" is only offered while logged in, and records a hash of
+ * that session's token: the callback links only if the same session is
+ * still the one logged in, so a session swapped in mid-flight (by login
+ * CSRF, say) can't receive the visitor's Google account.
+ */
+export function linkIntent(sessionToken: string): string {
+  return `link:${sessionFingerprint(sessionToken)}`;
+}
+
+export function sessionFingerprint(sessionToken: string): string {
+  return crypto.createHash("sha256").update(sessionToken).digest("hex");
+}
 
 export function oauthCookieOptions(maxAgeSeconds: number) {
   return {

@@ -12,6 +12,7 @@ import {
   SESSION_MAX_AGE_SECONDS,
   createSession,
   credentialProblem,
+  rejectCrossSite,
   sessionCookieOptions,
   throttledResponse,
   verifyPin,
@@ -20,6 +21,8 @@ import { loginThrottle, requestSource } from "@/lib/login-throttle";
 import { normalizeUsername } from "@/lib/usernames";
 
 export async function POST(req: NextRequest) {
+  const crossSite = rejectCrossSite(req);
+  if (crossSite) return crossSite;
   await ensureUsersSchemaOnce();
 
   const body = await req.json().catch(() => null);
@@ -29,8 +32,8 @@ export async function POST(req: NextRequest) {
   const problem = credentialProblem(username, pin);
   if (problem) return NextResponse.json({ error: problem }, { status: 400 });
 
-  const source = requestSource(req);
-  const verdict = loginThrottle.check({ username, source });
+  // Counted before any await — see beginAttempt in lib/login-throttle.ts.
+  const verdict = loginThrottle.beginAttempt({ username, source: requestSource(req) });
   if ("retryAfterSeconds" in verdict) return throttledResponse(verdict.retryAfterSeconds);
 
   const existing = await usersPool.query(
@@ -39,7 +42,6 @@ export async function POST(req: NextRequest) {
   );
   const row = existing.rows[0];
   if (!row || !(await verifyPin(pin, row.pin_hash))) {
-    loginThrottle.recordFailure({ username, source });
     return NextResponse.json({ error: LOGIN_REJECTION }, { status: 401 });
   }
   loginThrottle.recordSuccess({ username });

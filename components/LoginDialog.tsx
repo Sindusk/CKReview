@@ -29,13 +29,19 @@ export const AUTH_MESSAGES: Record<string, { text: string; error: boolean } | nu
   "google-unverified":   { error: true,  text: "That Google account's email address isn't verified." },
   "google-in-use":       { error: true,  text: "That Google account is already linked to a different account." },
   "google-other-linked": { error: true,  text: "This account already has a different Google account linked. Unlink it first." },
+  "google-link-mismatch":  { error: true, text: "You were logged out or switched accounts while linking Google, so nothing was linked. Log in and try again." },
+  "google-login-required": { error: true, text: "Log in before linking a Google account." },
 };
 
-/** Where a Google button sends the browser: back to this page afterwards. */
-export function googleStartUrl(): string {
+/**
+ * Where a Google button sends the browser, coming back to this page.
+ * "login" signs in (or creates an account); "link" adds Google to the
+ * logged-in account and is the only way linking happens.
+ */
+export function googleStartUrl(intent: "login" | "link"): string {
   const back = new URL(window.location.href);
   back.searchParams.delete("auth");
-  return `/api/auth/google?return_to=${encodeURIComponent(back.toString())}`;
+  return `/api/auth/google?intent=${intent}&return_to=${encodeURIComponent(back.toString())}`;
 }
 
 type LoginDialogProps = {
@@ -122,7 +128,7 @@ export default function LoginDialog({ open, onClose, onLoggedIn, googleEnabled, 
         <div style={{ marginBottom: "14px" }}>
           <a
             className="ck-btn ck-btn--md ck-btn--primary"
-            href={googleStartUrl()}
+            href={googleStartUrl("login")}
             style={{ display: "block", textAlign: "center", textDecoration: "none" }}
           >
             Sign in with Google

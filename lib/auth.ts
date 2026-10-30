@@ -94,6 +94,34 @@ export function credentialProblem(username: string, pin: string): string | null 
   return null;
 }
 
+/**
+ * Refuses a state-changing auth request that didn't come from this app's
+ * own pages: it must be JSON (an HTML form on another site can't send
+ * that without a CORS preflight, which this app never grants) and, when
+ * the browser sends Origin, from this same host. Login and signup need this
+ * because they work without a session — otherwise another site could log
+ * a visitor into an account of its choosing (login CSRF), and a later
+ * Google sign-in could attach the visitor's Google to it. Returns the
+ * response to send, or null to carry on.
+ */
+export function rejectCrossSite(req: Request): NextResponse | null {
+  const contentType = req.headers.get("content-type") ?? "";
+  const origin = req.headers.get("origin");
+  const host = req.headers.get("host");
+  let sameOrigin = true;
+  if (origin) {
+    try {
+      sameOrigin = new URL(origin).host === host;
+    } catch {
+      sameOrigin = false;
+    }
+  }
+  if (!contentType.toLowerCase().startsWith("application/json") || !sameOrigin) {
+    return NextResponse.json({ error: "Cross-site request refused" }, { status: 403 });
+  }
+  return null;
+}
+
 export function throttledResponse(retryAfterSeconds: number): NextResponse {
   return NextResponse.json(
     { error: `Too many attempts. Try again in ${retryAfterSeconds} seconds.` },

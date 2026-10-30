@@ -5,9 +5,10 @@
 // four-digit PIN is 10,000 possibilities, so an unthrottled login is
 // guessable in minutes.
 //
-// - Failures are counted per username and per request source over a
-//   sliding 15-minute window; a successful login clears the username's
-//   counter, so nobody can lock an owner out for longer than the window.
+// - Login attempts are counted per username and per request source over a
+//   sliding 15-minute window, before the PIN is checked (beginAttempt); a
+//   successful login clears the username's counter, so nobody can lock an
+//   owner out for longer than the window.
 // - Successful signups are counted per source over a day, since creating a
 //   fresh account never fails and would otherwise be unbounded.
 // - reserveCreation() checks and consumes a signup slot in one synchronous
@@ -79,10 +80,21 @@ function createLoginThrottle() {
   return {
     check,
 
-    recordFailure({ username, source }: Attempt) {
+    /**
+     * The login gate: checks the limits and, in the same synchronous step,
+     * counts this attempt as a failure up front. Checking first and counting
+     * only after the slow scrypt verification let concurrent guesses all
+     * pass the same check (64 parallel wrong PINs got through a limit of
+     * five). A correct PIN then calls recordSuccess, which clears the
+     * username's counter; the source counter keeps the attempt.
+     */
+    beginAttempt({ username, source }: Attempt): ThrottleVerdict {
+      const verdict = check({ username, source });
+      if ("retryAfterSeconds" in verdict) return verdict;
       const at = Date.now();
       push(`user:${username}`, at);
       if (source) push(`source:${source}`, at);
+      return verdict;
     },
 
     /** A failure that says nothing about the username's owner (signup of a taken name). */

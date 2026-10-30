@@ -13,6 +13,7 @@ import {
   createSession,
   credentialProblem,
   hashPin,
+  rejectCrossSite,
   sessionCookieOptions,
   throttledResponse,
 } from "@/lib/auth";
@@ -20,6 +21,8 @@ import { loginThrottle, requestSource } from "@/lib/login-throttle";
 import { normalizeUsername, validateNewUsername } from "@/lib/usernames";
 
 export async function POST(req: NextRequest) {
+  const crossSite = rejectCrossSite(req);
+  if (crossSite) return crossSite;
   await ensureUsersSchemaOnce();
 
   const body = await req.json().catch(() => null);

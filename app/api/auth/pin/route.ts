@@ -7,23 +7,34 @@
 //   { action: "set", pin } — only while there is no PIN (a Google-created
 //     account, or one that turned it off). Changing an existing PIN is not
 //     offered here.
+// Both run under the account row lock (withAccountLocked), so turning the
+// PIN off can't race a Google unlink into leaving no sign-in method.
 
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, hashPin } from "@/lib/auth";
-import { usersPool } from "@/lib/usersDb";
-import { googleEmailForUser } from "@/lib/google-auth";
+import { getCurrentUser, hashPin, rejectCrossSite } from "@/lib/auth";
+import { withAccountLocked } from "@/lib/usersDb";
+import { GOOGLE_PROVIDER } from "@/lib/google-auth";
 
 export async function POST(req: NextRequest) {
+  const crossSite = rejectCrossSite(req);
+  if (crossSite) return crossSite;
+
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Login required" }, { status: 401 });
 
   const body = await req.json().catch(() => null);
 
   if (body?.action === "disable") {
-    if ((await googleEmailForUser(user.id)) == null) {
-      return NextResponse.json({ error: "Link a Google account before turning the PIN off" }, { status: 409 });
-    }
-    await usersPool.query("UPDATE app_user SET pin_hash = NULL WHERE id = $1", [user.id]);
+    const error = await withAccountLocked(user.id, async client => {
+      const google = await client.query(
+        "SELECT 1 FROM auth_identity WHERE user_id = $1 AND provider = $2",
+        [user.id, GOOGLE_PROVIDER],
+      );
+      if (google.rowCount === 0) return "Link a Google account before turning the PIN off";
+      await client.query("UPDATE app_user SET pin_hash = NULL WHERE id = $1", [user.id]);
+      return null;
+    });
+    if (error) return NextResponse.json({ error }, { status: 409 });
     return NextResponse.json({ ok: true });
   }
 
@@ -32,14 +43,14 @@ export async function POST(req: NextRequest) {
     if (!/^\d{4}$/.test(pin)) {
       return NextResponse.json({ error: "PIN must be exactly 4 digits" }, { status: 400 });
     }
+    // Hashed outside the lock: scrypt is deliberately slow.
     const pinHash = await hashPin(pin);
-    const updated = await usersPool.query(
-      "UPDATE app_user SET pin_hash = $2 WHERE id = $1 AND pin_hash IS NULL",
-      [user.id, pinHash],
-    );
-    if (updated.rowCount === 0) {
-      return NextResponse.json({ error: "This account already has a PIN" }, { status: 409 });
-    }
+    const set = await withAccountLocked(user.id, async (client, currentHash) => {
+      if (currentHash) return false;
+      await client.query("UPDATE app_user SET pin_hash = $2 WHERE id = $1", [user.id, pinHash]);
+      return true;
+    });
+    if (!set) return NextResponse.json({ error: "This account already has a PIN" }, { status: 409 });
     return NextResponse.json({ ok: true });
   }
 

@@ -1,8 +1,9 @@
 // app/api/auth/google/callback/route.ts
 //
-// Google's redirect back. Links the Google account to the logged-in
-// account, or signs in / creates an account when logged out, then returns
-// to the page that started it with `?auth=<code>`. See lib/google-auth.ts.
+// Google's redirect back. For a "link" round trip, links the Google account
+// to the session that started it; for "login", signs in or creates an
+// account (never links). Returns to the page that started it with
+// `?auth=<code>`. See lib/google-auth.ts.
 
 import { NextRequest, NextResponse } from "next/server";
 import { decodeIdToken } from "arctic";
@@ -16,6 +17,7 @@ import {
 } from "@/lib/auth";
 import {
   GoogleClaims,
+  OAUTH_INTENT_COOKIE,
   OAUTH_RETURN_COOKIE,
   OAUTH_STATE_COOKIE,
   OAUTH_VERIFIER_COOKIE,
@@ -24,6 +26,7 @@ import {
   googleClient,
   googleConfigured,
   linkGoogle,
+  linkIntent,
   oauthCookieOptions,
   refreshGoogleEmail,
   safeReturnTo,
@@ -40,7 +43,7 @@ export async function GET(req: NextRequest) {
   const returnTo = safeReturnTo(req.cookies.get(OAUTH_RETURN_COOKIE)?.value ?? `${appOrigin()}/`);
   const finish = (code: string, sessionToken?: string) => {
     const response = NextResponse.redirect(withAuthOutcome(returnTo, code));
-    for (const name of [OAUTH_STATE_COOKIE, OAUTH_VERIFIER_COOKIE, OAUTH_RETURN_COOKIE]) {
+    for (const name of [OAUTH_STATE_COOKIE, OAUTH_VERIFIER_COOKIE, OAUTH_RETURN_COOKIE, OAUTH_INTENT_COOKIE]) {
       response.cookies.set(name, "", oauthCookieOptions(0));
     }
     if (sessionToken) {
@@ -57,7 +60,22 @@ export async function GET(req: NextRequest) {
   const state = params.get("state");
   const storedState = req.cookies.get(OAUTH_STATE_COOKIE)?.value;
   const verifier = req.cookies.get(OAUTH_VERIFIER_COOKIE)?.value;
+  const intent = req.cookies.get(OAUTH_INTENT_COOKIE)?.value ?? "";
   if (!code || !state || !storedState || !verifier || state !== storedState) {
+    return finish("google-expired");
+  }
+
+  // A link goes only into the very session that started it (see
+  // linkIntent): a different or missing session now means the round trip
+  // no longer belongs to whoever is logged in. Checked before the code is
+  // exchanged, so a mismatched round trip never touches Google.
+  let linkTo: number | null = null;
+  if (intent.startsWith("link:")) {
+    const token = req.cookies.get(SESSION_COOKIE)?.value;
+    const current = token ? await getCurrentUser() : null;
+    if (!token || !current || intent !== linkIntent(token)) return finish("google-link-mismatch");
+    linkTo = current.id;
+  } else if (intent !== "login") {
     return finish("google-expired");
   }
 
@@ -73,12 +91,11 @@ export async function GET(req: NextRequest) {
   if (!claims.sub || !claims.email_verified) return finish("google-unverified");
 
   const linkedUserId = await userIdForGoogle(claims.sub);
-  const current = await getCurrentUser();
 
-  if (current) {
-    if (linkedUserId === current.id) return finish("google-linked");
+  if (linkTo != null) {
+    if (linkedUserId === linkTo) return finish("google-linked");
     if (linkedUserId != null) return finish("google-in-use");
-    return finish((await linkGoogle(current.id, claims)) ? "google-linked" : "google-other-linked");
+    return finish((await linkGoogle(linkTo, claims)) ? "google-linked" : "google-other-linked");
   }
 
   let userId = linkedUserId;
