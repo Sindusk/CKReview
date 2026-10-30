@@ -28,9 +28,11 @@
 // claims: nothing here calls Google on the user's behalf later.
 //
 // Env: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI (this
-// app's public `/api/auth/google/callback` URL — also the source of this
-// app's public origin, since behind nginx the request's own Host is
-// 127.0.0.1). The redirect URI must be registered on the Google client.
+// app's public `/api/auth/google/callback` URL, which must be registered on
+// the Google client). It is also the source of this app's public origin
+// (appOrigin), so redirects and the cross-site check don't depend on the
+// proxy: production nginx forwards the public Host, but a proxy that sends
+// its upstream address instead (127.0.0.1:3000) would otherwise break them.
 
 import crypto from "node:crypto";
 import { Google } from "arctic";

@@ -20,6 +20,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { usersPool, ensureUsersSchemaOnce } from "./usersDb";
 import { USERNAME_MAX_LENGTH } from "./usernames";
+import { appOrigin, googleConfigured } from "./google-auth";
 
 const SCRYPT_KEYLEN = 32;
 
@@ -108,10 +109,14 @@ export function rejectCrossSite(req: Request): NextResponse | null {
   const contentType = req.headers.get("content-type") ?? "";
   const origin = req.headers.get("origin");
   const host = req.headers.get("host");
+  // Same origin = the Host this request reached, or this app's configured
+  // public origin (appOrigin), in case a proxy rewrites Host to its
+  // upstream address (Sol review, 2026-10-29).
   let sameOrigin = true;
   if (origin) {
     try {
-      sameOrigin = new URL(origin).host === host;
+      const url = new URL(origin);
+      sameOrigin = url.host === host || (googleConfigured() && url.origin === appOrigin());
     } catch {
       sameOrigin = false;
     }
