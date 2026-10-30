@@ -1,5 +1,58 @@
 // lib/mechanics/ffxiv/trials/queen-eternal.ts
 //
+// ── DIGEST (read first; detail in the sections it names) ─────────────────
+// What: Queen Eternal (trial), whole fight P1 + P2 (~9:40 kill). Self-gates
+//   on an enemy cast of SIGNATURE (40972 / 40985 / 40983). Owns every per-
+//   pull rule below; both-healers-dead comes from ffxiv/common.ts. Verified
+//   on two reports (A: 16 pulls, kill 9:43; B: 13 pulls, kills 9:24, 9:49).
+// Rules (ruleId prefix ffxiv-queen-eternal-; severity: meaning):
+//   avoidable   Minor, Major if it killed (no Damage Down in this fight)
+//   freeze      Deep Freeze; Minor, Major on death
+//   share       Retribute lines / Aeroquell stacks: in two, or living in none
+//   spread, earth, rush, ice-dart   one instance per player, owner and victim
+//     named; owned hitting 3+ others names owner alone; ownerless 4+ is
+//     player-less. spread = Atomic Ray, Radical Shift, Divide and Conquer;
+//     earth = towers, Pillar, Ray; rush adds "tether too short"
+//   empty-tower Major: player with no tower, else the two sharing one
+//   meteor      one landing hitting 2+ names all of them
+//   weighty-blow  a Weighty Blow line on a player
+//   prosecution (targeted: tanks) a tank died taking both hits; names other
+//   fall        death with no killing blow, phase in description; Bridge and
+//     Radical Shift falls never count as a called wipe
+//   Raid: boulder-wipe, tower-wipe (2+ killed, pull over within 40s),
+//     mass-deaths (4+ within 2.5s), enrage (41036 / 41053), called-wipe
+//     (3+ silent deaths within 5s), collapse (6 dead, or 5 and over in 45s)
+// Cutoffs: every wipe had one: boulder Big Burst (A5, B4), mass deaths, both
+//   healers dead, collapse, tower Big Burst. Kills carry no Raid error.
+// Key facts: no Damage Down anywhere; avoidables give Vulnerability Up.
+//   Meteor Impact 41007 = landed on a boulder, 41008 = fell in the void.
+//   Weighty Blow 41012 = line hit, 41010 = boulder blocked it. Tyranny's
+//   Grasp 41048 = tank tower miss. Clean meteor drops kept 4.1y+ apart (A8).
+//   Falls are the most common error. No pull saw the enrages.
+// Assumptions: roles.ts slots correct; no VOD, nobody remembers the plan.
+// Sections (grep the heading):
+//   "VERIFIED AGAINST LOGS (2026-10-14)"  clock, IDs, findings, cutoffs
+//   "RULES IMPLEMENTED"  rules and what is not built
+//   "SOURCES AND PATCH SENSITIVITY", "VOCABULARY, SEVERITY AND ATTRIBUTION",
+//   "SHAPE, CLOCK, PHASE CHECKS AND RESOURCES", "PARTY PLAN AND ARENA VARIANTS"
+//   "RECURRING RAIDWIDES, PROSECUTION AND LEGITIMATE FORCE"
+//   "AETHERTITHE / RETRIBUTE", "LAWS OF WIND / CHAINS / WIND OF CHANGE"
+//   "DIVIDE AND CONQUER", "EARTH FLIGHT / TOWERS / GRAVITATIONAL EMPIRE"
+//   "METEOR IMPACT / BOULDER LIFECYCLE", "WEIGHTY BLOW"
+//   "CORONATION / RUTHLESS REGALIA / ATOMIC RAY", "ABSOLUTE AUTHORITY"
+//   "LAWS OF ICE 1 / FREEZE / RUSH / BRIDGES"
+//   "LAWS OF ICE 2 / DREAR RISING / ICE DART / RAISED TRIBUTE"
+//   "RADICAL SHIFT (P2, TWO SETS OF TWO)"
+//   "DIMENSIONAL DISTORTION / TYRANNY'S GRASP"
+//   "DYING MEMORY / ROYAL BANISHMENT / WHAT ENDS THE PULL"
+//   "OPEN QUESTIONS FOR LOG VERIFICATION"
+// Open items: not built: Coronation tether endpoints, Absolute Authority
+//   flares, Raised Tribute membership, wind direction, Gravitational Anomaly
+//   flight, Royal Banishment / Dying Memory, Tyranny's Grasp tower misses,
+//   Shatter, raidwide deaths. Many action/status IDs are unmapped candidates
+//   (see "OPEN QUESTIONS FOR LOG VERIFICATION").
+// ── END DIGEST ──
+//
 // -- VERIFIED AGAINST LOGS (2026-10-14) --
 // A = r83YhVvDwpzBkLyF: 16 pulls, kill A16 (9:43).
 // B = rFQT8XZckzvH1LNx: 13 pulls, kills B3 (9:24) and B13 (9:49).

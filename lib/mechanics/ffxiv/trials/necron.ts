@@ -1,5 +1,58 @@
 // lib/mechanics/ffxiv/trials/necron.ts
 //
+// ── DIGEST (read first; detail in the sections it names) ─────────────────
+// What: FFXIV Necron (trial) detection, whole fight (~9:40 kill clock, one
+//   report A kill + one B with two kills). Per-player avoidable hits, hands,
+//   spreads/towers, Blue Shockwave cones, Mass Macabre, abyss, plus Raid
+//   cutoffs. Role-gated rules skip pulls where jobs swap (>2 tanks etc.).
+// Rules (ffxiv-necron-*; ids NC_*_RULE_ID 416-435):
+//   avoidable Minor (Major if it killed; no Damage Down exists); mori
+//   center Bleeding (Major if tick killed); hands (Fear of Death hand baits:
+//   2 names whoever baited none, 4+ baiting none = player-less); spread
+//   (Smite/End's Embrace overlaps); grand-cross (Shock towers + spreads);
+//   empty-tower (Electrify); shockwave (in two cones or none); blue-swap
+//   (tank took both cones; targeted at tanks); blue-cleave (3+ non-tanks in
+//   a cone names the aiming tank); enmity (cone on non-tank, player-less);
+//   big-hand (non-tank in Muted Struggle); macabre (Spreading Fear
+//   player-less; soak under last soak's Magic Vuln); abyss (died in abyss,
+//   Major); invitation (pulled back in; Major if died); fall (off Grand
+//   Cross circle, Major; lone silent deaths player-less).
+//   Exposure is everyone except blue-swap.
+// Cutoffs (Raid): adds (Darkness of Eternity with party adds alive), mass-
+//   deaths (4+ non-raidwide deaths in 2.5s, pull over within 60s), enrage,
+//   called-wipe (3 deaths in 10s, over within 12s), collapse (5 dead, pull
+//   over within 45s).
+// Key thresholds: DEATH_EVENT_LAG_MS 2000 (death logs ~2s after fatal hit);
+//   EPISODE_MS 3000; RAISE_GRACE_MS 10000; DOOMED_DEAD 3 (spreads/shares
+//   with 3+ dead are fallout, skipped); HANDS_UNPLANNED 4; MASS_* 4/2500/
+//   60000 (clean: kill B10 lost five to Spreading Fear and recovered;
+//   failing: A17, B7 six dead); COLLAPSE 5 dead/45000 (A15, A16, A18
+//   carried on 88-100s; B2, B7 ended 55s; others within 31s).
+// Strategy/assumptions: nobody remembers the plan, no VOD; kills end before
+//   Mori #2, so Grand Cross #2 and the enrage (44613) were never seen.
+//   Not built: missed portal identity, abyss role failures, Grand Cross
+//   proximity/Neutron Ring deaths, Relentless Reaping order, Invitation lane
+//   vs donut blame.
+// Sections: "VERIFIED AGAINST LOGS (2026-10-14)" (reports, fight clock, IDs);
+//   "RULES IMPLEMENTED"; "GUIDE-DERIVED MODEL: NECRON"; "SOURCES AND
+//   CONFIDENCE"; "LOG VOCABULARY AND SEVERITY"; "SHAPE, CHRONOLOGY AND
+//   RESOURCES"; "ASSIGNMENTS AND STRATEGY VARIANCE"; per-mechanic
+//   "BLUE SHOCKWAVE [BM, DATA]", "FEAR OF DEATH / CHOKING GRASP / THE END'S
+//   EMBRACE", "COLD GRIP / EXISTENTIAL DREAD [BM]", "MEMENTO MORI / SMITE OF
+//   GLOOM [BM, JP]", "SOUL REAPING / AETHERBLIGHT / TWO-FOLD OR FOUR-FOLD
+//   STACKS", "GRAND CROSS / SHOCK / ELECTRIFY / NEUTRON RING [BM]", "PARTY
+//   ADD WAVES / DARKNESS OF ETERNITY [BM, IV]", "INDIVIDUAL ABYSS / DOOM /
+//   ROLE-SPECIFIC HANDS [BM, IV]", "SPECTER OF DEATH / INVITATION / CIRCLE
+//   OF LIVES [BM]", "RELENTLESS REAPING / CROP ROTATION / SEASONS [BM]",
+//   "MASS MACABRE / MACABRE MARK / SPREADING FEAR [BM, JP]"; then "WHAT ENDS
+//   A PULL / OPEN QUESTIONS FOR LOG VERIFICATION" (raid deadlines, 6 open
+//   questions).
+// Open items: action/status ID confirmation, add gauge gains and wave
+//   clock, queued marks when a player dies, penalty scope and portal
+//   deadline, Mori center contact event, party routes/hand-bait formation
+//   and Blue swap/invuln plan (all under the last section).
+// ── END DIGEST ───────────────────────────────────────────────────────────
+//
 // -- VERIFIED AGAINST LOGS (2026-10-14) --
 // A = L9BzKkD2nxcVgHTC: 22 pulls, kill A6 (9:40), wipes A1-A5 A7-A22.
 // B = pG319BgHTnPJc6Ft: 19 pulls, kills B3 (9:42) and B10 (9:36).

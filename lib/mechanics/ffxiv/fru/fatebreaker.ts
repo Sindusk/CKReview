@@ -5,6 +5,63 @@
 // first Phase 2 cast; the fallback model (fallback.ts MODULE_PHASES) covers
 // the later phases and stays out of P1.
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// What: FRU Phase 1 (Fatebreaker), ~2:40 clock from engage: Cyclonic Break
+//   (cones, twice), Powder Mark Trail + Burn Mark, Utopian Sky (fog, halos,
+//   Sinsmite / Sinbound Thunder III spreads, Sinsmoke / Sinbound Fire III
+//   stacks, Blasting Zone), Fated Burn Mark, tether stacks, Fall of Faith
+//   (four ordered tethers), Burnt Strike towers + Burnished Glory. Self-gates
+//   on the opening casts, stops at the first Phase 2 cast. Boss HP depletion
+//   advances to P2, otherwise enrage ~02:40. Later phases belong to the
+//   fallback model.
+// Rules (ids end after ffxiv-fb-):
+//   avoidable (Major on Damage Down or death, else Minor): Cyclonic follow-ups,
+//     Blasting Zone, Brightfire, Burnt Strike, Burnout.
+//   overlap (Major if someone involved died, else Minor): all eight alive, hit
+//     by 2+ cones / Sinsmite / Thunder spreads. stack: in two stacks or none.
+//   powder-swap (Major): first Powder Mark on the tank who was not the opener
+//     Provoke MT, or holder killed by auto-attack. powder-death (Major): tank
+//     killed by the buster or a single expiry Burn Mark with the other alive.
+//   burn-mark: both expiry explosions on one tank, or one on a non-tank (all
+//     alive). wrong-call (Raid): everyone alive hit by one Blasting Zone.
+//   fated-burn-mark (Raid): explosion hitting 3+ others; holder named.
+//   tether-stack: overlapping / double / missing member, else player-less Minor.
+//   fall-of-faith: double hit, fire or lightning reaching the other group, short
+//     Sinblaze, or "Fall of Faith Wrong Side" (J14, NAUR conga).
+//   tower (Raid + Major): short tower, non-tank in none, extras in overfilled.
+//   knockback (Major): Blastburn or walking into the wall.
+//   dead-going-in (Raid): someone still dead at a mechanic start.
+//   mark: unexplained Mark of Mortality.
+// Cutoffs (Raid, earliest only, before any mechanic Raid): enrage and
+//   called-wipe (3+ no-killing-blow deaths within 10s / 12s of end), collapse
+//   (4 dead, pull over within 20s), tanks-dead (both tanks dead before P2;
+//   later per-player errors dropped).
+// Exposure: powder-swap and powder-death targeted (both tanks); the rest count
+//   everyone. Damage Down causes are excluded from ffxiv-damage-down.
+// Key thresholds: cone off-spot 20+ degrees (CONE_SPOT_MOVED); Sinsmite band
+//   outer under 11y, inner over 11y; wrong-call fallout window 1.5s; knockback
+//   reset 20s after own Damage Down; tower check skipped with 3+ non-tanks
+//   dead. No geometric tolerance or damage threshold is measured in a log.
+// Strategy: regional presets are bundles (NAUR Utopia, LPDU Fall, MUR towers
+//   can mix); off-plan but valid solutions are not errors. Utopian tether
+//   group A: supports north, DPS south; flex DPS varied, tether length is not
+//   logged, so overlapping stacks name both tethered players.
+// Sections (grep the heading):
+//   "VERIFIED AGAINST LOGS (2026-10-12)" three reports, 197 pulls, clock
+//   "RULES IMPLEMENTED" full rule text; "SOURCES"
+//   "SHARED SEVERITY, STATUS AND STRATEGY CONTRACT" severity, role clocks
+//   "PHASE SHAPE AND CLOCK" damage anchors by mm:ss
+//   "CYCLONIC BREAK, TWICE [I, NS]", "POWDER MARK TRAIL, TWICE [I, N]"
+//   "UTOPIAN SKY: FOG, ELEMENT AND HALOS [L, M, NS]"
+//   "FALL OF FAITH: FOUR ORDERED TETHERS [N, MF, L]"
+//   "BURNT STRIKE TOWERS AND BURNISHED GLORY [MT, I]"
+//   "STRATEGY OBSERVABILITY AND OPEN QUESTIONS"; "log IDs (VERIFIED above)"
+// Open items: Fall W/E vs N/S and NAUR/MUR priorities from clean pulls; tower
+//   fill (serial vs MUR pairs, 2/2/2 ambiguous); clone endpoints / tether
+//   length; status and penalty IDs; geometry tolerances; HP-advance and
+//   deliberate-reset signatures. Not built: see the end of RULES IMPLEMENTED.
+// ── END DIGEST ──
+//
 // -- VERIFIED AGAINST LOGS (2026-10-12) --
 // Three reports, 197 pulls, 18 P1 clears (no full kill). Cited as A12 +1:16
 // (report letter, pull number in the folder, m:ss from the pull start):

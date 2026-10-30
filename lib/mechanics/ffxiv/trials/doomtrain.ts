@@ -1,5 +1,46 @@
 // lib/mechanics/ffxiv/trials/doomtrain.ts
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// What: the Doomtrain trial (8 players, six cars, orb phase after car 3).
+//   Per-pull errors from avoidable hits, plasma/orb/arcane/plummet
+//   overlaps, Lightning Burst, Aetherial Ray, strandings, falls and
+//   cutoffs. Entry point detectDoomtrainErrors. No Damage Down exists in
+//   this fight, so a survived avoidable is Minor, a fatal one Major.
+// Rules (exposure = everyone except those marked targeted):
+//   ffxiv-dt-avoidable  Minor; Major when it killed.
+//   ffxiv-dt-plasma     stored Plasma overlaps, doubled / unpaired players.
+//   ffxiv-dt-orb-spread Aetherochar overlaps.
+//   ffxiv-dt-orb-stack  Aetherosote doubled / missed (targeted: non-tanks).
+//   ffxiv-dt-cone       non-tank hit by Aetherial Ray, both tanks healthy.
+//   ffxiv-dt-arcane     Hyperconductive doubled / missed.
+//   ffxiv-dt-plummet    player under two Plummets.
+//   ffxiv-dt-buster     non-tank in another's Lightning Burst.
+//   ffxiv-dt-enmity     buster on a non-tank, both tanks healthy; player-less Minor.
+//   ffxiv-dt-stranded   left on the Derailed car (Major); 4+ = Raid.
+//   ffxiv-dt-fall       falls (Major); Walking Dead running out (player-less).
+// Cutoffs (Raid): ffxiv-dt-orb-timeout, ffxiv-dt-mass-deaths (4+ non-raidwide
+//   deaths in 2.5s, pull over within 60s), ffxiv-dt-enrage (final Derail,
+//   ~11:26), ffxiv-dt-called-wipe, ffxiv-dt-collapse (5 dead, over in 45s).
+//   All 24 wipes in the two reports have one.
+// Key thresholds: orb must die by ~4:15 or Runaway Train returns for
+//   1.47M-3.22M per hit (clean 17.8k-189.7k); silent deaths 4.5s after a
+//   Derail = stranded, 2.0-2.4s after the raised-platform aura = fall;
+//   shares/spreads skip resolutions with 3+ dead; Burst and Ray rules skip
+//   while a tank is dead or raised within 30s.
+// Assumptions: Arcane 4:4 (tanks+melee / healers+ranged); Aetherosote 3+3
+//   non-tanks; Plummet is a split stack hitting all 8 per set.
+// Not built: Siege failures, wrong height as such, tank-side buster fault
+//   (no enmity data), cone aim.
+// Sections: "VERIFIED AGAINST LOGS (2026-10-14)" (clock, IDs, findings,
+//   cutoffs); "RULES IMPLEMENTED"; "GUIDE-DERIVED MODEL: DOOMTRAIN";
+//   "SOURCES AND PATCH SENSITIVITY"; "VOCABULARY, SEVERITY AND OBSERVABILITY";
+//   "SHAPE, CLOCK AND RESOURCES"; "ASSIGNMENTS AND STRATEGY VARIANCE";
+//   per-mechanic models from "STORED PLASMA: DEAD MAN'S OVERDRAUGHT [BM, DATA]"
+//   to "PSYCHOKINESIS / PLUMMET [BM, IV]"; "WHAT ENDS A PULL";
+//   "OPEN QUESTIONS FOR LOG VERIFICATION" (largest).
+// Open items: empty-Siege penalty unverified; see "OPEN QUESTIONS FOR LOG VERIFICATION".
+// ── END DIGEST ──
+//
 // -- VERIFIED AGAINST LOGS (2026-10-14) --
 // A = r4qDkR9btJCXnKWd: 19 wipes, no kill, early progression (longest
 //     10:15). Roster PLD/GNB, DRG, BLM/BRD/DNC, SGE/AST.

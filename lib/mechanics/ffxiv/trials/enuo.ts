@@ -1,5 +1,53 @@
 // lib/mechanics/ffxiv/trials/enuo.ts
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// What: FFXIV Enuo trial. Per-player errors for avoidable hits, Chains,
+//   Deep Freeze, Petrification, cone/line/stack shares, Dimension Zero,
+//   Meltdown spreads, Voidal Turbulence cones+towers, Gaze orbs, flares
+//   and lone deaths; plus Raid-level wipe causes. Phase gating, clock and
+//   signature: "ARENA, PHASE TRIGGERS, CLOCK AND GAUGE".
+// Rules (all ffxiv-enuo-*): avoidable (Minor, Major if it killed), chains
+//   (2+ ticks in one chain), freeze, petrify (Minor, Major if died), share
+//   (Airy/Dense, Holy, Return lines: in two, or living in none), return-front
+//   (non-tank 2x others' line hit, both tanks in line), dimension (living
+//   player out of every hit), spread (Meltdown), turbulence (cones+towers),
+//   empty-tower (Big Burst, Major), orb (lone/3rd/outside-pair soaker),
+//   flare (non-tanks; targeted), fall (lone death, no killing blow,
+//   player-less). Shares/spreads/orbs skip moments with 3+ dead.
+// Cutoffs (Raid): tower-wipe, self-destruct, mass-deaths (4+ non-raidwide
+//   deaths in 2.5s), enrage (final Almagest/Apeiron), called-wipe, collapse
+//   (6 dead). Kills carry no Raid error.
+// Key thresholds: front hit 2x others (a non-tank in front took 3.4-5.5x and
+//   died: A11 +5:16, B8 +1:09); flare 2x; chains 2+ ticks (kills hit up to 8);
+//   orbs soaked in role pairs in every kill. Mass deaths over within 40s,
+//   collapse within 45s.
+// Assumptions: one role group baits turbulence cones, the other takes
+//   towers (swaps per wave and pull). Dark Resistance Down makes a second
+//   hit lethal. Roles from roles.ts slots. Only Big Burst 50014 gives
+//   Damage Down; avoidables give Vulnerability Up.
+// Sections: "VERIFIED AGAINST LOGS (2026-10-14)" (2 reports, clock, IDs,
+//   findings); "RULES IMPLEMENTED" (incl. not-built list); "GUIDE-DERIVED
+//   MODEL: ENUO"; "SOURCES AND PATCH SENSITIVITY"; "LOG VOCABULARY,
+//   SEVERITY AND REMOVALS"; "ARENA, PHASE TRIGGERS, CLOCK AND GAUGE";
+//   "COMMUNITY ASSIGNMENTS / STRATEGY VARIANCE"; per-mechanic sections
+//   "METEORAIN / ALMAGEST / LIGHTLESS WORLD", "NAUGHT GROWS / RETURN TO
+//   NOTHING", "MELTDOWN / CHAINS OF CONDEMNATION", "AIRY / DENSE EMPTINESS",
+//   "GAZE OF THE VOID / FAST AND SLOW ORB SOAKS", "VACUUM / SILENT TORRENT",
+//   "DEEP FREEZE / FLARE TANKBUSTERS", "ALL FOR NAUGHT / LOOMING / VOIDAL
+//   TURBULENCE", "PERSONAL SHADOW DUELS / GAUNTLETS / DEATH FALLOUT",
+//   "PROTECTIVE SHADOW: DRAIN TOUCH / WEIGHT OF NOTHING", "SOOTHING SHADOW:
+//   ENTANGLEMENT / CURSE OF THE FLESH", "AGGRESSIVE SHADOW: DEMON EYE",
+//   "BEACON IN THE DARK / NOTHINGNESS / INTERMISSION DEADLINE", "FINAL
+//   PHASE: NAUGHT WAKES / PASSAGE OF NAUGHT", "SHROUDED HOLY / DIMENSION
+//   ZERO", "NAUGHT HUNTS / ENDLESS CHASE / HANDOFFS", "WHAT ENDS A PULL /
+//   OPEN QUESTIONS FOR LOG VERIFICATION".
+// Open items: not built are Disease cleanses, Drain Touch, Weight of
+//   Nothing, duel/gauge attribution, Gaze cone direction, Naught Hunts
+//   runner geometry, raidwide deaths. Some casts lose their target in the
+//   log. Enrage and Apeiron never seen (every kill ended first); open
+//   questions listed in the last section.
+// ── END DIGEST ──
+//
 // -- VERIFIED AGAINST LOGS (2026-10-14) --
 // A = Xk2DKZwVp4Ar6d7y: 11 pulls, kills A3 A4 A10 A11 (9:18-10:08).
 // B = pnLBzfbH8NjGAJRg: 15 pulls, kills B7-B12 B14 B15 (8:30-8:52).

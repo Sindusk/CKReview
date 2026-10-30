@@ -1,5 +1,62 @@
 // The Epic of Alexander (Ultimate) -- Phase 2: Brute Justice / Cruise Chaser.
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// What: BJ/CC phase of TEA, a scripted ~200s timeline from J Kick (Whirlwind
+//   +12, Judgment Nisi +15, Link-Up +21, Photon/pass 1 +37, Spin Crusher +47,
+//   Water/Lightning 1 +51, Missile Command/mines/ice +58-67, Water/Lightning 2
+//   +81, Limit Cut/shield +87, Flarethrower/pass 3 +89, Whirlwind +101,
+//   Water/Lightning 3 +110, pass 4, Propeller Wind +128, Gavel +130, Final
+//   Sentence +188). Same static and NAUR plan as intermission-limit-cut.ts,
+//   which owns pulls ending within 30s of J Kick (LC_HANDOFF_MS). No kill
+//   with an error on disk; 11 clears carry none.
+// Rules (Major unless noted; ids as spelled in code):
+//   ffxiv-bjcc-avoidable (Minor, Major if it killed): Chakram, Hawk Blaster,
+//     Spin Crusher, Drainage, Sludge, Frostbite, Propeller Wind, Flarethrower
+//     on a non-bait.
+//   ffxiv-bjcc-nisi-collision / -wrong-color / -dropped (both players /
+//     receiver + donor / DPS of the pair, at pass 4 both); each sets Raid
+//     ffxiv-bjcc-nisi-failed. ffxiv-bjcc-nisi-death (Raid): dead at Nisi or
+//     last copy of a color lost; later Nisi errors are fallout.
+//   ffxiv-bjcc-gavel (Raid): Gavel killed 3+. ffxiv-bjcc-wall: unexplained
+//     death (not called wipe, Photon tick, or within 6s of a knockback).
+//   ffxiv-bjcc-water-short (Major if killed/Punishing, else Minor): free pool
+//     player missing from a Water under 3. ffxiv-bjcc-lightning-alone (on the
+//     round's helper), -lightning-extra (Minor, Major if killed),
+//     -lightning-swap (Minor, Major if Punishing Thunder followed).
+//   ffxiv-bjcc-punishing (Raid), -mine-missed (+ Raid -shrapnel), -mine-clip
+//     (Minor/Major), -ice, -flarethrower (Major/Minor, BJ tank),
+//     -severe-contamination (Raid), -shield (Raid), -tank-dead (Raid),
+//     -chakram-bait (player-less Minor), -chakram-death (Raid).
+// Cutoffs (Raid, earliest kept): nisi-death, tank-dead, chakram-death, and
+//   generic called-wipe (3+ no-killing-blow deaths in 10s or any within 12s
+//   of the end) / collapse (4 dead, pull over within 30s), BJ/CC wipes only.
+// Exposure: water-short, lightning-alone, mine-missed, ice, flarethrower are
+//   targeted (per instance); the rest are everyone (all eight carry Nisi).
+// Key thresholds: WATER_MIN 3 (3-4 takers in 90 of 95 rounds; every 1-2
+//   player Water killed its takers); SHIELD_WHIRLWIND_MEDIAN 24k (unbroken
+//   shield 22-47k, broken up to 19k); SHIELD_WINDOW_MS 10s (shield broke
+//   4.1-8.2s after Limit Cut); knock-into-wall deaths 1.8-4.5s after the hit;
+//   NISI_DEATH_YIELD_MS 3s; NISI_LAST_COPY_MS 5s; WALL_PUSH_MS 6s;
+//   DRAINAGE_DEATH_MS 5s; PHOTON_DOT_MS 10s.
+// Strategy: Lightning goes DPS > MT > Water healer > OT; supports stand still
+//   and DPS pass Nisi at pass 3; a tank's death makes the mechanic
+//   unresolvable.
+// Sections (grep the heading): "VERIFIED AGAINST LOGS (2026-10-16)" reports,
+//   clock; "RULES IMPLEMENTED" full rule text, user rulings, VOD reviews;
+//   "GUIDE-DERIVED MODEL (2026-10-15)"; "SOURCES CHECKED 2026-10-15";
+//   "SHAPE, CLOCK, AND ACTORS" timeline, actor ids; "CANDIDATE IDs, STATUS
+//   MAPPING, SEVERITY"; "NAUR SLOTS, CLOCK SPOTS, AND PASS TRAFFIC";
+//   "JUDGMENT NISI / VERDICT / GAVEL"; "LINK-UP / COMPRESSED WATER AND
+//   LIGHTNING"; "CHAKRAMS / OPTICAL SIGHT / PHOTON / SPIN CRUSHER";
+//   "MISSILE COMMAND / MINES / ENUMERATION / ICE"; "PLASMA SHIELD /
+//   FLARETHROWER / TORNADO LIFECYCLE"; "PROPELLER WIND / GAVEL / ENDING
+//   BUSTERS"; "VARIANTS AND PULL-END STATES"; "OPEN QUESTIONS FOR LOG
+//   VERIFICATION" (the largest, ~13k tokens).
+// Open items: not built: Enumeration (one failure, followed three deaths),
+//   Super Jump / Apocalyptic Ray extras, Water/Lightning hits under their own
+//   Resistance Down, fault for a tank's death to autos (mitigation), enrage.
+// ── END DIGEST ──
+//
 // -- VERIFIED AGAINST LOGS (2026-10-16) --
 // Same static as intermission-limit-cut.ts, NAUR plan (user), no VODs, no
 // kill. Pulls are cited A<n> / B<n> / C<n> = the app's Pull n with the

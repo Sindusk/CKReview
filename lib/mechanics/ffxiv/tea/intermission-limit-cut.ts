@@ -1,5 +1,58 @@
 // The Epic of Alexander (Ultimate) -- Intermission: Limit Cut.
 //
+// -- DIGEST (read first; detail in the sections it names) --
+// What: Limit Cut in the intermission. Eight head markers (numbers 1..8),
+//   ten Hawk Blaster blasts (18480, two helper Cruise Chasers, 8 outer + 2
+//   center), then Alpha Sword (18484) and Super Blassty Charge (19279) hit
+//   numbered pairs in sequence, then J Kick (18516). Clock from the first
+//   blast: markers -2.0s, swords +7.4 / 12.1 / 16.7 / 21.3, charges +8.9 /
+//   13.5 / 18.2 / 22.8, J Kick +26.0. Each numbered hit applies Magic and
+//   Physical Vulnerability Up (10s / 17s); no Damage Down, so avoidables are
+//   Minor unless they kill. Owns Limit Cut only; BJ/CC is bj-cc.ts and J Kick
+//   deaths are mitigation, not flagged.
+// Rules (code ids ffxiv-lc-*):
+//   ffxiv-lc-stray: Minor, Major if it killed. Hit by another number's
+//     sword/charge. Exposure: everyone.
+//   ffxiv-lc-aim: Minor/Major by extras' deaths. Holder whose sword hit
+//     someone else while more than 60 degrees off the clockwise track, or
+//     whose charge hit 2+ players outside the pair, or took it 15y+ from the
+//     strike point ("Charge Taken From the Wrong Side"). Targeted per attack.
+//   ffxiv-lc-knockback: Major. Holder knocked off by their own sword/charge
+//     with no stray hit in the prior 3s. Targeted per attack.
+//   ffxiv-lc-hawk-blaster: Minor, Major if it killed. Not flagged within
+//     2.5s after a stray hit. Exposure: everyone.
+//   Not flagged: attacks whose holder was dead, the attack after one that
+//   hit an extra when it hits the same players, J Kick. Fallout (after the
+//   first death) is not independent.
+// Cutoffs (Limit Cut wipes only, earliest wins): ffxiv-lc-dead-going-in
+//   (dead at markers +1s), ffxiv-lc-death (first death), ffxiv-lc-called-wipe
+//   (3+ no-killing-blow deaths in 10s, or any within 12s of the end, knock-
+//   offs excluded), ffxiv-lc-collapse (4 dead, pull over within 30s). Of 28
+//   wipes in report A/B: dead going in 11, both healers dead 10, collapse 6,
+//   called wipe 1, unexplained 0.
+// Key thresholds: sword axis clean within 19 degrees (p90, median 9, 152
+//   swords), wrong-facing hits were 118 and 137 degrees off, flag at >60.
+//   Charge holder clean 0.4-6.4y from the strike point (p90 5y, 449), flag
+//   at 15y+. Knockback deaths 2.1-3.1s after the hit. Second numbered hit
+//   inside the 17s Physical Vulnerability kills (16-42k).
+// Assumptions: NAUR 1256 plan (north-west half starts 1256, south-east 3478).
+//   Any death in Limit Cut makes later deaths fallout (user, VOD
+//   2026-10-16).
+// Sections (grep the heading): "VERIFIED AGAINST LOGS (2026-10-16)" (clock,
+//   log ids, findings, cutoff counts), "RULES IMPLEMENTED" (rules, VOD
+//   reviews, replay findings, open questions 1-3), "GUIDE-DERIVED MODEL
+//   (2026-10-15)", "SOURCES CHECKED 2026-10-15", "CHRONOLOGY AND CLOCK
+//   ANCHOR", "NAMING, GEOMETRY, AND OBSERVABILITY", "ALPHA SWORD / SUPER
+//   BLASSTY CHARGE", "OPTICAL SIGHT / HAWK BLASTER", "NAUR / HARU GLORY 1256
+//   PLAN", "STRATEGY VARIANCE / EXPECTED COSTS" (Arm's Length / Surecast
+//   either way is not an error), "WHAT ENDS A PULL" (completion is all eight
+//   hits then J Kick), "OPEN QUESTIONS FOR LOG VERIFICATION" (long, original
+//   pre-log list).
+// Open items: charge through 2+ players (who was wrong?); sword partner at
+//   the cone apex named alone; #6 at the edge of #7's sword. Hawk Blaster
+//   casts are missing from 7 pulls that reached the swords.
+// -- END DIGEST --
+//
 // -- VERIFIED AGAINST LOGS (2026-10-16) --
 // Report A = 1NG4Zah79yKYHCDv (73 pulls, captured --to-minutes 3; 27
 // reached Limit Cut, 9 reached J Kick, 2 clean). Report B =

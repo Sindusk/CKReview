@@ -1,5 +1,64 @@
 // lib/mechanics/ffxiv/trials/zelenia.ts
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// What: FFXIV Zelenia trial, whole fight: timed opening (Catharsis, Shock,
+//   Specter, EF1, Stock), kill-dependent party adds, six scripted Blooms,
+//   Bloom1 repeat, tether busters, three Stock Breaks, Withering/Rose Red
+//   enrage. Kills end 8:22-9:50 (Bloom6 or Bloom1 repeat). Arena center
+//   (100,100) radius 16y. No Damage Down exists: avoidables give
+//   Vulnerability Up 1001789.
+// Rules (ids ffxiv-zelenia-*):
+//   avoidable: Vulnerability Up causes (Thunder II, Shock, Power Break,
+//     Valorous lines, Thunder Slash/IV, Encircling Thorns...); Minor, Major on
+//     death. center: center Bleeding; Major when lethal.
+//   specter (targeted tanks): non-tank in a cone names the tank who took none.
+//   spearpoint: 3+ hit player-less, 1-2 hit named.
+//   escelons: back-to-back or doubled EF cones, each player; nearly always lethal.
+//   thunder-drop: drop on roses names dropper (overlap names both);
+//     magic-break: the rose's dropper.
+//   tower: marked player in a Bloom3/6 tower or two towers; empty-tower:
+//     unmarked player with no tower (player-less if more than 2 left; add
+//     towers always player-less).
+//   share: living player missing Banish II/III or Stock Break.
+//   fall: lone silent deaths, player-less.
+//   Raid: quietus (adds 100 gauge), mass-deaths (4+ in 2.5s, over in 75s),
+//     enrage (Rose Red), called-wipe, collapse (5 dead, over in 45s).
+// Skips: drops, towers and EF skip resolutions with a player dead. Exposure is
+//   everyone except specter.
+// Cutoffs: Raid errors above; wipes need established unrecoverability, not one
+//   penalty aura. Late Stocks are healing pressure, not a soft enrage.
+// Key thresholds (A/B reports, 21 pulls, 8 kills): clock repeats within ~1s
+//   per pull, add phase included; Quietus 2:31 (hit 2:37); clean EF volley hits
+//   four alternating sets; Shock puddle pulses 43172 on circle holders are not
+//   errors (0-2 in every kill). Quietus fail 43192/43214 and Rose Red never seen.
+// Strategy: no static assignments supplied; community examples are not
+//   assignments. Bloom6 single Holy hit with heavy mitigation is intended, not
+//   an error. Rose-marked four drop Thunder III at Bloom4.
+// Not built: Shock circle placement, add tower ownership/shade aim (no tethers
+//   in log), Banish III splits, Bloom6 Holy (planned), rose placement beyond
+//   Magic Break, Withering/Rose Red.
+// Sections (grep the exact heading): "VERIFIED AGAINST LOGS (2026-10-14)"
+//   pulls, clock, IDs, findings; "RULES IMPLEMENTED" rule list;
+//   "GUIDE-DERIVED MODEL: ZELENIA"; "SOURCES AND PATCH SENSITIVITY";
+//   "SEVERITY, ATTRIBUTION AND LOG VOCABULARY" status id mapping;
+//   "SHAPE, CLOCK AND RESOURCES" tiles, reference clock;
+//   "ROSE NETWORK RULES / EMBLAZON [BM]"; "ASSIGNMENTS AND STRATEGY VARIANCE";
+//   "THORNED CATHARSIS / STOCK BREAK [BM, IV]";
+//   "SHOCK / ALEXANDRIAN HOLY: OPENING [BM, DATA]";
+//   "SPECTER OF THE LOST / ESCELONS' FALL [BM]";
+//   "BLESSED BARRICADE / SPEARPOINT PUSH / PARTY ADDS [BM]";
+//   "BLOOM1 / REPEAT: ALEXANDRIAN THUNDER II / III [BM]";
+//   "BLOOM2 / BLOOM5: THUNDER SLASH, THUNDER IV, VALOROUS ASCENSION";
+//   "BLOOM3: EMBLAZON / EXPANDED TOWERS [BM]";
+//   "POST-BLOOM3: DONUT SHOCK / BANISH II / EF2 [BM, G8]";
+//   "BLOOM4: ROSE/SPREAD NETWORK / ENCIRCLING THORNS / BANISH III";
+//   "BLOOM6: TOWERS / EMBLAZON / HOLY HAZARD [BM, G8]";
+//   "WHAT ENDS A PULL / OPEN QUESTIONS FOR LOG VERIFICATION".
+// Open items: Shock/Stock/Valorous pulse counts, add gauge rate/reset, copied
+//   tile and empty-tower event names, center vs wall Bleeding, real clocks
+//   and quadrant drop map (see last section).
+// ── END DIGEST ──
+//
 // -- VERIFIED AGAINST LOGS (2026-10-14) --
 // A = Y9Fh2BHyj3xAqZ6V: 8 pulls, kills A3 (9:42), A5 (8:22), A7 (8:55),
 //     A8 (8:37); wipes A1 A2 A4 A6.

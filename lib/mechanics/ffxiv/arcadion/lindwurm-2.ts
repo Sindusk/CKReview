@@ -4,6 +4,55 @@
 // FFLogs logs P2 as its own fight ("Lindwurm II"); the module self-gates on
 // P2's signature casts, so lindwurm-1.ts's door boss is skipped.
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// What: all of P2 (~9:05 kill): Replication 1/2/3, Blood Mana, Idyllic
+//   Dream, Arcadian Hell. Gate: P2 signature casts (Arcadia Aflame etc.).
+//   The static's plan varies pull to pull, so rules judge outcomes, never
+//   BC/SS/DN spots or assignments. Slots: roles.ts as-is.
+// Rules (Major on Damage Down or death unless noted):
+//   ffxiv-lw2-avoidable (Minor otherwise): plain avoidable hits.
+//   -element: Rep1 hit of an element whose Resistance Down is held; names
+//     the repeater (second-set fire/dark variants name the missed bait).
+//   -contact (Major): broken Blood Wakening wave names the Bloody Burst
+//     contact. -cone: live Hemorrhagic Projection names the Grotesquerie
+//     holder on its cast, else player-less.
+//   -overlap / -defam: one-bait-per-player families (PERSONAL: Mighty
+//     Magic, Scalding Waves, Firefall Splash, Mana Burst, Arcanum, portent
+//     cones, tank Finishers). -finisher: non-tank in a tank's Finisher.
+//   -stack: player in both Heavy Slam stacks, or the ones who missed a
+//     stack that killed; Unmitigated Impact player-less Minor.
+//   -mutation (Major): failed Mutation check (Unmitigated Explosion).
+//   -tower: empty Cosmic Kiss towers. -doom (Minor, player-less): Doom ran
+//     out. -fall: knocked off by wind tower (Major) else Minor.
+// Cutoffs (Raid): -mass-death (4+ deaths to one mechanic in 3s, pull over
+//   within 60s), -enrage (Arcadian Hell final volley), -called-wipe,
+//   -collapse; each only before any other Raid. -reset (Raid, player-less):
+//   death before first Arcadia Aflame = tactical reset after a Lindwurm
+//   kill. Both healers dead is a cutoff via ffxiv/common.ts.
+// Thresholds: Rep1 repeat hit while holding that Resistance Down killed
+//   69 of 71 (reports A, B); CONE_OWNER_MAX for cone holder; Blood Mana
+//   check at 3:23 and 3:53, every beta needs a hit, every alpha none (17
+//   fails in the sample); Doom 8s; mass-death 4+ in 3s.
+// Exposure (rule-meta.ts): -finisher non-tanks, -contact solo contact,
+//   rest everyone. Damage Down causes excluded from ffxiv-damage-down.
+// Sections: "VERIFIED AGAINST LOGS (2026-10-12)" (5 reports, kill clock,
+//   log IDs, failure findings); "RULES IMPLEMENTED" (full rule text, VOD
+//   rulings, not built); "GUIDE-DERIVED MODEL: LINDWURM II (M12S P2)";
+//   "SOURCES AND CONFIDENCE"; "ATTRIBUTION, STATUS NAMES AND CANDIDATE
+//   IDS"; "SHAPE, REFERENCE CLOCK AND ROLE CONVENTIONS"; "RAIDWIDES,
+//   DOUBLE SOBAT AND SNAKING KICK"; "REPLICATION 1: DN ELEMENT ROTATION";
+//   "REPLICATION 2: SHARED RECORDING RULES"; "REP2 PROFILE A: BC, D AS
+//   RELATIVE NORTH"; "REP2 PROFILE B: STATIC STAGING"; "BLOOD MANA:
+//   MUTATION AND SHAPE CONTACTS"; "IDYLLIC DREAM: TWO REALITIES AND
+//   RECORDING"; "IDYLLIC: DOWNFALL TOWERS, ARCANUM AND PORTENTS"; "IDYLLIC:
+//   DN UPTIME LIVE SETS AND FINAL REPLAYS"; "ARCADIAN HELL AND PULL END";
+//   "OPEN QUESTIONS FOR LOG VERIFICATION".
+// Open/not built: strategy assignment checks; Timeless Spite baits;
+//   Top-Tier Slam stack sizes; Bloody Burst / Wailing Wave survival; Dark
+//   II tower lines; which shape was contacted; tank buster deaths.
+//   Unruled VOD cases are listed in RULES IMPLEMENTED.
+// ── END DIGEST ──
+//
 // -- VERIFIED AGAINST LOGS (2026-10-12) --
 // Progression of the user's static, plan varying pull to pull (user: "ours,
 // plan varies"), so rules judge outcomes, never the BC/SS/DN spots below.

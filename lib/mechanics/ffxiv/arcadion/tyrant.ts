@@ -3,6 +3,56 @@
 // The Tyrant (M11S) per-pull rules. Entry point: detectTyrantErrors.
 // Self-gates on the boss's signature casts, so it is safe on every pull.
 //
+// ── DIGEST (read first; detail in the sections it names) ─────────────────
+// What: The Tyrant (M11S), whole fight (Crown/Raw Steel through Meteorain,
+//   Flatliner, Massive Meteor, Avalanche, Ecliptic Stampede, kicks, enrage
+//   Heartbreaker ~+11:05 on the kill). Self-gates on the boss's signature
+//   casts. Owns all per-pull rules below.
+// Rules (ruleId: severity, meaning). Default: Major on death or Damage Down,
+//   else Minor; Raid only for an unresolvable outcome; Major names a player.
+//   ffxiv-tyrant-avoidable     avoidable hits (0-damage mitigated hits skipped)
+//   ffxiv-tyrant-overlap       one-bait-per-player families (Impact, scythe
+//     cones, Gust, Fire Breath, Comets): victim and known owner named
+//   ffxiv-tyrant-stack         doubled stacks, missed stacks, Sharp Taste side,
+//     Eye of the Hurricane partners, Massive Meteor, Two/Four-Way front
+//   ffxiv-tyrant-buster       non-tanks in tank-only hits (axe, Wall, Fatality)
+//   ffxiv-tyrant-tank-buster  tanks: Tank Cones Overlapped, Lost Enmity,
+//     Cone Into the Party
+//   ffxiv-tyrant-meteorain    comet drops, Fearsome Fireball, early rock
+//     explosions, Shockwave; Raid at 3+ deaths
+//   ffxiv-tyrant-comet-bait   Dropped Comet on the Party, Rock Off Its Spot,
+//     Comet Dropped on a Rock (each drop's baiters)
+//   ffxiv-tyrant-fatality-tether  Missed Foregone Fatality Tether (tanks)
+//   ffxiv-tyrant-sharp-taste-side  healer on the wrong side (from -stack)
+//   ffxiv-tyrant-fireball-front    Fire Resistance Down holder took the front
+//   ffxiv-tyrant-tower        short Flatliner / Stampede tower; Tough Break Raid
+//   ffxiv-tyrant-stampede     Atomic Impact on a non-carrier, lava, Mammoth
+//   ffxiv-tyrant-fall         no-killing-blow death; "knocked" after knockback
+//   ffxiv-tyrant-enrage / -called-wipe / -collapse   Raid, only before any
+//     other Raid (3+ unexplained deaths in 10s; 5 dead and over within 45s)
+// Cutoffs: Raid from the three rules above, 3+ deaths in Meteorain/towers, the
+//   first two Flatliner waves short, 4+ hit by Shockwave at once.
+// Key thresholds: near-miss Comets 5y+ apart (clean 6.1y+) = player-less
+//   Minor (N8 +1:30); rock 5y+ off every ROCK_SPOTS = baiter named; a knocked
+//   fall >12s before the end never joins a called wipe (N9 +6:31); Gust / Fire
+//   Breath only with 8 alive, Impact only with both tanks on enmity.
+// Strategy: mostly Hector; slots from roles.ts, MT/OT and M1/M2 re-read from
+//   spreads (resolveSlots); spots IMPACT_SPOTS, SCYTHE_CLOCK, EYE_SPOTS,
+//   ROCK_SPOTS. Second Flatliner line wave swaps baiters and tether holders.
+// Sections: "VERIFIED AGAINST LOGS (2026-10-09)" (reports, clock, log IDs);
+//   "RULES IMPLEMENTED" (full rule semantics, not built); "GUIDE-DERIVED MODEL:
+//   THE TYRANT (M11S)" with "SOURCES AND CONFIDENCE", "SEVERITY, ATTRIBUTION
+//   AND LOG VOCABULARY", "SHAPE, REFERENCE CLOCK AND SHARED ASSIGNMENTS", then
+//   one block per mechanic group (Crown/Dance, Raw Steel, Trophy Weapons, Void
+//   Stardust, Great Wall of Fire, Meteorain, Flatliner, Massive Meteor,
+//   Ecliptic Stampede, Fireballs, Heartbreak Kick); "STRATEGY VARIANCE AND
+//   OPEN QUESTIONS FOR LOG VERIFICATION"; "OPEN QUESTIONS (VOD needed; moved
+//   from docs/open-items.md 2026-10-15)".
+// Open items: Shockwave line-of-sight, rock collisions, Wall front swaps, kick
+//   cooldown timing, tank deaths to own busters not built; strat variants
+//   (rocks, Dance, Stampede priorities) and several VOD questions open.
+// ── END DIGEST ──
+//
 // -- VERIFIED AGAINST LOGS (2026-10-09) --
 // One static, week-1 progression, 88 pulls over three reports. Cited as
 // B23 +9:36 (report letter, pull, mm:ss from pull start):

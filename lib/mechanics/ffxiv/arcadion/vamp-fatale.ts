@@ -3,6 +3,50 @@
 // Vamp Fatale (M9S) per-pull rules. Entry point: detectVampFataleErrors.
 // Self-gates on Killer Voice / Vamp Stomp, so it is safe on every pull.
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// What: whole-fight M9S rules (Stomp, Hardcore, Rain, Aetherletting,
+//   Plummet/Flails, Hell in a Cell, Deathmatch, enrage). Gate: Killer Voice /
+//   Vamp Stomp casts. Fixed clock, identical every pull (+/-0.3s), so
+//   mechanics are timed, not kill-dependent. Slots (MT/OT/M1/M2/H1/H2/R1/R2)
+//   come from the Toxic/Hector plan via roles.ts + resolveSlots.
+// Rules (all "ffxiv-vf-" + id):
+//   avoidable Major (one per resolution, 3s; chain Explosion 8s; Minor if
+//   target already had Damage Down and survived); stomp-bat, stomp-overlap
+//   Major (whoever is 45+ deg off clock spot); hardcore Major (non-tank hit),
+//   hardcore-tanks Major (both tanks, both circles within 150ms),
+//   hardcore-party Raid (3+ non-tanks, names nobody); rain-missed Major,
+//   rain-wipe Raid (3+ deaths, player-less); aetherletting-overlap Major+Raid,
+//   -cross Major, -clip Major, -misplaced Minor; saw Minor (Major if died
+//   with DoT); flail-tower Major (tank who soaked no Plummet); barbed-burst
+//   player-less Minor (Raid 3+ died); doornail Raid; cell-tower Major +
+//   Raid cutoff; cell-cone-tank Major (outside tank); cell-cone player-less
+//   Minor; last-lash Major (inmate); deathmatch-tower Major; enrage Raid;
+//   collapse Raid.
+// Cutoffs (first Raid error ends the pull): Hardcore party, Aetherletting
+//   overlap, missed cell tower, Rain wipe, Doornail, collapse (5 dead net of
+//   raises, pull ended within ~45s), enrage (Finale Fatale +605).
+// Key thresholds: avoidable 3s/8s; Hardcore tanks 150ms, non-tank hit only if
+//   both tanks alive and none dead in last 30s; Stomp overlap 45 deg; Cross
+//   victim within 1y of boss or drop under 16y out; Rain 3/4/6 hits per
+//   occurrence (+48/+258/+500). Stomp clock N/S/W/E/SW/SE/NW/NE; drops at
+//   wall 18.3-19.6y.
+// Strategy: Toxic/Hector plan; cells group G1 (MT/H1/M1/R1) soaks first set;
+//   a missed cell tower ends the pull (user); Hardcore party names nobody
+//   (user). Damage Down causes here are excluded from ffxiv-damage-down.
+// Sections (grep exact heading):
+//   "VERIFIED AGAINST LOGS (2026-10-08)": report jN3XDrf2z8PmLgRJ clock, log
+//   IDs, positions, failure findings, per-pull cutoffs, VOD reviews;
+//   "RULES IMPLEMENTED": rule semantics and exposure scoping;
+//   "SOURCES AND CONFIDENCE"; "SEVERITY, ATTRIBUTION AND LOG VOCABULARY";
+//   "SHAPE, CLOCK AND ASSIGNMENTS"; per-mechanic model headings from
+//   "SATISFIED / CROWD KILL [IV, KC]" to "UNDEAD DEATHMATCH / BAT CHAINS /
+//   SANGUINE SCRATCH [KU]"; "PULL END, VARIANTS AND NOT-ERROR SUMMARY";
+//   "OPEN QUESTIONS FOR LOG VERIFICATION"; "IDs (see VERIFIED AGAINST LOGS)".
+// Open items ("OPEN QUESTIONS (VOD needed; moved from docs/open-items.md
+//   2026-10-15)"): Stomp overlap blame on pulls 1/3/13; whether third Rain
+//   deaths (pulls 5, 7) should name anyone.
+// ── END DIGEST ──
+//
 // -- VERIFIED AGAINST LOGS (2026-10-08) --
 // Report jN3XDrf2z8PmLgRJ: 13 pulls, kill = P8 (586.9s). P1-P8 are one
 // roster, P9-P13 a second one (alts) running the same Toxic/Hector plan.

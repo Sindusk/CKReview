@@ -2,6 +2,68 @@
 // Entry point: detectAlphaOmegaErrors. Self-gates on Cosmo Memory (31649),
 // P6's opening raidwide, and runs from it to the pull's end.
 //
+// ── DIGEST (read first; detail in the sections it names) ─────────────────
+// What: TOP Phase 6 (Alpha Omega), from Cosmo Memory (31649, lands 14:31-14:45
+//   into the pull) to the pull's end. Self-gates on Cosmo Memory. Owns every
+//   per-pull P6 rule; the P6 clock is fixed within ~0.2s on every pull (Flash
+//   Gale, Cosmo Arrow, Dive, Unlimited, Wave Cannon, Wild Charge, Meteor,
+//   Magic Number, Run). No Damage Down exists in P6; Brilliant Dynamis buffs
+//   aren't in the fetched buff stream.
+// Rules (ruleId, severity: meaning):
+//   ffxiv-top6-avoidable    Major on death, else Minor  Cosmo Arrow, Unlimited
+//     exaflares/puddles, Meteor baits
+//   ffxiv-top6-spread       Major on death, else Minor  a Wave Cannon line hit
+//     someone besides its owner; owner = players within 5y of the boss, else
+//     players 23+ degrees off their group's clock, else the one 10+ worse
+//     than the rest, else all
+//   ffxiv-top6-charge       Major on death, else Minor  with eight alive, a
+//     player 4y+ off the Wild Charge line, or (none off) a player it missed
+//   ffxiv-top6-gale         targeted at both tanks (both alive): 2+ non-tanks
+//     hit and a non-tank the farthest -> names the tank who took neither
+//     gale, else player-less
+//   ffxiv-top6-death        Raid  first P6 death (bar a tank dying to Magic
+//     Number after their tank LB3)
+//   ffxiv-top6-called-wipe  Raid  that death was a reset (3+ silent deaths
+//     within 10s, within 12s of the end)
+//   ffxiv-top6-magic-number Raid  aura ran out with nobody dead yet
+// Cutoffs: earliest Raid error only. 7 P6 wipes, each first P6 death: spread
+//   overlap 2, Cosmo Arrow 2, Unlimited puddles 1, raw damage (nobody named)
+//   2. The kill has no P6 error. Any P6 death ends the pull (Brilliant
+//   Dynamis and the LB refund go with it); later deaths are fallout.
+// Key thresholds: SPOT_DEG 23 (clean hits sat within 21 degrees and 7.0y+
+//   out, 91 hits), SPOT_MARGIN_DEG 10; charge lateral 4y, bearing ignored
+//   inside 5y (front tanks); NUMBER_EXPIRY 5s (healer LB3 cleared the aura
+//   2.3-3.4s after it landed; the failed pull ran out at 6.0-6.2s); called
+//   wipe: 3 deaths / 10s / last 12s. Spread lines last 1.96s, second set
+//   lands 2.0s later: two lines in one set kill, one per set survives.
+// Strategy/assumptions: NAUR strats (user confirmed): supports on cardinals,
+//   DPS on intercardinals; Wild Charge stacks south, tanks in front; the two
+//   tanks hold/bait the Flash Gale circles; tank LB3 then healer LB3 pairs
+//   clear Magic Number. Sources differ on details (see STRATEGY AGREEMENT).
+// Sections (grep the heading):
+//   "VERIFIED AGAINST LOGS (2026-10-15)"  the 8 P6 pulls, clock, findings
+//   "RULES IMPLEMENTED"  rules above plus what is not built
+//   "GUIDE-DERIVED MODEL (2026-10-14; NOT VERIFIED AGAINST LOGS)"
+//   "SOURCES CHECKED 2026-10-14"
+//   "SHAPE, CLOCK AND LIMIT BREAK ECONOMY"
+//   "COSMO MEMORY / QUICKENING -> BRILLIANT -> SPARK"
+//   "AUTOATTACKS / FLASH GALE"
+//   "COSMO ARROW: TWO PATTERNS / TWO OCCURRENCES"
+//   "COSMO DIVE: CLOSE TANKS / FAR SIX-PLAYER SHARE"
+//   "UNLIMITED WAVE CANNON: EXAFLARES / SIX PUDDLE SETS"
+//   "WAVE CANNON: FOUR+FOUR SPREADS / WILD CHARGE"
+//   "COSMO METEOR: BAITS / ADDS / FOUR SPREAD VOLLEYS"
+//   "COSMO METEOR: THREE FLARES / FIVE-PLAYER STACK"
+//   "MAGIC NUMBER: TWO TANK LB -> HEALER LB CHECKS"
+//   "STRATEGY AGREEMENT"  where the sources disagree
+//   "FINAL RUN / WHAT ENDS A PULL"  Run 31648 enrage ~+267.2, deathwall
+//   "OPEN QUESTIONS / SOURCE DISAGREEMENTS FOR LOG VERIFICATION"
+// Open items: not built: opening tank LB, Cosmo Dive (busters always on
+//   tanks, share always six), Meteor spreads/flares/stack/add enrage, early
+//   or missing tank LB at Magic Number, final Run enrage, deathwall, who
+//   owed a missing healer LB3 (gauge not logged); none failed on disk.
+// ── END DIGEST ──
+//
 // -- VERIFIED AGAINST LOGS (2026-10-15) --
 // The static of blue-screen.ts and run-dynamis.ts (not the user's; no VOD;
 // NAUR strats, which the user confirmed). Every pull on disk that reached

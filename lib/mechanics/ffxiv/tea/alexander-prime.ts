@@ -1,6 +1,73 @@
 // The Epic of Alexander (Ultimate) -- Phase 3: Alexander Prime.
 // Includes entry Temporal Stasis and the Divine Judgment transition.
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// What: TEA phase 3 (FFLogs phases 4 Temporal Stasis, 5 Alexander Prime).
+//   Self-gates on Temporal Stasis; runs from its cast start to the
+//   transition hit (or Perfect Alexander's first cast, or the last event).
+//   Order: Stasis, Inception, Wormhole, Incinerating Heat, Enumeration,
+//   Mega Holy, Summon Alexander, J Waves, Divine Judgment. NAUR plan (user).
+//   Clock from Stasis cast completing (+SSS s, all pulls within ~0.3s):
+//   Inception +81, Wormhole Formation +129, Enumeration +175, J Storm +206,
+//   Divine Judgment +275, transition hit 15.4s later (17-31k, no LB).
+//   53 pulls reached Stasis, 10 cleared (reports B-F).
+// Rules (id: severity, meaning):
+//   ffxiv-ap-stasis-cone: Major if a cone killed, else Minor; wrong side
+//     for debuff, owner absent, or cone through others.
+//   ffxiv-ap-stasis-tether: Major, both players; Plaint of Surety 100+ dmg.
+//   ffxiv-ap-stasis-deaths: Raid fallback; 2+ Stasis deaths, 2+ still dead.
+//   ffxiv-ap-tetrashatter: Major; died to a crystal burst.
+//   ffxiv-ap-true-heart: Raid; fewer than four Tetrashatter casts.
+//   ffxiv-ap-electromagnetic-burst: Raid, player-less (orbs unreadable).
+//   ffxiv-ap-fire: Minor, Major if dead in 10s; extra beside tank, or hit
+//     under Fire Resistance Down.
+//   ffxiv-ap-sacrament: Major if killed; ffxiv-ap-sacrament-party: Raid, 4+.
+//   ffxiv-ap-inception-sword: Minor/Major; victim nearest Cruise Chaser
+//     plus non-baiters within 4y.
+//   ffxiv-ap-super-jump: Minor, Major if killed/knocked off; extras in jump.
+//   ffxiv-ap-wormhole-aim (holder), -stray, -knockback (Major, own attack),
+//     -dead-going-in (Raid, number with no holder).
+//   ffxiv-ap-wormhole-death: Raid; first Wormhole death before third soak.
+//   ffxiv-ap-avoidable: Minor, Major if killed (Apocalyptic Ray, Eye of
+//     the Chakram).
+//   ffxiv-ap-soak-extra: Minor, Major if dead in 10s; ffxiv-ap-soak-missed:
+//     Major; ffxiv-ap-confession: Raid.
+//   ffxiv-ap-heat-stack: Minor, Major if killed; outside Incinerating Heat.
+//   ffxiv-ap-enumeration: Major (wrong circle); -failed: Raid.
+//   ffxiv-ap-j-wave: Raid (3+ deaths from wave 9+); ffxiv-ap-enrage: Raid.
+//   ffxiv-ap-tank-buster: Major; tank killed by Chastening Heat/Divine Spear.
+//   ffxiv-ap-wall: Major; no-killing-blow death, not near a hit, <4 dead.
+//   ffxiv-ap-called-wipe (3+ no-kill deaths in 10s) and ffxiv-ap-collapse
+//     (4 dead, over within 30s): generic Raid, only without a mechanic Raid.
+// Cutoffs: only the earliest Raid marker is kept; later errors are fallout.
+// Exposure: wormhole-aim/-knockback targeted (attack holder), soak-missed
+//   targeted (two owed numbers); the rest everyone.
+// Key thresholds: Stasis near-pair 0.8-1.6y off line = failure (D16 3y);
+//   Tetrashatter 22-38k at a crystal vs ~10k stack, 32 hits per clean pull;
+//   inception sword 4y; jump extra 12y+ out (Inception), seen 9-14y;
+//   wormhole aim 10y+ down cone; Surety failed once (B46, 32k/47k).
+// Assumptions: Apocalyptic Ray aims at player farthest from Brute Justice
+//   (user); facing Cruise Chaser shortens knockback (user); wormhole death
+//   before third soak means wipe (user, D10).
+// Sections: "VERIFIED AGAINST LOGS (2026-10-16)" clock, IDs, findings;
+//   "RULES IMPLEMENTED" rules, VOD reviews, open questions;
+//   "GUIDE-DERIVED MODEL (2026-10-15)"; "SOURCES CHECKED 2026-10-15";
+//   "SHAPE, CLOCK, AND ENCOUNTER PUZZLE"; "IDs, GEOMETRY, AND ATTRIBUTION";
+//   "TEMPORAL STASIS"; "CHASTENING HEAT / DIVINE SPEAR / MEGA HOLY";
+//   "INCEPTION: ORBS, CRYSTALS, HEART";
+//   "INCEPTION: THREE FIRE BAITS, SACRAMENT, DEBUFFS, SWORDS/JUMP";
+//   "WORMHOLE: NAUR TRUE-COORDINATE PLAN";
+//   "WORMHOLE: VOID OF REPENTANCE / CONFESSION";
+//   "POST-WORMHOLE HEAT / ENUMERATIONS";
+//   "SUMMON ALEXANDER / J WAVES / DIVINE JUDGMENT";
+//   "STRATEGY VARIANCE AND NON-ERRORS";
+//   "WHAT ENDS A PULL / OPEN QUESTIONS FOR LOG VERIFICATION".
+// Open items: Electromagnetic Burst names nobody (C27, D5, D16); Wormhole
+//   #3's sword into the waiting group (D13, D19, F2, F7); charges hitting
+//   the odd number (D17, F11); near-pair 0.8-1.6y off (C13, C27); not
+//   built: Plaint of Solidarity short, the transition hit.
+// ── END DIGEST ──
+//
 // -- VERIFIED AGAINST LOGS (2026-10-16) --
 // Same static as the other tea/ modules, NAUR plan (user), roles.ts
 // slots roughly right (user), no VODs. Pulls are cited by the app's Pull

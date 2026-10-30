@@ -1,5 +1,68 @@
 // The Epic of Alexander (Ultimate) -- Phase 1: Living Liquid.
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// WHAT: TEA Phase 1 (Living Liquid, LL; the Liquid Hand splits off at
+//   Cascade). P1 runs from the pull to LL's death (~+2:01, Hawk Blaster, the
+//   first P2 cast); boss HP, not time, ends it. Per-wave blame follows NAUR's
+//   role groups; "LL tank" = first Fluid Swing target (open question 1: the
+//   MT/OT slots in roles.ts differ). TEA has no Damage Down, so avoidables
+//   are Minor unless they kill. Clock (+MM:SS): Fluid Swing 0:11, Cascade
+//   0:19, Exhaust 0:39 / 0:50, boss sequence 1 at 1:09, Drainage 1:27,
+//   Throttle 1:36, sequence 2 at 1:47.
+// RULES (severity; exposure):
+//   ffxiv-ll-avoidable Minor/Major if killed: boss and tornado waves (LL
+//     tank's opening one excepted), frontal, Sluice, cleaves on non-tanks,
+//     Drainage splash on non-holders, Dropsy. Everyone.
+//   ffxiv-ll-threat Minor/Major: cleave on 3+ non-tanks or the tank it
+//     targeted; victims not flagged. Everyone.
+//   ffxiv-ll-wave-bait Minor/Major if water killed within 6s: group member
+//     took no wave; outsider fallout stays the non-baiter's. Everyone.
+//   ffxiv-ll-exhaust Major if lethal: two Exhausts / second stack; at the
+//     second Exhaust with a melee doll, its owner ("Doll Fed Too Late").
+//   ffxiv-ll-doll-feed Major (owner, fed above 25%) + ffxiv-ll-doll-wipe
+//     Raid; ffxiv-ll-doll-kill Major (killing blow) + doll-wipe Raid.
+//     Doll-feed targeted to the owner.
+//   ffxiv-ll-hand, ffxiv-ll-pain: Raid, player-less (gate on damage).
+//   ffxiv-ll-throttle: player-less Minor + healer cleanse counts; targeted
+//     to healers. ffxiv-ll-drainage: Minor/Major on the idle tank, both
+//     tanks alive; targeted to tanks. ffxiv-ll-drainage-tank-dead: Raid.
+//   ffxiv-ll-outburst Raid + ffxiv-ll-orb Major (toucher within 2y, 2y+
+//     nearer than anyone else).
+// CUTOFFS (Raid, P1 wipes only, earliest kept, only before a mechanic):
+//   ffxiv-ll-dead-going-in, ffxiv-ll-called-wipe (3+ no-killing-blow
+//   deaths in 10s, Throttle expiries excluded, or any within 12s of the
+//   end), ffxiv-ll-collapse (4 dead, over within 30s), ffxiv-ll-enrage.
+//   Only the first Raid error is kept.
+// KEY THRESHOLDS (report A, 46 P1 wipes): clean feed 0.3-24.9% vs failures
+//   26.4-86.9% (12k-87k raid damage, 6-8 dead); clean Hand of Parting /
+//   Prayer 1-2k vs 29k+; clean Hand of Pain medians up to 5k vs 14k+;
+//   Throttle expiry = death with no killing blow 2.0s after a 10.0s
+//   removal; orb toucher 0.8y vs next 3.5y (B21). Numeric constants live in
+//   the code's "thresholds" block.
+// ASSUMPTIONS: doll owner = its auto-attack target; the LL tank takes the
+//   opening visible wave and both cleaves under Holmgang (0 damage); a wave
+//   on an outsider because a group member stood too far out is the
+//   non-baiter's alone (user, B11, B41); the healer with fewer cleanses is
+//   usually not at fault (user, B17); report A's healers and the Hand tank
+//   stand in one melee doll's circle on purpose.
+// SECTIONS: "VERIFIED AGAINST LOGS" (clock, log IDs, findings per
+//   mechanic, cutoff counts); "RULES IMPLEMENTED" (rules, VOD reviews
+//   2026-10-16/17, replay findings, open questions); "GUIDE-DERIVED
+//   MODEL"; "SOURCES CHECKED"; "SHAPE, CLOCK, AND PHASE BOUNDARY";
+//   "ID / STATUS CONVENTION AND CONSEQUENCES"; "NAUR PLAN AND COORDINATE
+//   FRAME"; "FLUID SWING / FLUID STRIKE"; "CASCADE, TORNADO PUDDLES,
+//   SPLASH"; "HAND OF PRAYER / PARTING / PAIN"; "JAGD DOLLS / EXHAUST /
+//   REDUCIBLE COMPLEXITY"; "PROTEAN WAVE / SLUICE"; "PRESSURIZE / EMBOLUS
+//   / OUTBURST"; "DRAINAGE / THROTTLE"; "VARIANTS, NON-ERRORS, AND
+//   PULL-END STATES"; "OPEN QUESTIONS FOR LOG VERIFICATION".
+// OPEN / NOT BUILT: MT/OT slot mismatch (roles.ts vs LL tank); a volley
+//   where one group member baited nothing and four outsiders took waves
+//   (unreviewed); Hand of Parting/Prayer/Pain blame; Pressurize orb paths
+//   (one Outburst on disk); tank deaths in the opening invulnerability
+//   window (mitigation); Throttle fault by party-list order (not in log);
+//   late Splash count unverified.
+// ── END DIGEST ──
+//
 // -- VERIFIED AGAINST LOGS (2026-10-16) --
 // Report A = 1NG4Zah79yKYHCDv: 73 pulls, no kill, 27 cleared Phase 1
 // (phase 2 from ~+2:01). Fetched with --to-minutes 3, so later phases have

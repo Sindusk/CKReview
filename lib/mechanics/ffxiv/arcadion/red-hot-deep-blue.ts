@@ -4,6 +4,65 @@
 // detectRedHotDeepBlueErrors. Self-gates on Hot Impact / Flame Floater /
 // Divers' Dare, so it is safe on every pull.
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// WHAT: M10S, whole fight: Red solo, Blue solo, both bosses, Air 1, normal
+//   snaking, Watery Grave prison, split arena, Xtreme snaking/Air 2, finish,
+//   hard enrage (Over the Falls). Scripted, no HP phase thresholds. Self-gates
+//   on Hot Impact / Flame Floater / Divers' Dare. Owns every RHDB rule below;
+//   the Damage Down causes are excluded from ffxiv-damage-down (error-rules.ts).
+// RULES (see "RULES IMPLEMENTED"):
+//  avoidable Major (Take-Off Minor unless it killed): 4 Damage Down causes +
+//    Sickest Take-Off; steam on a prison inmate skipped.
+//  fire Minor (Major if died burning): Burns; Cutback fire on 4+ players names
+//    the Cutback target if its safe slice hit old fire, else player-less Minor;
+//    Raid if 3+ died.
+//  wall Major: death with no killing blow outside a called wipe ("knocked" if
+//    a knockback hit in the prior 4.5s, else "walked"); Walking Dead expiry is
+//    a player-less Minor.
+//  floater Major: non-carrier hit by a dash. floater-tether Major: carrier
+//    killed by their own dash.
+//  overlap Major: player hit by another's bait (names both) or 2+ unowned
+//    (names victim); Freaky Pyrotation double pair stack. Clock-spot volleys
+//    name only players 30+ degrees off spot; split-arena cones name a victim
+//    6y+ off their column (clean 0-4y).
+//  buster Major: non-tank in Hot Impact / another's Vertical; nearest-drawn
+//    Vertical names that boss's tank; snaking Hot Impact names the non-tank.
+//  deep-impact Major: farthest player hit is the target; non-tank baited it,
+//    or tank under 6y from Deep Blue is blamed; Raid at 3+ deaths.
+//  stack: Pyrotation death names non-tanks outside it (Major); Re-Entry under
+//    four with a death (player-less Minor).
+//  xtreme-wave: per dash the free player hit farthest from the start holds;
+//    others in the lane Minor (Major if killed). xtreme-tether Major: holder
+//    killed by own dash alone.
+//  split-drop: Inferno drop off side/half (Major if that side's cones
+//    overlapped, else Minor); pair trading sides is a swap.
+//  prison Raid: Impact Zone at deadline; unsoaked tower player-less Minor.
+//  xtreme-cleanse Major: same-colour cleansers of a 2+ volley; Raid 3+ died.
+//  enrage, called-wipe (3+ no-killing-blow deaths at end), collapse: Raid,
+//    only before any other Raid.
+// CUTOFFS: Raid at the first death between Xtreme snaking and the fourth Air 2
+//   volley; the three end rules above fire only before any other Raid.
+// THRESHOLDS: kill clock (every pull within ~1s): Hot Impact +15, Floater
+//   +31..+41, Deep Impact +137, snaking +246, prison deadline +396, split
+//   Floater +417, Xtreme snaking +471, enrage +600. Cutback fire lights 3.0-
+//   3.3s after its hit. Clean carrier hits 17-136k. Source: 96 week-1 pulls
+//   over 3 reports plus the week-2 report (VOD review of its pulls 1-5).
+// STRATEGY: week-1 mixed improvisation, not Hector; no rule depends on a clock
+//   spot or group assignment. Non-Hector positions are not errors.
+// SECTIONS: "VERIFIED AGAINST LOGS" (report key, clock, log IDs);
+//   "RULES IMPLEMENTED"; "GUIDE-DERIVED MODEL: RED HOT / DEEP BLUE (M10S)";
+//   "SOURCES AND CONFIDENCE"; "SEVERITY, ATTRIBUTION AND EVENT VOCABULARY";
+//   "SHAPE, CLOCK AND ASSIGNMENTS"; per-mechanic sections (e.g. "FLAME
+//   FLOATER [KF, TF]", "SPLIT ARENA / FREAKY PYROTATION [KS, TF]",
+//   "DEEP AERIAL / WATERY GRAVE / XTREME WAVE [KG, P]"); "STRATEGY VARIANCE";
+//   "OPEN QUESTIONS FOR LOG VERIFICATION"; "OPEN QUESTIONS (VOD needed; moved
+//   from docs/open-items.md 2026-10-15)".
+// OPEN: Hot Aerial jump order errors (12 of 22 week-1 pulls) unruled, jump
+//   positions unreliable; Snaps blame in one pull unclear; Vulnerability Down
+//   on Watery Grave, Awesome Slab membership, lethal Xtreme aura expiry not
+//   built; several ID/timing questions in the open-question sections.
+// ── END DIGEST ──
+//
 // -- VERIFIED AGAINST LOGS (2026-10-09) --
 // One static, week-1 progression, 96 pulls over three reports. Cited as
 // A12 +213.3 (report letter, pull, seconds from pull start):

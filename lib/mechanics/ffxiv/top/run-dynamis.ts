@@ -2,6 +2,59 @@
 // Entry point: detectRunDynamisErrors. Self-gates on Phase 5's opening cast
 // (31621, or 31622 from Omega-F) and runs to Blind Faith's result.
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// WHAT: TOP Phase 5 (Run: Dynamis): Delta, Sigma and Omega sets of Worlds
+//   (Hello World chains, Dynamis stacks), Regression/Patch tethers, Delta
+//   arms/monitors/fists, Sigma prey/arms/glitch/towers, Omega clone combo,
+//   monitors and Blaster, ending at Blind Faith. Gates on cast 31621/31622.
+//   Clock from 31621: Delta Run +34, Sigma +116, Omega +205.5, Blind Faith
+//   +294.2. Timeline in "VERIFIED AGAINST LOGS (2026-10-15)".
+// RULES (see "RULES IMPLEMENTED"):
+//   ffxiv-top5-avoidable (Major on Damage Down/death, else Minor): Optical
+//     Laser, Swivel, Rear Lasers, Omega-F stance, clone combo.
+//   -delta-arm: names the baiter (cast target, else 3y+ nearest), not the hit.
+//   -wall (Major): silent death no Doom/failure/wipe/reset explains.
+//   -patch: failed Patch, both tether partners alive, both named.
+//   -monitor: Delta monitor on non-Local; Omega sit-out jumped by a World.
+//   -world: extra player in another origin circle, jump over two or back,
+//     hit at three Dynamis. -prey: unmarked Sigma arm victim not farthest.
+//   -arm: Sigma arm line on a non-target. -glitch: pair out of range at
+//     towers. -tower: empty tower / overfilled pair. -blaster: one circle
+//     over two players.
+// CUTOFFS (Raid, earliest kept): -hello-world, -patch, -fist, -tower, -dynamis
+//   (short after set 4), -raidwide (Run raidwide kills 3+), -blind-faith
+//   (Omega-M HP). -called-wipe, -collapse (4 dead at once) only before them.
+//   Over 34 P5 wipes: Hello World 18, Patch 6, tower 3, fists 2, raidwide 2,
+//   collapse 1, Dynamis short 1, both healers dead 1.
+// KEY FACTS: Hello World 31627 = every World failure; Patch 32505 = failed
+//   Patch; silent death within 20s of another P5 death = reset; Delta arm
+//   clean nearest player 5.0-13.2y, failure 1.5y vs 16.0y; Sigma arm target
+//   = farthest (25/25), retargeted baiter 39.0y vs next 2.2-11.1y nearer;
+//   Blind Faith passes at 13.3-19.4% Omega-M HP, fail 30.2% (20% cutoff).
+//   Basis: ten-report static, 42 P5 pulls, no VOD; Not built: fist pair
+//   fault, Solar Ray tank deaths, Pile Pitch on Defense target.
+// SECTIONS: "VERIFIED AGAINST LOGS (2026-10-15)" timeline + findings;
+//   "RULES IMPLEMENTED"; "GUIDE-DERIVED MODEL (2026-10-14)";
+//   "SOURCES CHECKED 2026-10-14"; "SHAPE, CLOCK AND RESOURCE ACCOUNTING";
+//   "SOLAR RAY / RUN: ****mi* RAIDWIDES"; "SHARED WORLD CHAIN MODEL (ALL
+//   FOUR SETS)"; "DELTA: ROCKET PUNCH PAIRING / EXPLOSION"; "DELTA: ARM
+//   BAITS / OPTICAL LASER"; "DELTA: MONITORS / BEYOND DEFENSE / PILE PITCH";
+//   "DELTA: PATCH BREAKS / SWIVEL / FIRST WORLDS"; "DELTA STRATEGY VARIANTS
+//   / DISAGREEMENT"; "SIGMA: SIX PREY BEAMS / TWO FARTHEST ARM BAITS";
+//   "SIGMA: KNOCKBACK / ONE- AND TWO-PERSON TOWERS"; "SIGMA: REAR LASERS / F
+//   STANCE / SECOND WORLDS"; "OMEGA: DOUBLE CLONE COMBO / DIFFUSE WAVE
+//   CANNON"; "OMEGA: FIRST WORLDS WITH MONITORS"; "OMEGA: SECOND WORLDS WITH
+//   BLASTER"; "BLIND FAITH / WHAT ENDS A PULL"; "OPEN QUESTIONS / SOURCE
+//   DISAGREEMENTS FOR LOG VERIFICATION" (source conflicts, not built).
+//   Later per-detector notes: "Avoidable damage", "Delta: the arms", "Deaths
+//   with no killing blow", "Delta: tethers and Patch", "Delta / Omega:
+//   monitors and Beyond Defense", "Hello World chains and Dynamis", "Sigma:
+//   prey, arms, glitch towers", "Omega: Blaster", "Cutoffs".
+// OPEN ITEMS: see "OPEN QUESTIONS / SOURCE DISAGREEMENTS FOR LOG
+//   VERIFICATION" (31627 splash vs holder death, Dynamis cap, monitor
+//   counts, Patch stacks, tower penalties).
+// ── END DIGEST ──
+//
 // -- VERIFIED AGAINST LOGS (2026-10-15) --
 // The ten-report static of blue-screen.ts (not the user's; no VOD; NAUR
 // strats, which the user confirmed). Every pull on disk that reached P5,

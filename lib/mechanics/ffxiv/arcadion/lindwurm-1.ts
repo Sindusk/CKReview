@@ -4,6 +4,51 @@
 // Self-gates on the boss's signature casts. FFLogs logs Lindwurm II as its
 // own fight ("Lindwurm II"), which stays on the fallback model.
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// What: M12S door boss (Lindwurm I). Self-gates on the boss's signature
+//   casts. Owns Mortal Slayer baits, Grotesquerie Acts 1-3, Curtain Call,
+//   Slaughtershed and the pull-end cutoffs. Lindwurm II is a separate fight.
+// Rules (code spells ids ffxiv-lw1-*): avoidable (Major on Damage Down or
+//   death, else Minor); cone (names players standing on the cast, never a
+//   victim; Major if a victim died within 3s); orb / overlap / chain-clip
+//   (one-bait-per-player families, Major if anyone died; names victim and
+//   owner); chain-clip "Left the Center Out of Turn" (Minor, In Line II/IV
+//   beyond ACT2_CENTER at first chain break); stack (Major, Fusion stack
+//   that killed; names living players >6y away, skipped with 3+ dead; Act 1
+//   names the Shared holder who took it away); buster (non-tank in Visceral
+//   Burst with both tanks up); chain (Major on Damage Down/death, Dramatic
+//   Lysis pulses on an Act 2 pair); tower (empty Act 2 tower names its In
+//   Line soaker, Major); metamitosis (empty Act 3 towers, names non-soakers
+//   only when they match the empty count); fall (Major, no-killing-blow
+//   deaths outside a called wipe).
+// Cutoffs (Raid, only before any other Raid): enrage; called-wipe (3+
+//   unexplained no-killing-blow deaths in 10s, 2 within 5s, or any within
+//   12s of the end); collapse (5 dead, pull over within 45s); tower Raid at
+//   3+ deaths; metamitosis Raid at 3+ deaths; fall adds a Raid at 4+ off one
+//   knockback. Both healers dead is a shared FFXIV cutoff (ffxiv/common.ts).
+// Key thresholds: CONE_OWNER_MAX, CHAIN_FAR, CHAIN_OFF_CENTER, ACT2_CENTER,
+//   STACK_GROUP_MAX, LAUNCH_SPOTS (constants near the shared helpers).
+// Assumptions: Ravenous Reach on a Rotting Flesh holder is the cleanse, not
+//   an error; orbs judged only with all eight alive; four waves = one
+//   resolution; Damage Down causes excluded from ffxiv-damage-down.
+// Sections (grep exactly): "VERIFIED AGAINST LOGS (2026-10-12)" (reports,
+//   log ids), "RULES IMPLEMENTED" (full rule text, VOD reviews 2026-10-12 and
+//   2026-10-14, exposure), "GUIDE-DERIVED MODEL: LINDWURM (M12S P1)",
+//   "SOURCES AND CONFIDENCE", "SEVERITY AND LOG VOCABULARY", "SHAPE AND
+//   REFERENCE CLOCK", "THE FIXER, SPLATTERSHED AND ORDINARY TANK DAMAGE",
+//   "MORTAL SLAYER: ROLE BAITS, TWICE [KM, R]", "GROTESQUERIE ACT 1 [K1, T]",
+//   "GROTESQUERIE ACT 2: GLOOPER [K2]", "GROTESQUERIE ACT 3: PLATFORM
+//   PROJECTIONS [K3, T]", "CURTAIN CALL: INTENTIONAL CLEAVE AND CHAINS
+//   [KC, T]", "SLAUGHTERSHED: THREE CYCLES [KS]", "PULL END AND EXPECTED
+//   TRANSITION", "OPEN QUESTIONS FOR LOG VERIFICATION".
+// Open items / not built: Mortal Slayer / Act 1 / Act 3 role-order
+//   assignments (groups varied); tank deaths to own purple orb or busters
+//   (mitigation); The Fixer deaths (healing); Raptor Knuckles / Serpentine
+//   first-arm reads. Unruled: one cone named by pairing on a healer, one
+//   pull's other mistakes. Open questions list covers IDs, Damage Down
+//   sources, Act 2 geometry, Rotting Flesh lethality, P1 HP gates.
+// ── END DIGEST ──
+//
 // -- VERIFIED AGAINST LOGS (2026-10-12) --
 // Week-2 progression of several roster configurations testing different
 // strategies (user: "will likely not follow the strategy perfectly"), so

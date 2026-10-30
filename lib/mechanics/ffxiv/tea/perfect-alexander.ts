@@ -1,5 +1,51 @@
 // The Epic of Alexander (Ultimate) -- Phase 4: Perfect Alexander.
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// WHAT: all of P4 after The Final Word (self-gates on it; runs from 10s before
+//   to the pull's end): Final Word march (light/dark beacons and followers),
+//   Ordained Motion/Stillness, Optical Sights, Fate Calibration alpha and beta
+//   (clones, Plaints, Sacraments, tethers, J Jump, Radiant Sacrament), Ordained
+//   (Capital) Punishment busters, Almighty Judgment, Irresistible Grace.
+//   Temporal Interference/Prison is never reached in logs (kills end first).
+// RULES (ffxiv-pa-*): ordained Major (Motion/Stillness failure hit); beacon
+//   Major (all living followers of a color hit, beacon alive); march Major
+//   (only some followers hit, or death with no killing blow = the wall);
+//   sacrament Minor (Major if died), sacrament-party Raid (4+ in alpha's
+//   crosses); defamation-aim (holder 9y+ from the non-firing clone) and
+//   defamation (holder on the spot: victims); assault-shared (Severity holder
+//   in Solidarity); tether Major, both partners (Surety 100+ damage, both
+//   alive, unless beta's stack was short); stack-short Raid player-less (beta
+//   Solidarity on <5, all eight up); jump (J Jump off the three dark baiters);
+//   donut (Radiant Sacrament hit); spread/stack (doubled, all eight up, nobody
+//   raised in 10s); capital (non-tank in a buster, a tank alive); trine,
+//   grace (alive, outside); enrage Raid (Temporal Prison completed).
+// CUTOFFS (Raid, no mechanic): called-wipe, mass-death (4+ dead in 8s),
+//   tanks-dead (both, none back in 20s), collapse (6 dead, pull over in 35s);
+//   earliest wins. See "Cutoffs" and "RULES IMPLEMENTED".
+// THRESHOLDS: clean Surety hits are 0 damage (fail 100+); beta Solidarity is
+//   5 players in every clean pull (B12: 3); clean Defamation clone 5.8-6.3y
+//   away; far pairs 34.2-34.3y apart (B12 29.9y). Pulls cite report A/B.
+// EXPOSURE: beacon, defamation-aim, assault-shared, tether targeted; rest all.
+// NOT BUILT / OPEN: Temporal Prison order; shared stacks short of players;
+//   Faithlessness (B3, after cutoff); B3 light beacon; A21 crosses unruled;
+//   B11 dark follower start and donut circle size (OPEN QUESTIONS).
+// SECTIONS: "VERIFIED AGAINST LOGS (2026-10-16)" clock, log ids, clones;
+//   "RULES IMPLEMENTED" rules, VOD reviews, replay findings;
+//   "GUIDE-DERIVED MODEL (2026-10-15)"; "SOURCES CHECKED 2026-10-15";
+//   "SHAPE, CLOCK, AND PHASE BOUNDARIES"; "IDs, EXPECTED EVENTS, AND
+//   CONSEQUENCES"; "FINAL WORD / FORCED MOVEMENT";
+//   "ORDAINED MOTION / ORDAINED STILLNESS"; "OPTICAL SIGHT / REPROBATIONS";
+//   "FATE PROJECTION: WHAT IS PREVIEWED AND WHAT IS REAL";
+//   "FATE CALIBRATION ALPHA: MOVEMENT / DEBUFFS / SACRAMENTS";
+//   "ORDAINED CAPITAL PUNISHMENT / ORDAINED PUNISHMENT";
+//   "FATE CALIBRATION BETA: COLOR, TETHERS AND FORCED ROUTES";
+//   "FATE CALIBRATION BETA: OPTICAL SIGHT / RADIANT SACRAMENT";
+//   "ALMIGHTY JUDGMENT / IRRESISTIBLE GRACE";
+//   "TEMPORAL INTERFERENCE / TEMPORAL PRISON ENRAGE";
+//   "STRATEGY VARIANCE / WHAT ENDS A PULL"; "OPEN QUESTIONS FOR LOG
+//   VERIFICATION" (long).
+// ── END DIGEST ──
+//
 // -- VERIFIED AGAINST LOGS (2026-10-16) --
 // Same static as the other tea/ modules, NAUR plan (user), roles.ts slots
 // accurate (user), no VODs. Pulls are cited by the app's Pull n with the

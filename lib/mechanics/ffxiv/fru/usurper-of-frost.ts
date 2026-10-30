@@ -6,6 +6,57 @@
 // at the first Phase 3 cast. The fallback model (fallback.ts
 // MODULE_PHASES) stays out of P2.
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// What: FRU P2 (Usurper of Frost) plus the crystal intermission. Self-gates
+//   on Quadruple Slap / Diamond Dust; runs from the first non-P1 cast to the
+//   first P3 cast. Entry: detectUsurperOfFrostErrors. Boss/helpers are
+//   mechanic sources, not killable adds.
+// Rules (ids end after "ffxiv-uof-"):
+//   avoidable (Major on Damage Down/death, else Minor): Icicle Impact, Kicks,
+//     Frigid Needle, twin cleaves, Burst, Hiemal Storm, Sinbound Blizzard III.
+//   gaze (Major): Stun / Damage Down from Shining Armor.
+//   marked-cone / cone-bait / stone: Frigid Stone players vs House of Light
+//     cones and stones (cone-bait names an unmarked player too far out).
+//   overlap: 2+ mirror/Banish/final cones on one player (all eight alive).
+//   boss-spot (Major): Scythe Kick in Mirror, Mirror on 3+ players names tank.
+//   stack: none or two of Holy / Ray / Banish pair / Powerful Light (all
+//     eight alive); Major on death or Mark, a missed Sinbound Holy always.
+//   puddle: Bleeding (Minor; Major if lethal). slap (Major): tank killed.
+//   refulgent-fate (Raid, 3+), center-tower (Raid + Major), fifth-stack
+//     (Major + Raid at 3+), wall (Major, no-killing-blow deaths),
+//     dead-going-in (Raid), mark (unaccounted Mark of Mortality).
+// Cutoffs (Raid): enrage, endless-ice-age (timer checks); called-wipe (3+
+//   no-killing-blow deaths in 10s) / collapse (3 dead, pull over in 25s):
+//   only the earliest, only before any mechanic Raid.
+// Exposure: slap = both tanks; marked-cone and stone = the four Frigid Stone
+//   players; everything else counts everyone.
+// Thresholds (19 reports, 245 P2 pulls, 91 clears, no VODs): P2 clock is
+//   within ~0.5s per pull (Slap +0, Dust +20.7, Holy +40.9-45.7, Rampant
+//   +117.4, House +155.5, Absolute Zero +173.8, Ice Age cast +200.3, ~39.7s).
+//   Wall: not within 36s of own Damage Down, 8s of another death. Shiva must
+//   be below 20% at Absolute Zero completion.
+// Not built: Hammer/tower overlaps, short Light Rampant tether culprit,
+//   crystal kill order, LR tower assignments, tank mitigation beyond deaths.
+// Sections (heading text, grep to find):
+//   "VERIFIED AGAINST LOGS (2026-10-12)" report list, P2 clock, log IDs
+//   "RULES IMPLEMENTED" full rule text
+//   "GUIDE-DERIVED MODEL: USURPER OF FROST (FRU PHASE 2)"
+//   "SOURCES AND PATCH SENSITIVITY"
+//   "SHAPE, ACTORS, CLOCK AND PHASE GATES" phase-relative damage order
+//   "QUADRUPLE SLAP AND MIRROR IMAGE [N]"
+//   "DIAMOND DUST: CIRCLES, KICK, STONE, CONES [I, S]"
+//   "FOUR SINBOUND HOLY, GAZE AND TWIN CLEAVES [L, I]"
+//   "MIRROR, MIRROR AND BANISH III [M, S]"
+//   "LIGHT RAMPANT: SIX TOWERS, TWO PUDDLES [N, ML, S]"
+//   "LIGHT RAMPANT: STACK ACCOUNTING AND ORBS [N, I]"
+//   "INTERMISSION: EIGHT CRYSTALS AND ICE VEIL [NI, L]"
+//   "STRATEGY OBSERVABILITY AND LOG-VERIFICATION QUESTIONS"
+//   "OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15)"
+// Open items: tank no-killing-blow death in Mirror, Mirror (wall or not?);
+//   two Frigid Stone players in one stone unflagged; center tower short with
+//   nobody named; Hammer/Powerful Light deaths. Several marked [STALE?].
+// ── END DIGEST ──
+//
 // -- VERIFIED AGAINST LOGS (2026-10-12) --
 // 19 reports from one static (Aug-Oct, week-by-week prog), 245 pulls that
 // reached P2, 91 P2 clears (none past early P3), no VODs. Fetched with

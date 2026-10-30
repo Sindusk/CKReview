@@ -2,6 +2,55 @@
 // Entry point: detectBlueScreenErrors. Self-gates on Phase 4's opening cast
 // (31559) and runs to Blue Screen's result (31612 pass / 31613 fail).
 //
+// ── DIGEST (read first; detail in the sections it names) ─────────────────
+// What: TOP Phase 4 (Blue Screen / Final Omega). After P3 reaches 0 HP the
+//   boss reboots at 100%: three rounds of eight protean spreads, delayed
+//   afterimages and two line stacks each; Wave Repeater rings overlap rounds
+//   2 and 3. Blue Screen checks boss HP (<20%) at its resolution; passing
+//   goes to P5, the boss need not die. Clock from the 31559 cast: proteans
+//   +22 / +32 / +42, afterimages and stacks +27 / +37 / +47, rings +30..36
+//   and +47..53, Blue Screen +62 ("SHAPE, HEALTH AND CLOCK", "VERIFIED
+//   AGAINST LOGS (2026-10-15)").
+// Rules (ruleId, severity: meaning; "RULES IMPLEMENTED"):
+//   ffxiv-top4-ring        Major on death or Damage Down, else Minor  hit by
+//     Wave Repeater
+//   ffxiv-top4-protean     a player hit by two lanes in one round, all alive
+//     (never seen; doubles only follow a death)
+//   ffxiv-top4-afterimage  Major if it killed, else Minor  afterimage on a
+//     living player (the baiter too if the lane was 15+ degrees off slot)
+//   ffxiv-top4-stack       Major if anyone in that resolution died, else
+//     Minor  in no stack, the other half's, or both, vs expected groups
+//   ffxiv-top4-swap        targeted: the crossing pair when both markers share
+//     a half; crosser or the player owed the swap back; "took the stack away"
+//   ffxiv-top4-wave-cannon Raid  one moment of P4 hits that killed 3+
+//   ffxiv-top4-blue-screen Raid  Blue Screen failed (31613), with Omega's HP
+//   ffxiv-top4-called-wipe / -collapse  Raid, earliest only, only before the
+//     mechanic Raid, never in a pull that passed (3 dead at once)
+// Attribution: a protean cast's target is NOT who its lane points at; the
+//   lane runs along the helper's facing and the player on that bearing at the
+//   cast owns it. Afterimages repeat the lanes within ~1 degree. Static
+//   layout: four protean slots east, four west, each half a stack group
+//   (south-east / south-west); with both markers on one half the southernmost
+//   marked player crosses and the other half's crosses back ("WAVE CANNON:
+//   PROTEAN SPREADS AND AFTERIMAGES", "WAVE CANNON: TWO SHARED LINE STACKS").
+// Cutoffs: failed Blue Screen is the hard cutoff; a 3-dead moment, called
+//   wall (silent deaths near the end) or collapse ends the pull; called
+//   walls are resets ("BLUE SCREEN: PASS DAMAGE VERSUS WIPE PENALTY",
+//   "STRATEGY AGREEMENT / WHAT ENDS A PULL", section "Cutoffs").
+// Not errors / not built: successful 31612 damage, holding or using an LB,
+//   late P3 DoTs; who was early or late on a ring, a stack's raw-damage
+//   deaths, LB plan and DPS (the Damage dialog's job). Strat details (South
+//   Safe, solo-tank lines) are unknown for the user's static.
+// Baseline (ten reports, one static, no VOD): 64 P4 pulls, 42 passed, 22
+//   wiped in P4; rings killed 18; a marked player killed before the second
+//   stacks leaves both lines on the other group.
+// Open: "OPEN QUESTIONS / SOURCE DISAGREEMENTS FOR LOG VERIFICATION" (ring
+//   count per set, 3/5 stack split that killed nobody, ring Damage Down).
+// Sections: "Wave Repeater rings", "Proteans and their afterimages",
+//   "Stacks" (detectors), "WAVE REPEATER OVERLAPS", "SOURCES CHECKED
+//   2026-10-14", "GUIDE-DERIVED MODEL (2026-10-14)".
+// ── END DIGEST ───────────────────────────────────────────────────────────
+//
 // -- VERIFIED AGAINST LOGS (2026-10-15) --
 // Ten reports of one static (the one omega-reconfiguredd.ts used; not the
 // user's; no VOD; NAUR strats; stand-ins on VPR, NIN and RPR in some). Only

@@ -5,6 +5,58 @@
 // Ultimate Relativity, runs from Hell's Judgment to Memory's End passing.
 // The fallback model (fallback.ts MODULE_PHASES) stays out of P3.
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// WHAT: FRU P3. Self-gates on Hell's Judgment / Ultimate Relativity; runs
+//   Hell's Judgment to Memory's End passing. One Relativity, then one
+//   six-wave Apocalypse. Full uptime, circular deathwall. Fallback model
+//   stays out of P3. Logs only, no VODs (133 P3 pulls, two statics), plus
+//   a few user rulings (2026-10-12).
+// CLOCK (s after Hell's Judgment, within ~0.5s every pull): Relativity +14.2,
+//   fires/Unholy/Blizzard +26.2/+36.2/+46.1, Return stun +55.2, Shell
+//   Crusher +62.4, Black Halo +78.8, Refrain +88.0, Waters +106.8/+125.8/
+//   +134.8, Spirit Taker +109.5, Apocalypse +117.6-128, Dance jump +128.3,
+//   Memory's End cast +153.4-154.2.
+// RULES (ffxiv-ood-*): fire (owner + caught; Major on a death), unholy
+//   (fire-less player missing it), blizzard (Major), bait / avoidable
+//   (Meltdown shots; Major on a death), eruption (rewind / Apocalypse
+//   Eruption overlaps), gaze (Major, Doom from Shadoweye), water (rewind
+//   and Refrain Waters), shell-crusher, spirit-taker, tank-buster (exposure:
+//   non-tanks), tank (exposure: tanks; Black Halo death without Provoke /
+//   Shirk, or a short Dance bait), apocalypse (Major, Damage Down), mark
+//   (unexplained Mark of Mortality, common.ts unexplainedMarks), wall
+//   (Major), enrage / called-wipe / collapse (Raid). Shots, waves or
+//   fires on 4+ are player-less.
+// CUTOFFS: Memory's End needs Gaia HP below 20%: passed 16.6-19.7%, enrage
+//   20.1-56.8% (Raid, lethal). Called wipe and collapse (Raid) when the
+//   raid is dead; four dead at once never recovered (0 of 6 clears).
+// THRESHOLDS: Unholy size 4 gives Mark 8 of 8, size 5 0 of 115; Water size
+//   3 gives Mark 31 of 36, size 4 0 of 184. Shell stack member 5.5y+ off
+//   the middle is named over the missers (clean max 5.3y; pulled 6.0-18.6y).
+//   Dance bait under 15y from center (clean solo 15.4-18.7y; failed
+//   11.5-13.6y). Doom kills ~5s after landing. See "thresholds (with the
+//   extremes behind them)".
+// ASSUMPTIONS: a dying fire holder detonates the fire at once (74 wipes
+//   collapsed in Relativity); fire casts lose their target when 2+ hit, so
+//   owners come from holders; 20s-fire DPS get Water, 30s-fire supports
+//   and long DPS Shadoweye, rest Eruption.
+// SECTIONS: "VERIFIED AGAINST LOGS (2026-10-12)" (clock, log IDs, answered
+//   questions); "RULES IMPLEMENTED"; "GUIDE-DERIVED MODEL: ORACLE OF
+//   DARKNESS (FRU PHASE 3)"; "SOURCES"; "PHASE SHAPE, GATE AND CLOCK";
+//   "ULTIMATE RELATIVITY: DEBUFF ASSIGNMENT [U, MU]"; "RELATIVITY: EIGHT
+//   HOURGLASSES AND REGIONAL PRIORITIES [MU, U, L]"; "RETURN SNAPSHOTS,
+//   STUN AND DELAYED RESOLUTION [N, I, U]"; "SHELL CRUSHER, PULSAR, BLACK
+//   HALO [I]"; "SPELL-IN-WAITING REFRAIN: THREE WATER PAIRS [A, MA, L]";
+//   "SIX APOCALYPSE WAVES, SPIRIT TAKER AND DARKEST DANCE [A, MA]";
+//   "OBSERVABILITY AND OPEN LOG-VERIFICATION QUESTIONS"; "OPEN QUESTIONS
+//   (VOD needed; moved from docs/open-items.md 2026-10-15)"; "log IDs
+//   (VERIFIED above)"; "thresholds (with the extremes behind them)";
+//   "helpers"; "personal spreads: Dark Fire III and the rewind's Dark
+//   Eruption".
+// OPEN ITEMS: VOD-needed questions under "OPEN QUESTIONS"; max-HP buff
+//   expiring between snapshot and damage can kill (cause needs a trace);
+//   E/W boundary for P4 Shiva can be ambiguous.
+// ── END DIGEST ──
+//
 // -- VERIFIED AGAINST LOGS (2026-10-12) --
 // 133 pulls that reached P3, no VODs. Two statics:
 // - A-S: the 19 reports of usurper-of-frost.ts (same letters), 91 P3 pulls,

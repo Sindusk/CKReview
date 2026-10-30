@@ -1,5 +1,51 @@
 // lib/mechanics/ffxiv/fru/enter-the-dragon.ts
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// What: FRU Phase 4 (Enter the Dragon) per-pull rules, entry point
+//   detectEnterTheDragonErrors. Self-gates on Materialization; runs from
+//   Memory's End passing (where oracle-of-darkness.ts stops) to the Phase 5
+//   transition, the enrage or Paradise Lost. fallback.ts stays out of P4.
+//   Built from 46 P4 pulls (six clears), no VODs, no raid plan.
+// Rules (all "ffxiv-etd-"; exposure is the targeted/assigned players):
+//   autos (tank missed Shiva's second auto; tanks), akh-rhai (Major),
+//   lightsteep (Major), chain (Major), water, mark (Mark of Mortality no
+//   error explains), spirit-taker, wings, tank-buster (non-tanks hit by
+//   Somber Dance), akh-morn (tanks), morn-afah, unholy, aero, blizzard and
+//   avoidable (Major), longing, wyrm (Major), rewind-wings, crystal (Major
+//   when it shattered, else Minor), dragon-head (Raid), wall (Major),
+//   enrage / called-wipe / collapse (Raid).
+// Cutoffs: Raid when a mechanic killed 4+ (lightsteep, chain, akh-morn,
+//   morn-afah), on the crystal's shattering hit, Paradise Lost, Joyless
+//   Dragonsong, enrage, called wipe, collapse at four dead. Damage Down causes
+//   are excluded from ffxiv-damage-down (error-rules.ts).
+// Key thresholds: GROUP_HIT 4 (4+ at once is player-less); AFAH_GAP_PCT 5
+//   (survived 4.8, 6.0 killed seven); WATER_MIN 4 and UNHOLY_MIN 5 (fewer
+//   gave Mark of Mortality); lone-Water group 3y / holder 4y away;
+//   KNOCKED_CHAIN_MS 1500; KNOCK_MIN_MS 1900 to KNOCK_MAX_MS 5800 for
+//   no-killing-blow deaths after a knockback; called wipe 3 deaths in 10 s;
+//   COLLAPSE_DEAD_COUNT 4 (no clear had more than two dead at once).
+// Assumptions: clock is stable within ~0.5s of Materialization (Darklit
+//   Dragonsong +25.7, Akh Morn +61.5, Crystallize Time +87.3, transition
+//   +166-175, enrages +167.6).
+// Sections: "VERIFIED AGAINST LOGS (2026-10-12)" pulls, clock, log IDs;
+//   "RULES IMPLEMENTED" rule list and not-built list; "GUIDE-DERIVED MODEL:
+//   ENTER THE DRAGON (FRU PHASE 4)"; "SOURCES, BASELINE AND DISAGREEMENTS";
+//   "SHAPE, CLOCK, CRYSTAL AND HP GATE [N, D]"; "DUAL AUTOS AND AKH RHAI
+//   [D, N]"; "DARKLIT: CHAINS, TOWERS AND CONES [D, MD, N]"; "LPDU MAMI
+//   DARKLIT VARIANT [LD]"; "SPIRIT TAKER, WATER/WINGS AND SOMBER DANCE
+//   [D, I]"; "AKH MORN AND MORN AFAH, TWICE [D, L, N]"; "CRYSTALLIZE TIME:
+//   DEBUFFS AND DRAGON LIFECYCLE [I, N, MC]"; "CT POSITION ASSIGNMENTS AND
+//   FIRST RESOLUTIONS [CT, LC, MC, L]"; "CT TIDAL LIGHT, CLEANSES, QUIETUS
+//   AND REWINDS [CT, MC, N]"; "STRATEGY OBSERVABILITY AND OPEN LOG-VERIFICATION
+//   QUESTIONS"; "OPEN QUESTIONS (VOD needed; moved from docs/open-items.md
+//   2026-10-15)"; "log IDs (VERIFIED above)"; "thresholds (with the extremes
+//   behind them)"; "helpers".
+// Open items: not built are Darklit tower under/over-soak alone, who aims a
+//   cone, bowtie/Mami presets, Edge of Oblivion and raidwide deaths
+//   (mitigation), CT positions, Tidal/rewind corner snapshots, beacon
+//   ownership, Dark Eruption on others; VOD questions in OPEN QUESTIONS.
+// ── END DIGEST ──
+//
 // Futures Rewritten Phase 4 (Enter the Dragon) per-pull rules. Entry point:
 // detectEnterTheDragonErrors. Self-gates on Materialization; runs from
 // Memory's End passing (where oracle-of-darkness.ts stops) to the Phase 5

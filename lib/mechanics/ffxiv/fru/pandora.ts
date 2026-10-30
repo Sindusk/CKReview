@@ -6,6 +6,54 @@
 // (enter-the-dragon.ts stops at the transition). The fallback model
 // (fallback.ts MODULE_PHASES) stays out of P5.
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// WHAT: FRU P5. Order: Fulgent Blade (exalines) + Akh Morn -> Paradise
+//   Regained (wings, tethers, three 2-player towers) -> Polarizing Strikes
+//   (four volleys) -> Pandora's Box (cycle 1 only) -> repeat shorter ->
+//   Fulgent + Akh Morn -> Paradise Lost (enrage). Clock from first Fulgent
+//   cast: exalines +13.8..+23.9, Akh +26.8, wings +45.5/+49.3, Polarizing
+//   +66.7, Box +100.9, 2nd Fulgent +113.1, enrage cast +251.0, lands +261.3.
+//   Self-gates on Pandora casts and Fulgent Blade. Calibrated on 37 pulls
+//   (3 clears), no VODs but report F's review; the rulings came from it.
+// RULES (ids ffxiv-pan-*): exaline (Major, Damage Down; each hit);
+//   akh-morn (player in neither stack / both / both stacks on one group;
+//   Raid at 4+ dead); autos (non-tank hit, names tank who took neither);
+//   wings (non-tank in cleave; 4+ player-less + Raid); tank-wings (both
+//   tanks in one wing); tank-swap (2nd wing on same tank); tether (buster
+//   on non-tank); tower (Major, living non-tank in no tower; Raid when
+//   Unmitigated Explosion kills 4+); polarizing (both lines, own-element
+//   resistance, neither line = Minor; Raid at 4+ dead); afterblast (Major,
+//   Damage Down); box (no tank LB, player-less); wall (Major, death with no
+//   killing blow, not a reset); enrage / called-wipe / collapse (Raid);
+//   mark (common.ts). Damage Down causes excluded from ffxiv-damage-down.
+// CUTOFFS: enrage (Pandora HP at Paradise Lost cast), collapse (4 dead),
+//   called-wipe (3 deaths in 10s, 4 raid dead); 34 non-clears: enrage 8,
+//   collapse 9, wings 5, Akh 3, Cruel Path 3, Unmitigated Explosion 3.
+// THRESHOLDS: FULGENT_SWEEP_MS 12s; RAISED_MS 60s (raised tank excluded);
+//   RESIST_MS 16.5s; ON_TOWER_YALMS 3 (early third-tower DPS 1.0-2.7);
+//   GROUP_HIT 4 (clean 0 non-tanks, failures 3-8); COLLAPSE_DEAD_COUNT 4
+//   (clears never over 2 dead); DD_RESET_MS 36s; RESET_AFTER_DEATH_MS 8s.
+// ASSUMPTIONS: exaline hit is the error, not the Akh deaths after it;
+//   Akh holders of that resistance always die; Unmitigated Explosions
+//   followed a soaker death; Damage Down reset death is intentional;
+//   enmity is not in the log (swap read from Provoke timing).
+// NOT BUILT: wing aimer (party cleaves player-less), tether tank distance,
+//   other duty swaps, Fulgent-after-Box raidwide deaths, boss facing, LB gauge.
+// SECTIONS: "VERIFIED AGAINST LOGS (2026-10-12)" clock, log IDs, answers;
+//   "RULES IMPLEMENTED"; "GUIDE-DERIVED MODEL: PANDORA (FRU PHASE 5)";
+//   "SOURCES AND CURRENT STRATEGY"; "PHASE SHAPE, RESOURCE AND CLOCK [I, C]";
+//   "FULGENT BLADE: THREE PAIRS OF EXALINES, THREE OCCURRENCES [ME, N]";
+//   "AKH MORN AFTER EACH FULGENT [I, L]";
+//   "PARADISE REGAINED: THREE TWO-PLAYER TOWERS [MW, L, N]";
+//   "POLARIZING STRIKES / PATHS: FOUR VOLLEYS, TWICE [MP, L]";
+//   "PANDORA'S BOX, FINAL LIMIT BREAK AND WIPE CUTOFF [I, L]";
+//   "CANDIDATE ACTION ANCHORS AND LOG-VERIFICATION QUESTIONS";
+//   "OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15)";
+//   "log IDs (VERIFIED above)"; "thresholds (VERIFIED above)".
+// OPEN: the OPEN QUESTIONS list needs the first VODs reaching P5 (stack
+//   swaps by resistance holders, group-misread naming, wing targets).
+// ── END DIGEST ──
+//
 // -- VERIFIED AGAINST LOGS (2026-10-12) --
 // 37 pulls that reached P5 (three clears), no VODs, no raid plan. Mostly
 // one static (same core roster in every report). Captures: A refetched to
