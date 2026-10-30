@@ -4,6 +4,54 @@
 // Called from transformFightToPull in lib/log-transforms.ts; it self-gates on
 // this encounter's debuff IDs, so it is safe on any WoW pull.
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// What: Mythic Lost Explorers, a 3-target council (Nama and Iku tankable,
+//   Gebbo throws crates) with a fish clock: Mor'zahi's Final Ascension (FA)
+//   casts 60s after each cycle start. The raid throws a Disgusting Fish at an
+//   explorer before it completes; Mor'zahi's Command then gives that explorer
+//   its ultimate (60s). Each explorer is fed once; the 4th FA (~+425-437) is
+//   the hard enrage. Self-gates on this encounter's debuff IDs. Owns all
+//   wow-le-* rules; two logs (A, B), no VOD ground truth yet.
+// Rules (severity; meaning):
+//   wow-le-final-ascension Minor/Major/Raid: late fish (thrower), no fish, enrage
+//   wow-le-relic-rupture Raid/Minor: unopened crate detonated
+//   wow-le-blast-wave Minor/Major: hit by Blast Wave (bounce timing)
+//   wow-le-no-bounce Minor/Raid: nobody bounced over a wave
+//   wow-le-elemental-explosion Major+Raid: element holder near opposite missile target
+//   wow-le-mighty-thud-undersoaked Minor: leap split by <= 8 (player-less)
+//   wow-le-icebound-flames Minor: Icebound Flames completed
+//   wow-le-shards-no-swap Minor/Major: tank reached 9+ Shredding Shards
+//   wow-le-throw-junk, -evil-eyes, -bomb-blast, -spreading-flames,
+//     -fungal-burst, -aftershock: Minor/Major avoidable damage
+//   wow-le-pull-over Raid: wipe called / 7+ dead / tank death ended the pull
+// Cutoffs (Raid error): FA kills >= 3 (FA_RAID_DEATHS); Relic Rupture hits
+//   the raid (>= 5 hits; fewer means already dead); no-bounce wave killing
+//   >= 3; pull-over.
+// Key thresholds: FA_WINDOW_MS 20000 (late fish killed 5/8/11; two late
+//   fish killed nobody); fish lands ~4.3-5.1s after throw. Mighty Thud
+//   clean 9-18 soakers (kill 13-16), 8 soakers killed twice, so <= 8 flags.
+//   EXPLOSION_PAIR_YD 12.5 (hits at 5.8-12.1yd). Shards 7 per cast, 8 is swap
+//   overlap, 12-15 two casts, flag at 9. COLLAPSE_DEAD 7 (5-6 dead survived
+//   71-120s; 7 dead ended within 31s). TANK_DEATH_END_MS 30000.
+// Assumptions: journal one-feed-per-explorer model (older PTR guide says
+//   repeatable); feed order is a raid choice, not a rule. United Defense
+//   (-99%) needs all three explorers within 30yd.
+// Sections: "VERIFIED AGAINST LOGS (offsets fight-relative)" log findings
+//   and fish clock; "RULES IMPLEMENTED"; "GUIDE-DERIVED MODEL (pre-log)";
+//   "ENCOUNTER SHAPE AND THE FISH CLOCK"; "ROUGH CHRONOLOGY OF A PULL";
+//   "CRATES, MYTHIC SPLINTERS, AND FISH"; "BASE ABILITIES AND POSITIONING";
+//   "GEBBO'S EMPOWERED WINDOW: BOMBS AND MUSHROOMS"; "NAMA'S EMPOWERED
+//   WINDOW: MIGHTY THUD"; "IKU'S EMPOWERED WINDOW: FROSTFIRE VOLLEY";
+//   "KILL WINDOW AND SURVIVOR EFFECTS"; "DETECTION NOTES FOR A LATER
+//   REAL-LOG IMPLEMENTATION"; "OPEN QUESTIONS (VOD needed; moved from
+//   docs/open-items.md 2026-10-15)"; "Ability IDs (log-verified, reports nRGxQ1b8LdMvzC4D +
+//   8PQFgdDh3R9BW71t)";
+//   "Thresholds" (with per-pull evidence); "Responsible players
+//   (docs/archive/exposure-plan.md)"; "When was the pull over?".
+// Open items: all calls await VOD review. Late-fish blame on the thrower
+//   (is that the right owner?); further questions in OPEN QUESTIONS.
+// ── END DIGEST ──
+//
 // The second half of this header is the guide-derived encounter model
 // (written 2026-09-26 before any log was available). The first half is what
 // the logs actually showed; where the two disagree, the log section wins.

@@ -8,6 +8,58 @@
 // (written 2026-09-26 before any log was available). The first half is what
 // the logs actually showed; where the two disagree, the log section wins.
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// WHAT: Mythic Sszorak, whole fight (loop ~100s: Serpent's Fury charge, Venomous
+//   Surge, Raging Crosswinds, then Howling Maelstrom marked by Dig In, enemy
+//   buff 1286033). Self-gates on the encounter's aura IDs. Owns all Sszorak
+//   rules below; pull-over markers mirror vashnik.ts. Basis: one report of 36
+//   Mythic wipes (no VOD, not the user's group); one kill used for angles.
+// RULES (id, severity, meaning):
+//   wow-ssz-unbound-ferocity  Raid       Fury stack missed (100 rage), player-less
+//   wow-ssz-virulence-spread  Minor/Major reinfected, and the spreader
+//   wow-ssz-mutilate-missed   Minor/Major absent from own group's soak
+//   wow-ssz-mutilate-repeat   Minor/Major soaked with Gash still active
+//   wow-ssz-ravage-swap       Minor/Major other tank didn't take Ravage
+//   wow-ssz-tempest           Minor/Major hit by a tornado
+//   wow-ssz-crosswinds-blast  Minor/Major non-holder in a blast
+//   wow-ssz-crosswinds-fall   Major      holder knocked off the platform
+//   wow-ssz-cyst-early        Minor/Major popped a cyst before Maelstrom
+//   wow-ssz-cyst-double       Minor/Raid two cysts popped in one gale
+//   wow-ssz-maelstrom-fall    Major/Raid blown off during Maelstrom
+//   wow-ssz-pull-over         Raid       5+ dead / unrecovered tank death / Berserk
+//   Exposure: crosswinds-fall is targeted (one instance per set, direction-aura
+//   holders); Mutilate is an assigned group duty (soak groups learned per report).
+// CUTOFFS (Raid error): Unbound Ferocity (46-47s after a mark, 8-18 die),
+//   5+ dead (COLLAPSE_DEAD), tank death not recovered (rez grace 15s, continue
+//   30s), Berserk.
+// KEY THRESHOLDS: Virulence reinfection lands 10-60ms after the spreader's
+//   removal (match -400/+60ms), spreaders 2-12yd away, 78 in 36 pulls. Mutilate
+//   groups fixed per tank, learned from soaks of 7+ (clean 9-10, deadly 1-5);
+//   Gash = +500% damage. Cyst pop blame radius 8yd, hits within ~0.3s, gap
+//   >= 0.9s; Maelstrom pops at Dig In +3/+12/+20/+28. Falls = ability-less death
+//   at >= 25% HP (real 30-100%, spike deaths < 15%), 4.6-5.6s after a blast.
+//   Crosswinds bearings: 1285425 15, 1285453 195, 1297096 105, 1297111 285 deg.
+// ASSUMPTIONS: charge cannot be tied to players by position (samples stale);
+//   death-triggered Virulence chains are fallout, not flagged. Not flagged:
+//   Caustic Claws/Residue, Surge ticks, Gash ticks, a normal Maelstrom pop.
+// SECTIONS: "VERIFIED AGAINST LOGS" timeline, mechanics, failures, wipe survey;
+//   "RULES IMPLEMENTED"; "GUIDE-DERIVED MODEL (pre-log)"; "ENCOUNTER SHAPE";
+//   "ROUGH CHRONOLOGY / PLAYER SOLUTION"; "MYTHIC SERPENT'S FURY / CHARGE /
+//   VIRULENCE"; "APEX PREDATOR AND TANKS"; "VENOMOUS SURGE, CYSTS, AND CAUSTIC
+//   RESIDUE"; "RAGING CROSSWINDS AND HOWLING MAELSTROM"; "FUTURE LOG VALIDATION
+//   / ERROR CANDIDATES"; "OPEN QUESTIONS"; "Ability IDs"; "Thresholds";
+//   "Small helpers"; then per-detector blocks: "Serpent's Fury: Unbound
+//   Ferocity", "Virulence: didn't spread after the charge", "Mutilate: missed
+//   and repeated soaks", "Ravage: missed tank swap", "Tempest tornadoes",
+//   "Raging Crosswinds", "Viscous Cysts and Howling Maelstrom", "When was the
+//   pull over?", "Entry point".
+// OPEN (need VOD): tempest volume (tank hits, single hit Minor?); missed
+//   Mutilate exceptions (knockback, mark holder); Virulence blame both or one;
+//   early-pop blame on nearest player (often a tank); double-cyst blame
+//   dropper vs raid; Crosswinds partner blame; keep 5-dead threshold (ended two
+//   pulls 20-70s early); flag Caustic Claws/Residue?
+// ── END DIGEST ──
+//
 // ── VERIFIED AGAINST LOGS (report rNL38zFGMbyADRTh, 36 Mythic pulls, all
 //    wipes, longest +289s; offsets fight-relative) ───────────────────────────
 //

@@ -4,6 +4,58 @@
 // Called from transformFightToPull in lib/log-transforms.ts; it self-gates on
 // this encounter's debuff IDs, so it is safe on any WoW pull.
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// What: Mythic Coiled Altar, 3 stages + intermission (Zul'jan, then Hex Lord
+//   Malacrass). Self-gates on COILED_ALTAR_SIGNATURE (Volatile/Mutagenic
+//   Venom, Venom Rupture, Dreadmarch, Unnerving Fixation). First half of the
+//   header = log-verified, second half = pre-log guide model; log wins.
+// Rules (severity; meaning):
+//   wow-ca-venom-eruption Minor/Major/Raid  orb collision / Deluge eruption, names carriers
+//   wow-ca-guillotine-execution Minor/Raid  under-soaked (Grim) Guillotine
+//   wow-ca-guillotine-resoak Minor/Major  soaked again while Guillotined
+//   wow-ca-frontal Minor/Major  non-tank hit by Sever / Soul Sever / Blighted Sever
+//   wow-ca-gravebound-expired Major  died to uncollected fragments
+//   wow-ca-ghost-caught Minor/Major  own ghost reached the player
+//   wow-ca-dreadmarch-fall Minor  absorb not broken, player fell (player-less)
+//   wow-ca-malevolent-resonance Minor/Major  ghosts collided (not inherited)
+//   wow-ca-wail Minor/Raid  a Soulcoiler completed Wail
+//   wow-ca-soulcoiler-shield Minor  Gloombomb wave left an add's Spirit Shield up
+//   wow-ca-gloombomb-bystander Minor/Major  hit by someone else's bomb
+//   wow-ca-nightfall Raid  Eternal Nightfall completed
+//   wow-ca-spirit-erasure Minor/Raid  intermission intercept deaths
+//   wow-ca-avoidable Minor/Major  Widow's Kiss, Death's Embrace, Deluge impact;
+//     deaths to axes / Noxious Ground
+//   wow-ca-pull-over Raid  6 dead / tank death / called wipe
+// Exposure: Gravebound, ghost-caught, Malevolent Resonance are targeted;
+//   Guillotine (ca-guillotine) is an assigned soak-group duty.
+// Cutoffs (Raid error): pull-over marker: COLLAPSE_DEAD 6, tank death
+//   (TANK_REZ_GRACE_MS 15000, TANK_DEATH_END_MS 30000), called wipe
+//   (CALLED_WIPE_DEATHS 4 in 10000ms, Dreadmarch falls excluded).
+// Key thresholds (report wThYvpJkbK6Pjrdc, P = pull): ERUPTION_HIT 700k
+//   (normal Rupture ticks peak ~615k P5; eruptions 848k+ median P7);
+//   ERUPTION_MIN_PLAYERS 3; ERUPTION_MERGE_MS 5000; ERUPTION_CAUSE_MS 400;
+//   CARRY_FULL_MS 4800; RAID_DEATHS 3; WAIL_RAID_DEATHS 5 within 15000ms (P14);
+//   WAIL_PULL_END_MS 35000 (P14 ended 30.9s after Wail, P15 fought on 57s);
+//   RESONANCE_INHERIT_MS 1500; DREADMARCH_CAST_MS/FALL_MS 1500; SHIELD_CHECK_MS 500.
+// Assumptions: Zul'jan's first defeat (not a timer) starts stage 2; carriers
+//   walk orbs into a safe Sever frontal; Guillotine soak groups alternate.
+// Sections (exact headings): "VERIFIED AGAINST LOGS", "RULES IMPLEMENTED",
+//   "GUIDE-DERIVED MODEL (pre-log)", "PATCH SENSITIVITY BEFORE BUILDING DETECTION",
+//   "OVERALL SHAPE AND ROUGH CHRONOLOGY", "STAGE 1: COALESCED VENOM AND MYTHIC MUTATIONS",
+//   "STAGE 1: OTHER ZUL'JAN WORK", "STAGE 2: DREADMARCH AND PERSONAL MANIFESTATIONS",
+//   "MYTHIC SPIRITCACKLE / SPITEFUL SOULCOILERS", "INTERMISSION: SOULBINDING AND FRAGMENT CADENCE",
+//   "STAGE 3: COILED UNION", "FUTURE DETECTION CHECKLIST", "OPEN QUESTIONS",
+//   "Ability IDs", "Thresholds", "Responsible players"; per-detector blocks:
+//   "Venom eruptions", "Guillotine / Grim Guillotine", "Tank frontals on non-tanks",
+//   "Gravebound: fragments not collected", "Dreadmarch: ghosts reaching their player, and falls",
+//   "Malevolent Resonance: two ghosts touching", "Spiteful Soulcoilers: Wail of Terror and Spirit Shield",
+//   "Gloombomb on bystanders", "Eternal Nightfall completed", "Intermission: Spirit Erasure deaths",
+//   "Avoidable damage", "Pull over: called wipe / 6 dead / tank death".
+// Open items: no VOD ground truth yet; only pulls 1-17 of 30 fetched (kill in
+//   pull 30, no kill baseline); who caused each orb collision (purple carrier,
+//   player walked into, or both) unresolved; see "OPEN QUESTIONS".
+// ── END DIGEST ──
+//
 // The second half of this header is the guide-derived encounter model
 // (written 2026-09-26 before any log was available). The first half is what
 // the log actually showed; where the two disagree, the log section wins.

@@ -8,6 +8,68 @@
 // (written 2026-09-26 before any log was available). The first half is what
 // the log actually showed; where the two disagree, the log section wins.
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// WHAT: Mythic Ula'tek, three stages plus the Shattering intermission. Egg
+//   carriers, Caustic Waves, Spectral Coils, Serpent's Bite, Volatile Purge,
+//   Mother's Wrath, Grasping Fangs / Blight Vein, adds, avoidable damage,
+//   hard enrage, pull-over. Self-gates on ULATEK_SIGNATURE (Noxious Shell,
+//   Soul Constrictor, Stone Venom, Rancid Yolk), so it is safe on any WoW
+//   pull. One report so far (JZp82Rm7TzycM94a: 25 pulls, kill in pull 25);
+//   no VOD ground truth yet.
+// RULES (severity; meaning):
+//   wow-ula-egg-hatch        Minor/Major/Raid  a Viper hatched; blames the
+//                            carrier(s) in Caustic Waves / Noxious Splash,
+//                            else player-less
+//   wow-ula-caustic-waves    Minor/Major  hit by Caustic Waves (tanks too)
+//   wow-ula-spectral-coils   Minor/Raid   <=3 mitigators, or 3+ Coil deaths
+//   wow-ula-calcified-corpse Raid         a Serpent's Bite calcified
+//   wow-ula-volatile-purge   Minor/Major  died to own purge; non-tank overlap
+//   wow-ula-mothers-wrath    Minor/Raid   Stone Venom on 4+ players
+//   wow-ula-blight-vein      Major/Raid   died tethered; 3+ Blight Vein deaths
+//   wow-ula-add-cast         Minor/Raid   Malice / Anguished Cry / Hatching
+//                            Doom completed, Rawling or second Shrieker
+//                            Acidic Expulsion
+//   wow-ula-avoidable        Minor/Major  Falling Debris, Virulent Spit,
+//                            Desperate Thrash (non-tanks), heavy Circling Prey,
+//                            Fester Burst (3+ hit), Deadly Venom deaths
+//   wow-ula-enrage           Raid  Fury Unleashed
+//   wow-ula-pull-over        Raid  7 dead / tank death / called wipe
+//   Exposure: Blight Vein targeted (tethered players, one instance per Fangs
+//   wave); Volatile Purge targeted (purge holders); Spectral Coils assigned
+//   mitigation duty (Soul Constrictor recipients).
+// CUTOFFS: wow-ula-pull-over Raid; wow-ula-enrage; egg-hatch wipe (5+ dead
+//   within 50s of a hatch); the other Raid rules above.
+// THRESHOLDS (P = pull of the report): HATCH_MIN_PLAYERS 5 (Membrane hits
+//   16-20); HATCH_CAUSE_MS 600; HATCH_WIPE_MS 50000 (P6 hatch +117.2, over
+//   +163.0); COIL_UNDERSOAK 3 (clean min 5 intermission / 7 stage 1; fails
+//   0-3); BITE_HELPERS 4 (P5 +570.7 had 3); PREY_HEAVY 600k (outside 13yd
+//   ~500k, inside 0.7-1.2M); STONE_RAID_MIN 4; FESTER_GROUP 3 (kill 1 per
+//   cast, P18 +70.6: 9); COLLAPSE_DEAD 7 / COLLAPSE_END_MS 45000 (P2 fought
+//   90s with 7 dead); TANK_DEATH_END_MS 30000; CALLED_WIPE 4 deaths in 10s.
+// ASSUMPTIONS: a hatch shows only as Putrid Membrane on the whole raid; the
+//   cause is whatever hit a carrier that millisecond. Fixed boss clock to
+//   0.1s per pull.
+// SECTIONS (grep the heading): "VERIFIED AGAINST LOGS" clock and offsets;
+//   "RULES IMPLEMENTED"; "GUIDE-DERIVED MODEL (pre-log)";
+//   "CURRENT-PATCH GUARDRAILS"; "FIGHT SHAPE / ROUGH CHRONOLOGY";
+//   "EGGS: THE ENCOUNTER'S CENTRAL STATE MACHINE";
+//   "STAGE ONE: TANKS, COILS, WRETCH"; "STAGE TWO: TWO WARDENS, TWO CAULDRONS";
+//   "THE SHATTERING INTERMISSION";
+//   "STAGE THREE: SHRINKING ARENA AND PLAYER-ORIGIN WAVES";
+//   "LOG INTERPRETATION / FUTURE DETECTION"; "OPEN QUESTIONS"; "Ability IDs";
+//   "Thresholds"; per-rule code blocks "Eggs hatching into Vipers", "Caustic
+//   Waves hits", "Spectral Coils impacts", "Serpent's Bite -> Calcified
+//   Corpse", "Volatile Purge", "Mother's Wrath with no tank in reach",
+//   "Grasping Fangs / Blight Vein", "Add casts that should never finish",
+//   "Avoidable damage", "Hard enrage", "Pull over: called wipe / N dead /
+//   tank death", "Entry point".
+// OPEN: pulls 21-24 not fetched (rate limit); carrier blame in Caustic Waves
+//   and Noxious Splash; tank hits from Caustic Waves / Falling Debris; who to
+//   name for short Coil soak and Bite helpers; late Blight Vein breaker;
+//   Fester threshold; unflagged mechanics; no rule for Mother's Boon, Mass
+//   Gestation, Rattler Slam.
+// ── END DIGEST ──
+//
 // ── VERIFIED AGAINST LOGS (offsets fight-relative) ──────────────────────────
 //
 //   Report JZp82Rm7TzycM94a: 25 pulls, the kill in pull 25 (+598.6). Pulls

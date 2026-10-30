@@ -8,6 +8,55 @@
 // (written 2026-09-26 before any log was available). The first half is what
 // the logs actually showed; where the two disagree, the log section wins.
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// What: Mythic Vashnik, single boss, one repeating cycle with adds. At 100
+//   energy Imbibe draws from the two closest of three fountains (Blood,
+//   Shadow, Flame); venoms path to the Malignant Cavity; Mythic Imbibe also
+//   spawns Malignant Totems that Plague Froth waves must clear. Self-gates
+//   on the Vashnik ability IDs. Fountain choice is strategy, not an error.
+// Rules (all wow-vash-*):
+//   malignance Raid (totems left standing); malignant-burst Raid (venom
+//   reached cavity); bile-unsoaked Minor, Raid at 3+ kills (missed 5-impact
+//   Bile); exploding-infection Minor/Raid (carrier died infected);
+//   dispel-overlap Major (stacked dispel blasts that killed);
+//   plague-wave Minor/Major (wave victim); plague-froth Minor/Major
+//   (non-carrier stayed near a carrier); froth-carrier-overlap Minor/Major;
+//   stygian-burst Minor/Major (non-holder hit); umbral-ejection Minor/Major
+//   (Shrouded Venom death impact); fangs-swap Minor/Major (other tank did
+//   not taunt Dripping Fangs); pull-over Raid.
+// Exposure: targeted per Froth set (carriers for overlap, living non-carriers
+//   for standing near); role-only per Dripping Fangs hit (the tanks).
+// Cutoffs (pull-over Raid, earliest generic marker only, and only if no
+//   mechanic Raid error came first): 5+ dead net of battle-rezzes; a tank
+//   death not rezzed in 15s; Berserk. Mechanic Raid errors cover 16 of 18
+//   wipes.
+// Thresholds (report kGVX7tafBT2pM1N3, 19 pulls): RAID_WIPE_KILLS 3;
+//   BILE_IMPACTS 5 (82 of 103 launches had 5 soakers), BILE_WINDOW 12s;
+//   wave lane half-width 300 (250 of 258 hits within 2.5yd), travel 6s;
+//   Froth grace 1.5s, min 2 ticks (443 of 489 non-carrier sets took 0-1);
+//   death-removal 300ms; explosion stack 1.5s; Fangs death window 10s.
+// Open: no VOD ground truth yet. Plague Wave blame on the lane's carrier;
+//   Stygian Burst on non-holders (92 Minors) may be undodgeable; missed
+//   totems and undispelled infection name no player.
+// Sections (exact headings):
+//   "VERIFIED AGAINST LOGS" what the 19 pulls showed (log wins);
+//   "RULES IMPLEMENTED" rule list; "GUIDE-DERIVED MODEL (pre-log)";
+//   "ENCOUNTER SHAPE AND CENTRAL CHOICE"; "ROUGH CHRONOLOGY OF A CYCLE";
+//   "MYTHIC TOTEMS/TUMORS AND PLAGUE FROTH";
+//   "SHARED MECHANICS PRESENT ON MYTHIC";
+//   "THE THREE FOUNTAIN ADD FAMILIES";
+//   "STRATEGY VARIANCE AND WHAT A DETECTOR SHOULD MEASURE";
+//   "OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15)";
+//   code: "Ability IDs (log-verified, report kGVX7tafBT2pM1N3)",
+//   "Thresholds", "Small helpers", "Malignant Totems left standing
+//   (Malignance)", "A living venom reached the cavity (Malignant Burst)",
+//   "Catalytic Bile: impact nobody soaked", "Exploding Infection: removals,
+//   and who they killed", "Plague Froth / Plague Wave", "Stygian Burst on a
+//   non-holder", "Umbral Ejection (Shrouded Venom death impacts)",
+//   "Dripping Fangs: missed tank swap", "When was the pull over?",
+//   "Entry point".
+// ── END DIGEST ──
+//
 // ── VERIFIED AGAINST LOGS (report kGVX7tafBT2pM1N3, 19 Mythic pulls, kill
 //    on pull 19; offsets fight-relative) ─────────────────────────────────────
 //

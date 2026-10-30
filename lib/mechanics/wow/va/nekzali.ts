@@ -4,6 +4,74 @@
 // detection. Called from transformFightToPull in lib/log-transforms.ts; it
 // self-gates on this encounter's aura IDs, so it is safe on any WoW pull.
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// What: Mythic Nek'zali, whole fight (phase 1, 50% Ritual of Awakening
+//   intermission, phase 2 after Uncoiling). Gate: Nek'zali aura IDs
+//   (NEKZALI_SIGNATURE). Owns Vessel revival, Ritual/Uncoiled Rage cutoffs,
+//   Hungering Pyre soak, Possession Barrage, avoidable damage, Mythic well
+//   (Curse / exhausted re-entry), Invoke silence, Rites, pull-over marker.
+//   Only 6 pulls (5 wipes, 1 kill), no VOD ground truth: thresholds are
+//   first guesses resting on 1-2 failures.
+// Rules (id  severity  meaning):
+//   wow-nek-vessel-revival    Minor/Raid  unburned corpse revived (player-less)
+//   wow-nek-ritual-completed  Raid  Echoes not killed before Ritual ended
+//   wow-nek-uncoiled-rage     Raid  phase 2 energy reached 100
+//   wow-nek-pyre-undersoaked  Minor  Pyre split by <= 6 (player-less;
+//                             assigned soak-group duty, soakers perform)
+//   wow-nek-barrage-short     Minor/Major  Barrage hit hard (targeted: the
+//                             debuffed tank, one instance per cast)
+//   wow-nek-latent-cultist / -anguished-echoes / -soul-transfer /
+//   -closed-well              Minor/Major  stood in pool/burst, hit by
+//                             Echoes, in Soul Transfer beam, in closed well
+//   wow-nek-curse             Minor  Soulcoiler's Curse completed (player-less)
+//   wow-nek-exhausted-death   Major  died in well after entering exhausted
+//   wow-nek-invoke-silence    Minor  casting when Invoke landed
+//   wow-nek-unscheduled-rite  Minor  Rite outside Ignition/Invoke (unverified)
+//   wow-nek-pull-over         Raid  5+ dead / tank death the pull didn't survive
+// Cutoffs (Raid error): Vessel revival (3+ revived or 3+ killed), Ritual
+//   completed (Uncoiled Rage within 15s of Uncoiling), Uncoiled Rage (phase 2
+//   clock, +183.4s after Uncoiling in both phase 2s that reached it),
+//   pull-over (COLLAPSE_DEAD 5, or tank death with pull ending within 30s).
+// Key thresholds (clean vs failure):
+//   Pyre soakers: clean min 7; deaths at 5 and 6 -> PYRE_MAX_UNDERSOAK 6.
+//   Barrage median raid hit: clean max 68k, failure 137k -> 100k.
+//   Vessel: 1 revived killed nobody; 3 revived killed 5-6; 6 killed 12.
+//   Revival match 50ms, cluster 5s, death window 8s (pulses last 5s).
+//   Curse: Soulcoiled lands ~7.5s after cast (12s window, held 20s max 25s).
+//   Rite cluster 400ms, min 5 players; Ignition window 6s; Invoke 1.5s.
+//   Well re-entry with Soul Exhaustion is routine in phase 2; only 8.6s left
+//   entering alone died.
+// Assumptions: energy has no passive gain in phase 1 (15 Ignition Rites,
+//   0 -> 75); Invoke every 32-48s in phase 2; two teams alternate Grasping
+//   Depths windows; the log section wins over the guide-derived model.
+// Not flagged: Ignition/Invoke Rites, Hollowing Strikes stacks, Swirling
+//   Spirit, Grasping Depths/Uncoiling raid ticks, add melee on non-tanks.
+// Sections (Grep the heading):
+//   "VERIFIED AGAINST LOGS" - timeline, ability facts, wipe survey
+//   "RULES IMPLEMENTED" - rule table, exposure notes
+//   "GUIDE-DERIVED MODEL (pre-log)", "ENCOUNTER SHAPE", "ROUGH CHRONOLOGY"
+//   "SOULCOIL WELL, RITE, AND ENERGY", "RESTLESS AMANI AND THEIR CORPSES"
+//   "MYTHIC GRASPING DEPTHS / DROWNED ECHO"
+//   "TANK AND RAID MECHANICS (PHASES 1 AND 2)"
+//   "50% INTERMISSION: RITUAL OF AWAKENING", "PHASE 2: UNCOILING AND INVOKE"
+//   "DETECTION NOTES FOR THE FUTURE IMPLEMENTATION"
+//   "OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15)"
+//   code: "Ability IDs (log-verified, report nRGxQ1b8LdMvzC4D)",
+//   "Thresholds (report nRGxQ1b8LdMvzC4D)", "Small helpers", per-rule blocks
+//   "Vessel of Awakening: unburned corpses revived",
+//   "Uncoiled Rage: the Ritual completed, or the phase 2 clock ran out",
+//   "Hungering Pyre: under-soaked", "Possession Barrage: not taken far enough",
+//   "Avoidable damage", "Mythic well: uninterrupted Curse, exhausted re-entry",
+//   "Mythic Invoke: casting through the silence",
+//   "Soulcoil Rite outside Ignition / Invoke", "When was the pull over?",
+//   "Entry point"
+// Open items: Latent Cultist volume (every pool contact flagged, 31 Minors
+//   in the kill); who owns Vessel revival and Pyre/Curse (no assignments);
+//   Barrage: tank distance vs raid stacking; Invoke silence per caster keep?;
+//   unscheduled-rite unconfirmed (one firing); tank-death marker only within
+//   30s of pull end.
+// ── END DIGEST ──
+//
 // The second half of this header is the guide-derived encounter model
 // (written 2026-09-26 before any log was available). The first half is what
 // the logs actually showed; where the two disagree, the log section wins.

@@ -8,6 +8,78 @@
 // (written 2026-09-26 before any log was available). The first half is what
 // the logs actually showed; where the two disagree, the log section wins.
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// What: Mythic Twin Fangs (Vexhul + Ithraz, separate health pools, repeating
+//   155s main-phase/Submerge cycle on a fixed clock). Central resource is the
+//   permanent Eternal Venom DoT: 10 stacks kills; only Ravenous Feast removes
+//   one (per bite target). A death with venom releases 3 more globules, the
+//   cascade that wipes pulls. Self-gates on this encounter's debuff IDs
+//   (TWIN_FANGS_SIGNATURE). Called from transformFightToPull. Owns every
+//   wow-tf-* rule; deaths are named only when the log shows the cause.
+// Rules (sev; meaning):
+//   wow-tf-venom-cap Major: died at 10 stacks (not from a burst); stack history
+//   wow-tf-venom-overflow Raid: one Emergence capped 3+ (soft enrage)
+//   wow-tf-globule-burst Minor/Raid: globule burst, player-less
+//   wow-tf-globule-pickup-death Major: died to a pickup (picker named)
+//   wow-tf-feast-double-bite Minor/Major: bitten while Feasted
+//   wow-tf-feast-raid-bite Raid: a bite hit 12+ (previous bite under-soaked)
+//   wow-tf-tainted-burst Minor/Raid: fount burst, player-less
+//   wow-tf-visceral-burst Minor/Raid: broodlings finished the cast
+//   wow-tf-stone-breaker-unsoaked Minor/Major/Raid: on the tank whose set it was
+//   wow-tf-corrosive-spit Minor/Major: unmarked player in a Spit line
+//   wow-tf-stir-wave, -deluge-splash, -vile-flood, -sanguine-storm,
+//     -congealed-gore, -noxious-slick, -barbed-bulwark, -deadly-venom:
+//     Minor/Major avoidable hits
+//   wow-tf-out-of-range Minor: Concentrated Spittle / Clotted Bolt, no tank in melee
+//   wow-tf-uncoiled-wrath Raid: a twin outlived the other by 5s+
+//   wow-tf-pull-over Raid: 6 dead, or a tank death the pull didn't survive
+// Cutoffs (what makes the Raid error): burst killing 3+ (BURST_RAID_DEATHS);
+//   Emergence capping 3+ (OVERFLOW_RAID_DEATHS); Visceral Burst killing 3+
+//   (BROOD_RAID_DEATHS); Feast bite hitting 12+; Stone Breaker empty impact;
+//   6 dead (COLLAPSE_DEAD; every such pull ended within 31s); tank dead and
+//   not raised within TANK_REZ_GRACE_MS 15s, pull ending within 30s.
+// Key thresholds (all in the Thresholds block, with their source pulls):
+//   - burst cluster 500ms; Deluge-origin burst 11-17s after Deluge (observed
+//     12.0-16.8s); other bursts are death-released globules.
+//   - a lone missed Deluge globule killed 0-1 every time; 5+ deaths never
+//     recovered. Double pickups within 1.5s survived 47 times: not flagged alone.
+//   - cap killing blow follows its source by 0-0.2s (1.1s once): window 1.2s.
+//   - clean Feast bites hit 4-9 (kill 8/6/6); a bite under 4 makes the next
+//     strike hit 15-19 (~800k): a wipe every time.
+//   - Stone Breaker: one tank soaks all 3 impacts of a set, tanks alternate.
+//   - Spit: marked player always takes the hit; Spit mark lookback 6.5s.
+//   - Uncoiled Wrath only counts if the survivor lived 5s+.
+// Strategy/assumptions: clock is fixed (energy time-driven); cycle times in
+//   "VERIFIED AGAINST LOGS". Venom only climbs (+1/Emergence, -1/Feast), so
+//   the ~+407s Emergence is a soft enrage. Venom-cap deaths name the player.
+//   Globule burst, Tainted Burst and Visceral Burst stay player-less (no
+//   assignment in the log; kick order differed every pull).
+// Reports: A = 6Jnq8ycwgkYZpHND (24 wipes + kill in pull 25), B =
+//   xKP1M6gwC8WpnrBc (14 wipes). No VOD ground truth yet.
+// Sections (grep the heading):
+//   "VERIFIED AGAINST LOGS" cycle clock, venom/globule/Feast/brood/Stone/Spit
+//     facts, wipe survey (earliest Raid error per wipe)
+//   "RULES IMPLEMENTED" rule list
+//   "GUIDE-DERIVED MODEL (pre-log)" model from the guide
+//   "ENCOUNTER SHAPE AND RESOURCE LOOP" venom as the resource
+//   "ROUGH CHRONOLOGY OF A CYCLE"
+//   "ETERNAL VENOM: TRACK THE CAUSE, NOT JUST THE DEATH"
+//   "VEXHUL: DELUGE, GLOBULES, ADDS, WAVES"
+//   "ITHRAZ: FEAST, BLOOD, BROODLINGS, STONE"
+//   "SUBMERGE, SPACE, AND KILL ORDER"
+//   "FUTURE DETECTION / LOG VALIDATION"
+//   "OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15)"
+//   "Ability IDs (log-verified, reports 6Jnq8ycwgkYZpHND + xKP1M6gwC8WpnrBc)"
+//   (code) "Thresholds", "Eternal Venom sources", "Venom cap deaths",
+//     "Caustic Globules", "Ravenous Feast", "Avoidable damage",
+//     "When was the pull over?", "Entry point"
+// Open items (OPEN QUESTIONS): is a venom-cap death the player's fault when
+//   the last stack was an unavoidable Emergence (67 Majors); should the +407
+//   Emergence cap always count as the enrage; who picks up death-released
+//   globules (bursts killed 13-18); is there a soak/kick assignment; the Stir
+//   "wave" debuff lands all pull, what it is on screen is unknown.
+// ── END DIGEST ──
+//
 // ── VERIFIED AGAINST LOGS (offsets fight-relative) ──────────────────────────
 //
 //   A = report 6Jnq8ycwgkYZpHND, 24 wipes and a kill in pull 25.

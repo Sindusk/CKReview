@@ -5,6 +5,60 @@
 // on this encounter (Stasis casts or Mark debuffs), so it is safe on any WoW
 // pull.
 //
+// ── DIGEST (read first; detail in the sections it names) ──
+// What: Mythic Entombed Sentinels (Venomous Abyss), whole fight. Self-gates
+//   on Vitriolic Stasis casts or Mark debuffs. Two bosses (Breath = green,
+//   Blood = red) plus slime; teams swap bosses every Stasis (~104-110s cycle).
+//   Owns every mechanic below; Marks are by design and not flagged.
+// Rules (id: severity, meaning):
+//   wow-es-noxious-blast: missed orbs, raid-wide; Raid if >=2 victims die in 3s
+//   wow-es-droplet-pickup-death: Major, died collecting an orb
+//   wow-es-living-venom: hit by returning venom (current Breath tank exempt)
+//   wow-es-helical-overload: Major, toxin merge totalling above 4
+//   wow-es-helical-unresolved: still holding toxins at expiry
+//   wow-es-helical-collapse: Raid at first overload of a Stasis (or >=3 toxin
+//     deaths without one)
+//   wow-es-protovenom-eruption: marked collider; -unmarked: the unmarked
+//     player of the same collision; -ticks: died to ticks before pairing
+//   wow-es-miasma-missed-soak: thin Miasma soak, flags Blood-team players out
+//   wow-es-blood-venom / wow-es-deadly-venom: stood in pool / arena-edge venom
+//   wow-es-blighted-blood: Major, undispelled death
+//   wow-es-blighted-blood-pool: undispelled expiry dropped pool on others
+//     (carrier flagged; player-less Minor if it hit nobody)
+//   wow-es-contaminate: slime outlived a normal kill (>=25s), killed players
+//   wow-es-pull-over: generic Raid marker (5+ dead, tank death, untanked boss,
+//     bosses not separated, Berserk) when no mechanic Raid came first
+// Severity: Minor = avoidable damage; Major = killed someone; Raid = inevitable
+//   wipe (first Raid error is the cutoff). Player-less is only Minor or Raid.
+// Cutoffs: Noxious Blast with 2+ kills in 3s (pulls 10/12/13/15/22/26; single
+//   kills did not end pulls); first helical overload; RAID_WIPE_KILLS = 3 for
+//   unattributable raid-wide events; wow-es-pull-over.
+// Key thresholds: Miasma clean soaks 8-10, flag <=7 (7 cost ~490-540k each,
+//   6 killed in pull 25); pool ticks >=2 (own-pool >=3); pool spawns 0.7-1.6s
+//   after source debuff; Blighted Blood 18.0s natural, undispelled death after
+//   6s held; slime 25s; Living Venom lag 4.0s (2.5-6s window); Helical expiry
+//   28.0s, exact total 4 clears, burst death window 5s.
+// Assumptions: match by ability ID, never actor ID; Living Venom converges on
+//   the boss, path matched via the Breath tank position.
+// Not flagged: Mark deaths and Mark refresh, Contaminate ticks, helical ticks
+//   on a pairing player, tank-buster hits, first tick of own Murk/Injection
+//   pool, Ula'tek's Dominance.
+// Sections (Grep the heading): "VERIFIED AGAINST LOGS" (log facts, ids,
+//   timings), "RULES IMPLEMENTED", "ENCOUNTER MODEL (guide-derived, pre-log)",
+//   "OPEN QUESTIONS", "Ability IDs", "Thresholds", "Small helpers",
+//   "Toxic Droplets: missed orbs (Noxious Blast)",
+//   "Toxic Droplets: died collecting", "Living Venom: hit by a returning venom",
+//   "Helical Toxins (Vitriolic Stasis)", "Shifting Protovenom",
+//   "Unstable Miasma: thin soak", "Blighted Blood: undispelled death",
+//   "Blighted Blood: expired undispelled and dropped a pool",
+//   "Venom Coagulation: slime lived long enough to kill",
+//   "When was the pull over?", "Tank buster on a non-tank.",
+//   "Bosses left together after Stasis.", "Enrage.", "Entry point".
+// Open items: Living Venom blame (victim, collector or both); keep Protovenom
+//   flagging both players; keep player-less Blighted pool Minor; not built:
+//   tank-swap misses, non-lethal Blighted Blood ticks. No VOD ground truth yet.
+// ── END DIGEST ──
+//
 // The second half of this header is the guide-derived encounter model
 // (written 2026-09-25 from Method / Wowhead / Icy Veins before any log was
 // available). The first half is what the logs actually showed; where the
