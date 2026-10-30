@@ -195,7 +195,10 @@ const FRAME_FIT = 400;
 // own spot crowded them; one who moved less than OVERLAP_STILL stayed put
 // (user, 2026-10-28, hjgk42MDf81arFVY: Pull 15 the DNC 4.4y toward, the SCH
 // -0.4y; Pull 18 the SAM 1.9y and the MNK 3.8y toward the SCH, who moved
-// 0.5y; Pull 33 the DRK 3.3y toward the SCH, 0.3y).
+// 0.5y; Pull 33 the DRK 3.3y toward the SCH, 0.3y; user, 2026-10-30,
+// KCX2qW4khczmZ9T1 Pull 8 2:54.1, "RDM, SAM ... definitely wrong": the
+// RDM 7.3y toward the SGE, -0.0y; the SAM 4.0y toward the MNK, 0.9y, the
+// closest a stayer has come to OVERLAP_STILL).
 const OVERLAP_MOVED = 150;
 const OVERLAP_STILL = 100;
 
@@ -386,17 +389,28 @@ export function applySynergyOrder(
   // stayed put is dropped.
   const moved = new Map<string, string>();
   const frame = so.slots && eyeFrame(read, expRow);
-  const slotOf = (n: string) => frame && so.slots!.get(slotKey(read, frame.rank(n)));
-  const devOf = (n: string) => { const s = slotOf(n), q = frame!.pt(n); return s ? Math.hypot(q.lat - s.lat, q.al - s.al) : NaN; };
-  const cleanDevs = frame ? frame.names.filter((n) => read.clean.has(n)).map(devOf).filter((d) => !Number.isNaN(d)).sort((a, b) => a - b) : [];
-  if (frame && cleanDevs.length >= 3 && cleanDevs[Math.floor(cleanDevs.length / 2)] <= FRAME_FIT) {
+  // A pair the tied orders leave without rows: each member takes the row of
+  // the side they stood on (an overlap inside a row is on that row's side;
+  // user, 2026-10-30, KCX2qW4khczmZ9T1 Pull 8 2:54.1: the T pair RDM / SAM,
+  // unordered by the six tied orders, each crowded a row's O spot).
+  const rowOf = (n: string): 0 | 1 => expRow.get(n) ?? (frame!.pt(n).lat >= 0 ? 1 : 0);
+  const ptOf = (n: string) => { const q = frame!.pt(n); return expRow.has(n) ? q : { lat: Math.abs(q.lat), al: q.al }; };
+  const rankOf = (n: string) => (read.remote && rowOf(n) === 1 ? RANK_REVERSED : RANK_FROM_EYE)[read.symbol.get(n) ?? ""];
+  const slotOf = (n: string) => (frame && read.firePos.has(n) && rankOf(n) !== undefined ? so.slots!.get(slotKey(read, rankOf(n))) : undefined);
+  const devOf = (n: string) => { const s = slotOf(n), q = ptOf(n); return s ? Math.hypot(q.lat - s.lat, q.al - s.al) : NaN; };
+  const devsOf = (ns: string[]) => ns.map(devOf).filter((d) => !Number.isNaN(d)).sort((a, b) => a - b);
+  // The frame's fit: the clean players, else (under 3 clean: Pull 8 above,
+  // four under the glitch and four in two overlaps) every ordered player.
+  let fitDevs = frame ? devsOf(frame.names.filter((n) => read.clean.has(n))) : [];
+  if (frame && fitDevs.length < 3) { const all = devsOf(frame.names); if (all.length >= 4) fitDevs = all; }
+  if (frame && fitDevs.length >= 3 && fitDevs[Math.floor(fitDevs.length / 2)] <= FRAME_FIT) {
     const fireErr = (n: string) => errors.find((e) => e.ruleId === TOP2_FIRE_RULE_ID && e.name === "Fire Overlap" && e.player === n && !drop.has(e) && !narrowed.has(e));
     for (const g of fireGroups(players, read.fireT)) {
       const named = g.map((p) => p.name).filter((n) => fireErr(n) && slotOf(n));
       if (named.length < 2) continue;
       // How far n moved from their spot toward each other member's spot.
       const toward = (n: string, m: string) => {
-        const s = slotOf(n)!, t = slotOf(m)!, q = frame.pt(n);
+        const s = slotOf(n)!, t = slotOf(m)!, q = ptOf(n);
         const d = Math.hypot(t.lat - s.lat, t.al - s.al);
         return d ? ((q.lat - s.lat) * (t.lat - s.lat) + (q.al - s.al) * (t.al - s.al)) / d : 0;
       };

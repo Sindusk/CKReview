@@ -478,7 +478,7 @@ import { interpolatePlayerPosition } from "@/lib/mechanics/player-position";
 import { kFmt, yd, joinNames, playerError, raidMarker, clusterByGap, RAID_MARKER_SORT_OFFSET_MS } from "@/lib/mechanics/wow/common";
 import {
   DAMAGE_DOWN, DEATH_EVENT_LAG_MS, PREVIEW_AMOUNT, type Hit, type Life,
-  bodyHit, buildLife, castsOf, gotAura, uniq, namesOf, isTank, realAmount, allAlive, resetCluster,
+  bodyHit, buildLife, castsOf, gotAura, uniq, namesOf, isTank, realAmount, allAlive, resetCluster, immuneHit,
 } from "../fru/common";
 
 export const TOP1_AVOIDABLE_RULE_ID   = "ffxiv-top1-avoidable";
@@ -595,7 +595,16 @@ function instanceHits(players: PlayerInfo[], life: Life, c: EnemyEvent, ms = 150
   return out;
 }
 
-const doomedAt = (p: PlayerInfo, t: number) => gotAura(p, DOOM, t, 1500);
+/**
+ * This cast's hit on p landed under Transcendent (fru/common.ts immuneHit):
+ * still a share of a stack or tower, never p's error (user, 2026-10-30,
+ * KCX2qW4khczmZ9T1 Pull 20 1:39.1: the RDM, raised 1:36.0, under their own
+ * missile and a line).
+ */
+const immuneTo = (p: PlayerInfo, c: EnemyEvent, ms = 1500) => p.damageTaken.some((x) =>
+  x.abilityId === c.abilityId && x.sourceInstance === c.sourceInstance && Math.abs(x.timestamp - c.timestamp) <= ms && immuneHit(x));
+
+const doomedAt =(p: PlayerInfo, t: number) => gotAura(p, DOOM, t, 1500);
 /**
  * "A and B got Doom and died; C died; D got Doom" for a description;
  * "All 4" / "All but X" when a clause covers every player just `named`
@@ -1216,12 +1225,14 @@ function detectPantokrator(players: PlayerInfo[], life: Life, deaths: DeathEvent
       const carrier = m.hit.find((p) => p.name === m.c.target) ?? carriers.find((p) => m.hit.includes(p));
       if (!carrier || !life.alive(carrier, s.t - 500) || named.has(carrier)) continue;
       named.add(carrier);
-      const others = m.hit.filter((p) => p !== carrier);
+      // A player the missile hit under Transcendent isn't at fault, nor a
+      // victim (immuneTo).
+      const others = m.hit.filter((p) => p !== carrier && !immuneTo(p, m.c));
       const stayed = inLine(carrier);
       // Still in the line stack with the missile: a share of the line plus
       // the missile under Magic Vulnerability Up (A100 +1:21.5, died).
       if (!others.length) {
-        if (!stayed) continue;
+        if (!stayed || immuneTo(carrier, m.c)) continue;
         const died = diedOf(carrier, life, deaths, s.t);
         errors.push(playerError(carrier, {
           ruleId: TOP1_MISSILE_RULE_ID, severity: died ? "Major" : "Minor", name: "Missile in the Stack",
@@ -1431,7 +1442,9 @@ function detectDiffuse(players: PlayerInfo[], life: Life, deaths: DeathEvent[], 
       }
       break;
     }
-    const nonTanks = uniq(hits.filter((x) => !isTank(x.p)));
+    // A raised player under Transcendent drew a cone where they got up
+    // (2qgaAkxVypGWv9CN Pulls 56, 69): not baited (immuneHit).
+    const nonTanks = uniq(hits.filter((x) => !isTank(x.p) && !immuneHit(x.e)));
     if (!nonTanks.length) continue;
     const ox = v[0].x, oy = v[0].y;
     const dist = (e: PlayerEvent) => (ox === undefined || oy === undefined || e.x === undefined || e.y === undefined ? -1 : Math.hypot(e.x - ox, e.y - oy));
@@ -1467,10 +1480,12 @@ function detectWaveCannon(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
     const t = set[0].timestamp;
     if (!nonTanks.every((p) => life.alive(p, t - 500))) continue;
     for (const c of set) {
-      const hit = instanceHits(players, life, c, 1000).map((x) => x.p);
+      const hits = instanceHits(players, life, c, 1000);
+      const hit = hits.map((x) => x.p);
       if (hit.length <= 1) continue;
       const died = hit.filter((p) => life.diedFrom(p, t));
-      for (const p of hit) {
+      // Not a player it hit under Transcendent (immuneHit).
+      for (const p of hits.filter((x) => !immuneHit(x.e)).map((x) => x.p)) {
         errors.push(playerError(p, {
           ruleId: TOP1_WAVE_CANNON_RULE_ID, severity: died.length ? "Major" : "Minor", name: "Wave Cannon Overlap",
           description: `One Wave Cannon Kyrios line hit ${namesOf(hit)}${c.target ? ` (aimed at ${c.target})` : ""}${died.length ? `; ${namesOf(died)} died` : ""}. Whoever stood on another's line is at fault. ${WAVE_WHY}`,

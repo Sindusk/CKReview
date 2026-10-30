@@ -392,7 +392,7 @@ import { interpolatePlayerPosition } from "@/lib/mechanics/player-position";
 import { detectFFRoles, type FFRoleSlot } from "@/lib/mechanics/ffxiv/roles";
 import {
   DAMAGE_DOWN, MARK_OF_MORTALITY, DEATH_EVENT_LAG_MS, type Hit, type Life,
-  buildLife, hitsOf, castsOf, uniq, namesOf, isTank, realAmount, allAlive, byPlayer, unexplainedMarks,
+  buildLife, hitsOf, castsOf, uniq, namesOf, isTank, realAmount, allAlive, byPlayer, unexplainedMarks, immuneHit,
 } from "./common";
 
 export const OOD_AVOIDABLE_RULE_ID   = "ffxiv-ood-avoidable";
@@ -859,7 +859,9 @@ function detectApocalypse(players: PlayerInfo[], life: Life, start: number, end:
   const errors: PullError[] = [];
   const why = "Apocalypse's lights explode in six waves rotating from where they start: stand one marker opposite the rotation, then move in behind the explosions.";
   const individual: Hit[] = [];
-  for (const wave of clusterByGap(hitsOf(players, life, APOCALYPSE, end).filter((h) => h.e.timestamp >= start), (h) => h.e.timestamp, 1000)) {
+  // Not a hit under Transcendent: a freshly raised player gets up where they
+  // fell (JZ1KXhDbqkNH3jxR Pull 3 9:34.5, the WAR raised 9:32.0; immuneHit).
+  for (const wave of clusterByGap(hitsOf(players, life, APOCALYPSE, end).filter((h) => h.e.timestamp >= start && !immuneHit(h.e)), (h) => h.e.timestamp, 1000)) {
     const hit = playersOf(wave);
     if (hit.length < APOC_GROUP) { individual.push(...wave); continue; }
     const killed = diedIn(life, wave);

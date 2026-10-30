@@ -160,7 +160,7 @@
 // - F5 2:54.9: the O pair (MNK, DNC) both west of the line and in the
 //   laser; the MNK should have flexed to the other side (user).
 // Report G = KCX2qW4khczmZ9T1 (the user's static; same eight jobs). VOD
-// review 2026-10-30 (user): Pulls 10, 18 and the Fire cutoff. Findings:
+// review 2026-10-30 (user): Pulls 8, 10, 18 and the Fire cutoff. Findings:
 // - The Fire snapshots the glitch's Vulnerability Up at its CAST (the hits
 //   land ~0.6s later; dying removes the aura at ~+0.62s). In all four
 //   reports with P2 pulls, a player holding it at the cast took a 73k+ Fire
@@ -173,6 +173,22 @@
 //   Mid) both were moving (the DNC 12.1y between -4.3s and the hit, the MNK
 //   19.4y between -2.2s and the hit). Both stay named; the rulings pin the
 //   user's call.
+// - G18 2:53.3 (Mid, same pair): "MNK was wrong here and late to get to
+//   their spot." Still no separating signal over the ruled glitch pairs:
+//   distance from the learned spot names the wrong one in G10 (MNK 3.3y,
+//   DNC 0.5y) but not G18 (MNK 0.6y, DNC 2.1y) or F17 (the ruled GNB 0.4y,
+//   SAM 3.1y); the last sample far (10y+) from the Fire spot names the MNK
+//   in G10 and G18 (-3.7s, -2.2s vs the DNC none / -4.3s) but the SGE alone
+//   in F5 (-6.1s; the GNB, ruled and "more incorrect", never 10y off), and
+//   "no sample" isn't "on the spot" (G10's DNC). Both stay named.
+// - G8 2:54.1 (Mid; no clean player: four under the glitch, four in two
+//   overlaps): "RDM, SAM, and GNB are definitely wrong"; the SCH / DNC
+//   glitch pair "should have been further apart", either or both (stays
+//   both). The T pair RDM / SAM has no rows (six orders tie, the conga
+//   doesn't pick); by the side each stood on, the RDM moved 7.3y toward
+//   the SGE (-0.0y) and the SAM 4.0y toward the MNK (0.9y): the RDM and
+//   SAM keep the Fire Overlap. Same frame fallback: G34's DRK 3.8y toward
+//   the SCH (-1.4y; unreviewed).
 // - G10 2:54.6: the Fire killed two (MNK, DNC); "the pull was over at the
 //   time that the MNK and DNC died" (the Spotlight cutoff ~11s later
 //   was too late). Same shape: G18, G26 and G30 (one in the laser, one to
@@ -204,7 +220,9 @@
 //   ones still glitch-vulnerable 0.5s after the cast); synergy-order.ts keeps the ones on the wrong
 //   side of the eye for their row when the rest weren't (user, E11), else
 //   the ones who moved 1.5y+ toward the others from their learned spot when
-//   the rest moved under 1.0y (user, F15, F18, F33).
+//   the rest moved under 1.0y (user, F15, F18, F33, G8). A member the tied
+//   orders leave rowless takes the row of the side they stood on, and a
+//   pull with under 3 clean players fits the frame on every ordered one (G8).
 // ffxiv-top2-stack: at Spotlight, all eight alive: a pair in one stack
 //   (both; synergy-order.ts keeps the one outside their expected stack),
 //   both marks together (3+ in both stacks: the two marked players), else

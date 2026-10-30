@@ -5,7 +5,10 @@
 // aura lookups, and name formatting. Moved out of fatebreaker.ts unchanged.
 // Also used by TEA (tea/*) and every TOP module. buildLife dates a raise by
 // the Weakness / Brink of Death (+1.5s settle) or the first cast / real hit,
-// whichever is first (2026-10-30; raisedAt below).
+// whichever is first (2026-10-30; raisedAt below). Alive isn't hittable: a
+// 0-damage hit under Transcendent (resurrection immunity) is never the
+// player's error, though they count as alive and present from the raise
+// date. Error rules filter those hits with immuneHit; presence reads don't.
 
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
@@ -31,9 +34,40 @@ export type Life = {
   outIntervals: { p: PlayerInfo; start: number; end: number }[];
 };
 
+// Transcendent: the resurrection immunity a raised player gets with the
+// Weakness (5s, dropped early when they act).
+export const TRANSCENDENT = 1000418;
+
+/**
+ * A hit on a freshly raised player under Transcendent: FFLogs logs it with
+ * 0 damage (hitType 10, HP unchanged) and Transcendent in the hit's status
+ * snapshot. The game ignored the player, so it's never their error nor a
+ * sign they were "in" the mechanic (user, 2026-10-30, TOP KCX2qW4khczmZ9T1
+ * Pull 20 1:39.1: the RDM, raised 1:36.0, took Guided Missile Kyrios 0
+ * under Transcendent; "RDM has resurrection immunity at the time of the
+ * hit"). The 0-damage guard matters: the snapshot can still list a status
+ * removed up to ~1s before the hit (TEA HwjvVh3TNAZmMQyq Pull 26 1:58.3,
+ * the MNK's Transcendent dropped that instant and Alpha Sword did 6.8k and
+ * killed them: a real hit). The raise date (raisedAt) is untouched: the
+ * player counts as alive and present for duties throughout. Reads the
+ * status by id or by name: the validate harness (scripts/lib/
+ * build-ff-players.js) keeps only activeBuffNames.
+ *
+ * Applied only where a hit IS the player's error (an avoidable hit, a
+ * missile on the carrier, a tank cone baited): filter those hits with
+ * `!immuneHit(e)`. Never where a hit says who was in a shared mechanic
+ * (line stacks, towers, tether takes): an immune player still takes a
+ * share there, and folding this into bodyHit made 14 false "wasn't in
+ * their group's line" / "Blaster also hit" calls in TOP P1 (LG64YVQy2KZbtpN8,
+ * hjgk42MDf81arFVY) by dropping the raised player from the line count.
+ */
+export const immuneHit = (e: PlayerEvent) => !((e.amount ?? 0) > 0) &&
+  (e.statusIds?.includes(TRANSCENDENT) || e.activeBuffNames?.includes("Transcendent") || false);
+
 /**
  * A dead body still logs hits: 0 damage at 0 HP. The live pipeline marks
- * them healthBefore 0; the validate harness has only healthAfter.
+ * them healthBefore 0; the validate harness has only healthAfter. An
+ * immuneHit is NOT a bodyHit: see immuneHit for why.
  */
 export const bodyHit = (e: PlayerEvent) => e.healthBefore === 0 || (e.healthAfter === 0 && !((e.amount ?? 0) > 0));
 

@@ -192,6 +192,13 @@ Topic (when it applies):
   2.6s), so "next cast" dating called a player raised before Hello World
   dead at it (TOP P3). Keep a ~1.5s settle after the Weakness: a player
   can't act on the first hit after the raise (fru/common.ts raisedAt).
+  Alive isn't hittable: a hit during Transcendent (resurrection immunity,
+  status 1000418 in the hit's statusIds, 0 damage) is no one's error and
+  doesn't count against them (TOP P1 missile on a raised RDM; user,
+  VOD). Require 0 damage too: the snapshot lags a removal by up to ~1s.
+  Filter it only in error rules (fru/common.ts immuneHit), never in
+  presence reads: an immune player still takes a share of a line stack,
+  and dropping them made 14 false line/Blaster calls.
 - **A hand-off failure is the mover's.** The taker walks to the holder,
   who stays still; blame the holder only if they walked off their spot
   (TOP P3 rots; user, VOD).
