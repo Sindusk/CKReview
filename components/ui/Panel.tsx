@@ -16,22 +16,29 @@ export function Panel({
   bodyStyle,
   diamond = true,
   diamondBottom = false,
+  variant = "primary",
 }: {
   children:       ReactNode;
   style?:         CSSProperties;
   bodyStyle?:     CSSProperties;
   diamond?:       boolean;
   diamondBottom?: boolean;
+  /** "support": a supporting panel beside the screen's main one — softer
+      border, smaller dimmer corners, no diamonds. The workspace's centre
+      (video) panel stays "primary"; Roster, Pull Review, VODs and Pulls are
+      "support". */
+  variant?:       "primary" | "support";
 }) {
+  const support = variant === "support";
   return (
-    <section className="ck-panel" style={style}>
+    <section className={support ? "ck-panel ck-panel--support" : "ck-panel"} style={style}>
       <div className="ck-panel__body" style={bodyStyle}>{children}</div>
       <span aria-hidden="true" className="ck-corner ck-corner--tl" />
       <span aria-hidden="true" className="ck-corner ck-corner--tr" />
       <span aria-hidden="true" className="ck-corner ck-corner--bl" />
       <span aria-hidden="true" className="ck-corner ck-corner--br" />
-      {diamond && <span aria-hidden="true" className="ck-diamond" />}
-      {diamondBottom && <span aria-hidden="true" className="ck-diamond ck-diamond--bottom" />}
+      {diamond && !support && <span aria-hidden="true" className="ck-diamond" />}
+      {diamondBottom && !support && <span aria-hidden="true" className="ck-diamond ck-diamond--bottom" />}
     </section>
   );
 }

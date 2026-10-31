@@ -43,6 +43,16 @@ file's header comment. Mechanic detection has its own guide:
   `.ck-badge`.
   - Gold framing is for top-level panels only. Cards inside use neutral
     borders; selection and active tabs are arcane blue, never gold.
+  - Panel tiering (user, 2026-10-31): in the workspace only the centre
+    video panel has the full frame (corners + diamonds); Roster, Pull
+    Review, VODs and Pulls are `variant="support"` (softer edge, smaller
+    dimmer corners, no diamonds).
+  - Buttons: gold-framed `.ck-btn` is the default, including Import and
+    Add VOD. Primary blue is reserved for the one action that unblocks
+    the user (Connect after an import error, dialog confirms).
+  - Typography and contrast (2026-10-31): `--ck-text-3` is 6.4:1 on the
+    panel background; workspace secondary text is 12px. The dense
+    dialogs, RosterPanel and 10px badges / table headers weren't raised.
   - Every modal uses `components/ui/Dialog.tsx` (frame, title bar,
     footer, `Field` rows). Form dialogs omit `onBackdropClick` so a stray
     click can't discard input. Dropdown menus use `.ck-menu`/
@@ -59,8 +69,10 @@ file's header comment. Mechanic detection has its own guide:
   and the panel grid: the one import field, Live log, and a Connect to
   Logs → Import Report → Review strip (step 1 checked when either
   provider's token is in localStorage). Import progress is the same
-  `WCLImportBar`, passed in. Plan and remaining steps:
-  [opening-screen-plan.md](opening-screen-plan.md).
+  `WCLImportBar`, passed in. User's choices (2026-10-31): ChatGPT-style
+  centred hero, gold-framed Import (not primary blue), no recent reviews
+  or statics list, no background art. There is no way to add a VOD before
+  a log from here (Add VOD is in the VODs panel); add a link only if asked.
 - **Toolbar** (under the header, once the workspace shows): a three-track
   grid — report title, pull count and Live indicator (`ReportInfo`) |
   Damage / Mitigation / Strategy, centred | a button with the report code

@@ -1664,6 +1664,7 @@ export default function Home() {
             overhang it. Each Panel clips its own body instead. */}
         <div ref={leftColRef} style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
           <Panel
+            variant="support"
             style={{
               // Defaults to exactly one column of 5 players (header + 5 rows)
               // for WoW, and 4 rows of paired players (MT/OT, H1/H2, M1/M2,
@@ -1695,7 +1696,7 @@ export default function Home() {
           <ResizeHandle orientation="row" size={GAP} onReset={layout.resetRoster}
             onDrag={(d) => layout.moveRosterBorder(d, (leftColRef.current?.clientHeight ?? 800) - GAP - 160)} />
 
-          <Panel style={{ flex: "1 1 0" }}>
+          <Panel variant="support" style={{ flex: "1 1 0" }}>
             <AnalysisPanel
               pull={activePull}
               playbackTimeMs={panelTimeMs}
@@ -1718,8 +1719,8 @@ export default function Home() {
             <VideoPanel
               headerCenter={
                 <div style={{ display: "flex", gap: 4 }}>
-                  <button className={`ck-tab ck-tab--sm${centerView === "video" ? " ck-tab--active" : ""}`} onClick={showVideoView}>Video</button>
-                  <button className={`ck-tab ck-tab--sm${centerView === "replay" ? " ck-tab--active" : ""}`} onClick={showReplayView}
+                  <button className={`ck-tab${centerView === "video" ? " ck-tab--active" : ""}`} onClick={showVideoView}>Video</button>
+                  <button className={`ck-tab${centerView === "replay" ? " ck-tab--active" : ""}`} onClick={showReplayView}
                     title="Top-down positions from the log. Pauses the VOD and starts at its time; going back to Video resumes from the replay's time">Replay</button>
                 </div>
               }
@@ -1917,9 +1918,10 @@ function SyncToPullButton({
 
 // ─── ReportInfo / ReportLink (the loaded toolbar's left and right ends) ───────
 //
-// docs/opening-screen-plan.md step 2: the report's title and encounter on
-// the left, its log URL on the right with the import's API points, the
-// live-log state and the sample-data flag in an InfoTip.
+// The report's title, pull count and Live indicator on the left; on the
+// right a button with the report code that opens the log, with the import's
+// API points, the live-log state and the sample-data flag in an InfoTip
+// (docs/app-architecture.md, "Toolbar").
 
 function ReportInfo({ title, code, pullCount, liveLogEnabled, liveLogError }: {
   title:          string | null;
@@ -2133,10 +2135,11 @@ function WCLImportBar({
         Live log
       </label>
       <button
-        className="ck-btn ck-btn--primary"
+        className="ck-btn"
         onClick={handleSubmit}
         disabled={!value.trim()}
       >
+        <LineGlyph name="upload" size={14} />
         Import
       </button>
       {error && (

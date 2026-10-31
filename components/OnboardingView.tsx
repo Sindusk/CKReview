@@ -6,7 +6,7 @@ import { LineGlyph, type LineGlyphName } from "@/components/ui/LineGlyph";
 import type { LogProvider } from "@/components/LogApiSetupDialog";
 
 /*
-  The opening screen (docs/opening-screen-plan.md, step 1): shown in place of
+  The opening screen (docs/app-architecture.md, "Opening screen"): shown in place of
   the panel grid while no report is loaded and no VOD has been added. One
   import entry point (the toolbar import is hidden while this shows), and a
   three-step strip — Connect to Logs, Import Report, Review — whose first

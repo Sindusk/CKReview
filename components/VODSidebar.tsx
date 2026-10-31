@@ -79,7 +79,7 @@ export default function VODSidebar({
         minHeight: 0,
       }}
     >
-      <Panel style={{ flex: "0 0 auto" }}>
+      <Panel variant="support" style={{ flex: "0 0 auto" }}>
         <PanelHeader title="VODs" count={vods.length > 0 ? `(${vods.length})` : undefined}>
           <button className="ck-btn" onClick={onAddVod} title="Add a YouTube, Twitch or local VOD to watch alongside the pulls">
             <LineGlyph name="add" size={14} strokeWidth={2} />
@@ -125,7 +125,7 @@ export default function VODSidebar({
         </div>
       </Panel>
 
-      <Panel style={{ flex: "1 1 0" }}>
+      <Panel variant="support" style={{ flex: "1 1 0" }}>
         <PullList
           pulls={pulls}
           selectedPullId={selectedPullId}
