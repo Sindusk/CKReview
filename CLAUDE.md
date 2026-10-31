@@ -35,6 +35,7 @@ sampling it.
 | Who holds aggro (FFXIV enmity), tank swaps | Header of `lib/mitigation/enmity.ts`; accuracy `node scripts/check-enmity.js <code> [--list]` |
 | Per-player exposure, assigned duties, the Adjusted / pull headline | Headers of `lib/mechanics/rule-meta.ts`, `occurrences.ts`, `assignments.ts`, `lib/static-analysis.ts` |
 | WoW replay: what's left | [docs/wow-replay-plan.md](docs/wow-replay-plan.md) |
+| Opening screen / workspace UI refresh (in progress) | [docs/opening-screen-plan.md](docs/opening-screen-plan.md) |
 | What's unfinished or waiting on a user decision | [docs/open-items.md](docs/open-items.md) |
 | Accounts, login, Google sign-in shared by every consistencykings.com app (incl. adding a new app) | [docs/shared-auth.md](docs/shared-auth.md) |
 | Which ports are taken locally and in production | [PORTS.md](PORTS.md) |
