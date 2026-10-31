@@ -95,11 +95,12 @@ onboarding view in place of the panel grid.
 
 The user rejected the chip / two-line / breadcrumb mockups for a simpler
 three-part toolbar (page.tsx `ReportInfo` / `ReportLink`): the report's
-title (Cinzel) and "boss · N pulls · K kills" on the left; Damage /
-Mitigation / Strategy centred with line glyphs (`components/ui/
-LineGlyph.tsx`); the report's log URL on the right, whose `InfoTip` holds
-the import's API points, the hourly quota, the live-log state and the
-sample-data flag (a dot beside the URL while Live log is on). The pull
+title (Cinzel), pull count and a Live indicator (while Live log is on) on
+the left; Damage / Mitigation / Strategy centred with line glyphs
+(`components/ui/LineGlyph.tsx`); on the right a `.ck-btn` with the bare
+report code in bold arcane blue, opening the log in a new tab, whose
+`InfoTip` holds the import's API points, the hourly quota, the live-log
+state and the sample-data flag. The pull
 itself isn't in the bar. **Changing reports stays with New Session** (no
 "Change report" button). The title is kept from the report query
 (`loadedReportTitle`), no new fetch.

@@ -1553,7 +1553,8 @@ export default function Home() {
       >
         <div style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
           {reportLoaded
-            ? <ReportInfo title={loadedReportTitle} code={loadedReportCode} pulls={pulls} />
+            ? <ReportInfo title={loadedReportTitle} code={loadedReportCode} pullCount={pulls.length}
+                liveLogEnabled={liveLogEnabled} liveLogError={liveLogError} />
             : importBar}
         </div>
         <div style={{ display: "flex", gap: "8px" }}>
@@ -1919,14 +1920,13 @@ function SyncToPullButton({
 // the left, its log URL on the right with the import's API points, the
 // live-log state and the sample-data flag in an InfoTip.
 
-function ReportInfo({ title, code, pulls }: { title: string | null; code: string; pulls: Pull[] }) {
-  const bosses = [...new Set(pulls.map(p => p.name))];
-  const kills = pulls.filter(p => p.result === "Kill").length;
-  const detail = [
-    bosses.join(", "),
-    `${pulls.length} pull${pulls.length === 1 ? "" : "s"}`,
-    kills > 0 ? `${kills} kill${kills === 1 ? "" : "s"}` : null,
-  ].filter(Boolean).join(" · ");
+function ReportInfo({ title, code, pullCount, liveLogEnabled, liveLogError }: {
+  title:          string | null;
+  code:           string;
+  pullCount:      number;
+  liveLogEnabled: boolean;
+  liveLogError:   string | null;
+}) {
   return (
     <div style={{ display: "flex", alignItems: "baseline", gap: "10px", minWidth: 0 }}>
       <span
@@ -1945,9 +1945,18 @@ function ReportInfo({ title, code, pulls }: { title: string | null; code: string
       >
         {title || code}
       </span>
-      <span style={{ fontSize: "12px", color: "var(--ck-text-2)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>
-        {detail}
+      <span className="ck-num" style={{ fontSize: "12px", color: "var(--ck-text-2)", whiteSpace: "nowrap", flexShrink: 0 }}>
+        {pullCount} pull{pullCount === 1 ? "" : "s"}
       </span>
+      {liveLogEnabled && (
+        <span
+          title={liveLogError ? `Live poll failed: ${liveLogError}` : "Live log: checking for new pulls"}
+          style={{ display: "inline-flex", alignItems: "center", gap: "5px", alignSelf: "center", fontSize: "12px", fontWeight: 600, color: liveLogError ? "#f87171" : "#4ade80", whiteSpace: "nowrap", flexShrink: 0 }}
+        >
+          <span aria-hidden="true" style={{ width: "7px", height: "7px", borderRadius: "50%", backgroundColor: "currentColor" }} />
+          {liveLogError ? "Live failed" : "Live"}
+        </span>
+      )}
     </div>
   );
 }
@@ -2013,20 +2022,15 @@ function ReportLink({
       maxWidth={340}
       content={tip}
       trigger={
-        <span style={{ display: "inline-flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
-          {liveLogEnabled && (
-            <span aria-hidden="true" style={{ width: "7px", height: "7px", borderRadius: "50%", backgroundColor: liveColor, flexShrink: 0 }} />
-          )}
-          <a
-            href={url}
-            target="_blank"
-            rel="noreferrer"
-            className="ck-num"
-            style={{ fontSize: "12px", color: "var(--ck-arcane-text)", textDecoration: "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
-          >
-            {host.replace(/^www\./, "")}/reports/{code}
-          </a>
-        </span>
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className="ck-btn ck-btn--md"
+          style={{ color: "var(--ck-arcane-text)", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}
+        >
+          {code}
+        </a>
       }
     />
   );

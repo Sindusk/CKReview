@@ -62,8 +62,9 @@ file's header comment. Mechanic detection has its own guide:
   `WCLImportBar`, passed in. Plan and remaining steps:
   [opening-screen-plan.md](opening-screen-plan.md).
 - **Toolbar** (under the header, once the workspace shows): a three-track
-  grid — report title and encounter (`ReportInfo`) | Damage / Mitigation
-  / Strategy, centred | the log URL (`ReportLink`), whose hover tip holds
+  grid — report title, pull count and Live indicator (`ReportInfo`) |
+  Damage / Mitigation / Strategy, centred | a button with the report code
+  that opens the log (`ReportLink`), whose hover tip holds
   API points, quota, live-log state and the sample-data flag. Before a
   report is loaded (a VOD added first) the left track is the import field.
   New Session is how you change reports.
