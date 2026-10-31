@@ -37,8 +37,10 @@
 
   /* Text */
   --ck-text:      #ece8df;
-  --ck-text-2:    #b3afa6;
-  --ck-text-3:    #80848a;
+  /* Contrast on --ck-bg-panel: text-2 9.0:1, text-3 6.4:1 (both AA for
+     small text; text-3 was 4.8:1, readable only at body size). */
+  --ck-text-2:    #bcb8af;
+  --ck-text-3:    #959aa1;
   --ck-text-gold: #e2c47f;
 
   /* Neutral lines */
@@ -237,7 +239,7 @@
 
 .ck-panel-subtitle {
   margin-top: 3px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.4;
   color: var(--ck-text-3);
 }
@@ -290,7 +292,7 @@
 /* Explanatory note under a heading */
 .ck-help {
   margin-bottom: 12px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.55;
   color: var(--ck-text-2);
 }
@@ -725,7 +727,7 @@ button.ck-stat:hover {
 
 .ck-stat__label {
   display: block;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;

@@ -189,7 +189,7 @@ function FeedRow({
       <span
         className="ck-num"
         style={{
-          fontSize: "11px",
+          fontSize: "12px",
           fontWeight: 500,
           color: hasPassed ? "var(--ck-text-2)" : "var(--ck-text-3)",
           minWidth: "50px",
@@ -231,19 +231,19 @@ function FeedRow({
               {entry.player ?? "Raid-Wide"}
             </span>
             {specLabel && (
-              <span style={{ fontSize: "10px", color: "var(--ck-text-3)", flexShrink: 0 }}>
+              <span style={{ fontSize: "11px", color: "var(--ck-text-3)", flexShrink: 0 }}>
                 {specLabel}
               </span>
             )}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "2px" }}>
             <TitleIcon src={entry.titleIcon} abilityId={entry.abilityId} game={entry.game} />
-            <div style={{ fontSize: "11px", fontWeight: 500, color: hasPassed ? style.color : "#b3984f", transition: "color 0.3s" }}>
+            <div style={{ fontSize: "12px", fontWeight: 500, color: hasPassed ? style.color : "#b3984f", transition: "color 0.3s" }}>
               {entry.kind === "Death" ? "⚔ " : ""}{entry.title}
             </div>
           </div>
           {entry.subtitle && (
-            <div style={{ fontSize: "11px", lineHeight: 1.4, color: "var(--ck-text-2)", marginTop: "2px" }}>
+            <div style={{ fontSize: "12px", lineHeight: 1.4, color: "var(--ck-text-2)", marginTop: "2px" }}>
               {entry.subtitle}
             </div>
           )}
@@ -252,7 +252,7 @@ function FeedRow({
         <div style={{ display: "flex", alignItems: "flex-start", gap: "6px", flexShrink: 0 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "3px" }}>
             {showKindBadge && (
-              <span className="ck-badge" style={{ color: hasPassed ? style.color : "#8a8a8a", fontSize: "9px" }}>
+              <span className="ck-badge" style={{ color: hasPassed ? style.color : "#8a8a8a", fontSize: "10px" }}>
                 {style.label}
               </span>
             )}

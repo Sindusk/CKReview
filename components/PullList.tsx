@@ -106,7 +106,7 @@ export default function PullList({ pulls, selectedPullId, onSelectPull }: PullLi
               </div>
 
               {/* Line 2 — pull stats */}
-              <div className="ck-num" style={{ display: "flex", flexWrap: "wrap", gap: "12px", fontSize: "11px", fontWeight: 500, color: "var(--ck-text-3)", minWidth: 0 }}>
+              <div className="ck-num" style={{ display: "flex", flexWrap: "wrap", gap: "12px", fontSize: "12px", fontWeight: 500, color: "var(--ck-text-3)", minWidth: 0 }}>
                 <span style={{ color: "var(--ck-text-2)" }}>⏱ {formatDuration(pull.fightDuration)}</span>
                 {deaths > 0 ? (
                   <span style={{ color: SEVERITY_COLOR.Death, display: "inline-flex", alignItems: "center", gap: "4px" }}>

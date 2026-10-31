@@ -138,7 +138,21 @@ Original scope, for reference:
 - Done when: no orphan controls in the header; the page still never
   scrolls.
 
-### 4. Typography and contrast pass
+### 4. Typography and contrast pass — done 2026-10-31
+
+`--ck-text-2` `#b3afa6` → `#bcb8af` (9.0:1 on `--ck-bg-panel`),
+`--ck-text-3` `#80848a` → `#959aa1` (4.8 → 6.4:1). `.ck-panel-subtitle`
+and `.ck-help` 11 → 12px, `.ck-stat__label` 9 → 10px. Workspace panels:
+Pull Review entry text 11 → 12 (spec 10 → 11, kind badge 9 → 10), pull
+list stats 11 → 12, VOD card labels 10 → 11, video header sync note and
+local-file error 11 → 12. The import bar's slate colours are theme tokens
+and its text is 12px. Checked at 1600x900 with the Day 44 sample: no
+overflow. **Not touched:** the dense dialogs and timelines (Damage,
+Mitigation, Strategy, statics), RosterPanel (fixed height, signed off), and
+`.ck-badge` / `.ck-label` / `.ck-table th` at 10px. Raise those only if
+the user asks.
+
+Original scope, for reference:
 
 - Raise 11px secondary text (import bar, status lines, panel subtitles) to
   12-13px where space allows.

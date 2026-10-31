@@ -693,7 +693,7 @@ export default function VideoPanel({
         {vod?.isCalibrated && syncPointLabels && syncPointLabels.length > 1 && (
           <span
             title="This VOD was re-synced after a skip. Each pull uses the latest sync at or before it."
-            style={{ fontSize: "11px", color: "var(--ck-text-3)", whiteSpace: "nowrap" }}
+            style={{ fontSize: "12px", color: "var(--ck-text-3)", whiteSpace: "nowrap" }}
           >
             synced at pulls {syncPointLabels.join(", ")}
           </span>
@@ -850,7 +850,7 @@ export default function VideoPanel({
                 </div>
               )}
               {localError && (
-                <div style={{ fontSize: "11px", opacity: 0.7, wordBreak: "break-word" }}>
+                <div style={{ fontSize: "12px", color: "var(--ck-text-2)", wordBreak: "break-word" }}>
                   Browser says: {localError}
                 </div>
               )}

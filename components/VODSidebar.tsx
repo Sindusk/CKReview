@@ -236,7 +236,7 @@ function VodCard({
             title={vod.durationSec === undefined
               ? "Covered pulls. The video's length isn't known until it plays once, so this may run past its end."
               : "Pulls whose start is in this VOD"}
-            style={{ fontSize: "10px", color: "var(--ck-text-3)", whiteSpace: "nowrap" }}
+            style={{ fontSize: "11px", color: "var(--ck-text-3)", whiteSpace: "nowrap" }}
           >
             {rangeLabel}
           </span>
@@ -248,7 +248,7 @@ function VodCard({
       <div
         title={title ?? undefined}
         style={{
-          fontSize: "10px",
+          fontSize: "11px",
           color: "var(--ck-text-2)",
           overflow: "hidden",
           textOverflow: "ellipsis",

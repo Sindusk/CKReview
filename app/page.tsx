@@ -2086,24 +2086,24 @@ function WCLImportBar({
   if (importing) {
     return (
       <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1 }}>
-        <div style={{ width: "10px", height: "10px", borderRadius: "999px", backgroundColor: "#38bdf8", boxShadow: "0 0 0 4px rgba(56,189,248,0.2)" }} />
+        <div style={{ width: "10px", height: "10px", borderRadius: "999px", backgroundColor: "var(--ck-arcane)", boxShadow: "0 0 0 4px rgba(83,169,255,0.2)" }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
-            <span style={{ fontSize: "11px", fontWeight: 600, color: "#e2e8f0" }}>Importing report</span>
-            <span style={{ fontSize: "11px", color: "#94a3b8" }}>{Math.max(4, importProgress)}%</span>
+            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--ck-text)" }}>Importing report</span>
+            <span className="ck-num" style={{ fontSize: "12px", color: "var(--ck-text-2)" }}>{Math.max(4, importProgress)}%</span>
           </div>
-          <div style={{ height: "8px", borderRadius: "999px", backgroundColor: "#1f2937", overflow: "hidden" }}>
+          <div style={{ height: "8px", borderRadius: "999px", backgroundColor: "var(--ck-bg-deep)", border: "1px solid var(--ck-line-2)", overflow: "hidden" }}>
             <div
               style={{
                 width:        `${Math.max(4, importProgress)}%`,
                 height:       "100%",
-                background:   "linear-gradient(90deg, #38bdf8, #2563eb)",
+                background:   "linear-gradient(90deg, var(--ck-arcane), #2d6fd8)",
                 borderRadius: "999px",
                 transition:   "width 0.2s ease",
               }}
             />
           </div>
-          <div style={{ marginTop: "4px", fontSize: "11px", color: "#94a3b8" }}>
+          <div style={{ marginTop: "4px", fontSize: "12px", color: "var(--ck-text-2)" }}>
             {importStatus ?? "Preparing import…"}
           </div>
         </div>
@@ -2123,7 +2123,7 @@ function WCLImportBar({
       />
       <label
         title="Keep checking this report for new fights and import them automatically as they occur"
-        style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "#94a3b8", whiteSpace: "nowrap", cursor: "pointer" }}
+        style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "var(--ck-text-2)", whiteSpace: "nowrap", cursor: "pointer" }}
       >
         <input
           type="checkbox"
@@ -2140,7 +2140,7 @@ function WCLImportBar({
         Import
       </button>
       {error && (
-        <span style={{ fontSize: "11px", color: "#f87171", maxWidth: "320px" }}>
+        <span style={{ fontSize: "12px", color: "#f87171", maxWidth: "320px" }}>
           {error}
         </span>
       )}
