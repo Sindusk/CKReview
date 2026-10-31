@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { Panel } from "@/components/ui/Panel";
+import { LineGlyph, type LineGlyphName } from "@/components/ui/LineGlyph";
 import type { LogProvider } from "@/components/LogApiSetupDialog";
 
 /*
@@ -15,46 +16,10 @@ import type { LogProvider } from "@/components/LogApiSetupDialog";
   `progress`, so the importing state has one implementation.
 */
 
-type Glyph = "connect" | "import" | "review" | "upload" | "link";
+type Glyph = LineGlyphName;
 
-// Line glyphs on a 24-unit grid, stroked in currentColor.
-const GLYPHS: Record<Glyph, ReactNode> = {
-  connect: (
-    <>
-      <path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1" />
-      <path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1" />
-    </>
-  ),
-  import: (
-    <>
-      <path d="M7 3h7l4 4v14H7z" />
-      <path d="M14 3v4h4" />
-      <path d="M10 12h5M10 15h5M10 18h3" />
-    </>
-  ),
-  review: <path d="M9 6.5l9 5.5-9 5.5z" />,
-  upload: (
-    <>
-      <path d="M12 15V4" />
-      <path d="M7.5 8.5L12 4l4.5 4.5" />
-      <path d="M5 14v5h14v-5" />
-    </>
-  ),
-  link: (
-    <>
-      <path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1" />
-      <path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1" />
-    </>
-  ),
-};
-
-function GlyphIcon({ name, size }: { name: Glyph; size: number }) {
-  return (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor"
-      strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      {GLYPHS[name]}
-    </svg>
-  );
+function GlyphIcon({ name, size }: { name: Glyph | "link"; size: number }) {
+  return <LineGlyph name={name === "link" ? "connect" : name} size={size} />;
 }
 
 type StepState = "done" | "current" | "todo";

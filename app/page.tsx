@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
+import { InfoTip } from "@/components/ui/InfoTip";
+import { LineGlyph } from "@/components/ui/LineGlyph";
 import Header from "../components/Header";
 import AddVodDialog, { type AddVodSource } from "../components/AddVodDialog";
 import UsageNoticeDialog, { hasAcceptedUsageNotice } from "@/components/UsageNoticeDialog";
@@ -256,6 +258,8 @@ export default function Home() {
   // day someone got round to adding it — see StaticReview.reportStartedAt.
   // Null for sample-data imports captured before the field was queried.
   const [loadedReportStartedAt, setLoadedReportStartedAt] = useState<number | null>(null);
+  // The log's own title ("Day 44"), for the toolbar's report info.
+  const [loadedReportTitle, setLoadedReportTitle] = useState<string | null>(null);
 
   // "Live log" — opt-in, off by default. When on, keeps polling the loaded
   // report for newly-appeared fights (see the polling useEffect below) and
@@ -960,6 +964,7 @@ export default function Home() {
     setSelectedPullId(null);
     setLoadedReportCode(report.code);
     setLoadedReportStartedAt(report.startTime ?? null);
+    setLoadedReportTitle(report.title ?? null);
     setLoadedSource("wcl");
     setImportStatus(`Log Loaded: ${report.code}`);
     setImportProgress(100);
@@ -1020,6 +1025,7 @@ export default function Home() {
     setSelectedPullId(null);
     setLoadedReportCode(report.code);
     setLoadedReportStartedAt(report.startTime ?? null);
+    setLoadedReportTitle(report.title ?? null);
     setLoadedSource("ffl");
     setImportStatus(`Log Loaded: ${report.code}`);
     setImportProgress(100);
@@ -1219,6 +1225,7 @@ export default function Home() {
       setImportStatus(null);
       setLoadedReportCode(null);
       setLoadedReportStartedAt(null);
+      setLoadedReportTitle(null);
       return message;
     } finally {
       setImporting(false);
@@ -1401,6 +1408,7 @@ export default function Home() {
     setSelectedPullId(null);
     setLoadedReportCode(payload.report.code);
     setLoadedReportStartedAt(payload.report.startTime ?? null);
+    setLoadedReportTitle(payload.report.title ?? null);
     setLoadedSource(payload.source);
     setImportStatus(`Log Loaded: ${payload.report.code} (local sample data)`);
     setImportProgress(100);
@@ -1490,18 +1498,14 @@ export default function Home() {
       importing={importing}
       importProgress={importProgress}
       importStatus={importStatus}
-      loadedReportCode={loadedReportCode}
       error={importError}
       onImport={handleImportClick}
-      importPointsUsed={importPointsUsed}
-      rateLimit={liveRateLimit}
       liveLogEnabled={liveLogEnabled}
       onLiveLogEnabledChange={handleLiveLogEnabledChange}
-      liveLogError={liveLogError}
-      loadedFromSampleData={loadedFromSampleData}
       onConnect={setLogApiSetup}
     />
   );
+  const reportLoaded = loadedReportCode !== null && !importing;
 
   return (
     <div
@@ -1535,37 +1539,62 @@ export default function Home() {
       {!showOnboarding && <div
         className="ck-strip"
         style={{
-          display:         "flex",
-          alignItems:      "center",
-          gap:             "8px",
-          padding:         "6px 16px",
-          flexShrink:      0,
-          position:        "relative",
-          zIndex:          1,
+          // Report info | analysis buttons (centred) | report link. The two
+          // side tracks share the leftover width so the buttons stay centred.
+          display:             "grid",
+          gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)",
+          alignItems:          "center",
+          gap:                 "16px",
+          padding:             "6px 16px",
+          flexShrink:          0,
+          position:            "relative",
+          zIndex:              1,
         }}
       >
-        {importBar}
-        <button
-          className="ck-btn"
-          onClick={() => setShowDamage(true)}
-          title="Where each player lost damage, scored in their own damage and checked against the fight"
-        >
-          Damage
-        </button>
-        <button
-          className="ck-btn"
-          onClick={() => setShowMitigation(true)}
-          title="The party's mitigation on each raidwide, read from the log"
-        >
-          Mitigation
-        </button>
-        <button
-          className="ck-btn"
-          onClick={() => setShowStrategy(true)}
-          title="Raid strategy detected automatically from this report's pulls"
-        >
-          Strategy
-        </button>
+        <div style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
+          {reportLoaded
+            ? <ReportInfo title={loadedReportTitle} code={loadedReportCode} pulls={pulls} />
+            : importBar}
+        </div>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button
+            className="ck-btn ck-btn--md"
+            onClick={() => setShowDamage(true)}
+            title="Where each player lost damage, scored in their own damage and checked against the fight"
+          >
+            <LineGlyph name="damage" />
+            Damage
+          </button>
+          <button
+            className="ck-btn ck-btn--md"
+            onClick={() => setShowMitigation(true)}
+            title="The party's mitigation on each raidwide, read from the log"
+          >
+            <LineGlyph name="mitigation" />
+            Mitigation
+          </button>
+          <button
+            className="ck-btn ck-btn--md"
+            onClick={() => setShowStrategy(true)}
+            title="Raid strategy detected automatically from this report's pulls"
+          >
+            <LineGlyph name="strategy" />
+            Strategy
+          </button>
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", minWidth: 0 }}>
+          {reportLoaded && (
+            <ReportLink
+              code={loadedReportCode}
+              source={loadedSource}
+              importPointsUsed={importPointsUsed ?? null}
+              rateLimit={liveRateLimit ?? null}
+              liveLogEnabled={liveLogEnabled}
+              liveLogError={liveLogError}
+              loadedFromSampleData={loadedFromSampleData}
+            />
+          )}
+        </div>
       </div>}
 
       <StrategyDialog
@@ -1884,6 +1913,125 @@ function SyncToPullButton({
   );
 }
 
+// ─── ReportInfo / ReportLink (the loaded toolbar's left and right ends) ───────
+//
+// docs/opening-screen-plan.md step 2: the report's title and encounter on
+// the left, its log URL on the right with the import's API points, the
+// live-log state and the sample-data flag in an InfoTip.
+
+function ReportInfo({ title, code, pulls }: { title: string | null; code: string; pulls: Pull[] }) {
+  const bosses = [...new Set(pulls.map(p => p.name))];
+  const kills = pulls.filter(p => p.result === "Kill").length;
+  const detail = [
+    bosses.join(", "),
+    `${pulls.length} pull${pulls.length === 1 ? "" : "s"}`,
+    kills > 0 ? `${kills} kill${kills === 1 ? "" : "s"}` : null,
+  ].filter(Boolean).join(" · ");
+  return (
+    <div style={{ display: "flex", alignItems: "baseline", gap: "10px", minWidth: 0 }}>
+      <span
+        title={title ?? code}
+        style={{
+          fontFamily:   "var(--font-cinzel), serif",
+          fontSize:     "15px",
+          fontWeight:   700,
+          color:        "var(--ck-text-gold)",
+          whiteSpace:   "nowrap",
+          overflow:     "hidden",
+          textOverflow: "ellipsis",
+          flexShrink:   1,
+          minWidth:     0,
+        }}
+      >
+        {title || code}
+      </span>
+      <span style={{ fontSize: "12px", color: "var(--ck-text-2)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>
+        {detail}
+      </span>
+    </div>
+  );
+}
+
+function ReportLink({
+  code,
+  source,
+  importPointsUsed,
+  rateLimit,
+  liveLogEnabled,
+  liveLogError,
+  loadedFromSampleData,
+}: {
+  code:   string;
+  source: "wcl" | "ffl" | null;
+  // Points spent by the import that just completed, or null if the
+  // provider never returned rateLimitData.
+  importPointsUsed: number | null;
+  // Live-ticking snapshot of the provider's hourly points quota (page.tsx's
+  // polling useEffect keyed on loadedSource).
+  rateLimit:        RateLimitStatus | null;
+  liveLogEnabled:   boolean;
+  // Most recent background poll failure (pollWCLForNewFights /
+  // pollFFLForNewFights), or null if the last poll succeeded.
+  liveLogError:     string | null;
+  // Loaded from lib/sample-report-store.ts rather than a live fetch.
+  loadedFromSampleData: boolean;
+}) {
+  const host = source === "ffl" ? "www.fflogs.com" : "www.warcraftlogs.com";
+  const url = `https://${host}/reports/${code}`;
+  const liveColor = liveLogError ? "#f87171" : "#4ade80";
+
+  const row = (label: string, value: ReactNode, color?: string) => (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: "16px" }}>
+      <span style={{ color: "var(--ck-text-2)" }}>{label}</span>
+      <span className="ck-num" style={{ color: color ?? "var(--ck-text)", textAlign: "right" }}>{value}</span>
+    </div>
+  );
+
+  const tip = (
+    <div style={{ display: "flex", flexDirection: "column", gap: "3px", minWidth: "220px" }}>
+      <div style={{ fontWeight: 600, color: "var(--ck-text-gold)", marginBottom: "2px" }}>
+        {source === "ffl" ? "FF Logs" : "Warcraft Logs"} report
+      </div>
+      {loadedFromSampleData && row("Source", "Local sample data", "#c4b5fd")}
+      {importPointsUsed != null && row("This import", `${importPointsUsed.toLocaleString()} pts`)}
+      {rateLimit && row("This hour", `${rateLimit.pointsSpentThisHour.toLocaleString()} / ${rateLimit.limitPerHour.toLocaleString()} pts`)}
+      {rateLimit && row("Quota resets in", formatWaitTime(rateLimit.secondsUntilReset))}
+      {row("Live log", liveLogEnabled ? (liveLogError ? "Poll failed" : "Checking for new pulls") : "Off",
+        liveLogEnabled ? liveColor : "var(--ck-text-3)")}
+      {liveLogEnabled && liveLogError && (
+        <div style={{ color: "#f87171", fontSize: "11px", marginTop: "2px" }}>{liveLogError}</div>
+      )}
+      {!loadedFromSampleData && importPointsUsed == null && !rateLimit && (
+        <div style={{ color: "var(--ck-text-3)", fontSize: "11px" }}>No API usage reported for this import.</div>
+      )}
+    </div>
+  );
+
+  return (
+    <InfoTip
+      label={`Report ${code}: API usage and live log status`}
+      maxWidth={340}
+      content={tip}
+      trigger={
+        <span style={{ display: "inline-flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+          {liveLogEnabled && (
+            <span aria-hidden="true" style={{ width: "7px", height: "7px", borderRadius: "50%", backgroundColor: liveColor, flexShrink: 0 }} />
+          )}
+          <a
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            className="ck-num"
+            style={{ fontSize: "12px", color: "var(--ck-arcane-text)", textDecoration: "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+          >
+            {host.replace(/^www\./, "")}/reports/{code}
+          </a>
+        </span>
+      }
+    />
+  );
+}
+
 // ─── WCLImportBar (now handles both WCL and FFLogs) ───────────────────────────
 //
 // Now a controlled component — `value`/`onChange` are lifted to page.tsx so
@@ -1896,15 +2044,10 @@ function WCLImportBar({
   importing,
   importProgress,
   importStatus,
-  loadedReportCode,
   error,
   onImport,
-  importPointsUsed,
-  rateLimit,
   liveLogEnabled,
   onLiveLogEnabledChange,
-  liveLogError,
-  loadedFromSampleData,
   onConnect,
 }: {
   onConnect:        (provider: LogProvider) => void;
@@ -1913,27 +2056,13 @@ function WCLImportBar({
   importing:        boolean;
   importProgress:   number;
   importStatus:     string | null;
-  loadedReportCode: string | null;
   error:            string | null;
   onImport:         (url: string) => void;
-  // Points spent specifically by the import that just completed, or null
-  // if unavailable (e.g. the provider never returned rateLimitData).
-  importPointsUsed?: number | null;
-  // Live-ticking snapshot of the provider's hourly points quota — see
-  // page.tsx's polling useEffect keyed on loadedSource.
-  rateLimit?:        RateLimitStatus | null;
   // Opt-in "keep polling this report for new fights" toggle — off by
   // default, set before Import is clicked, drives page.tsx's live-poll
   // useEffect once a report is loaded.
   liveLogEnabled:         boolean;
   onLiveLogEnabledChange: (v: boolean) => void;
-  // Most recent background poll failure, or null if the last poll (or the
-  // initial import) succeeded — see page.tsx's pollWCLForNewFights/
-  // pollFFLForNewFights.
-  liveLogError: string | null;
-  // True if the currently-loaded report came from lib/sample-report-store.ts
-  // (scripts/fetch-*-report.js's saved output) rather than a live fetch.
-  loadedFromSampleData: boolean;
 }) {
   function handleSubmit() {
     const trimmed = value.trim();
@@ -1947,61 +2076,8 @@ function WCLImportBar({
   const connectMatch = error?.match(/"Connect (FFLogs|WarcraftLogs)"/);
   const connectProvider: LogProvider | null = connectMatch ? (connectMatch[1] === "FFLogs" ? "ffl" : "wcl") : null;
 
-  // #7 — "Import Another" was removed. Once a report is loaded, this bar
-  // just shows the loaded-state badge; there's no in-place reset flow to
-  // maintain/support.
-  if (loadedReportCode && !importing) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1, flexWrap: "wrap", rowGap: "4px" }}>
-        <span className="ck-chip">
-          <span style={{ color: "var(--ck-text-2)", fontWeight: 500 }}>Log Loaded:</span>
-          {loadedReportCode}
-        </span>
-        <span style={{ fontSize: "11px", color: "var(--ck-text-2)" }}>Ready for review</span>
-
-        {loadedFromSampleData && (
-          <span
-            title="Loaded from local sample data (scripts/fetch-wow-report.js / fetch-ff-report.js) — not a live fetch"
-            style={{ fontSize: "11px", color: "#c4b5fd", fontWeight: 600 }}
-          >
-            · Local sample data
-          </span>
-        )}
-
-        {liveLogEnabled && liveLogError && (
-          <span
-            title={liveLogError}
-            style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "#f87171", maxWidth: "320px" }}
-          >
-            <span style={{ width: "6px", height: "6px", borderRadius: "999px", backgroundColor: "#f87171" }} />
-            Live poll failed: {liveLogError}
-          </span>
-        )}
-
-        {liveLogEnabled && !liveLogError && (
-          <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "#4ade80" }}>
-            <span style={{ width: "6px", height: "6px", borderRadius: "999px", backgroundColor: "#4ade80" }} />
-            Live — checking for new pulls
-          </span>
-        )}
-
-        {rateLimit && (
-          <span
-            title="API points used to import this log, total points used this hour, and when the hourly quota resets"
-            className="ck-num"
-            style={{ fontSize: "11px", color: "var(--ck-text-3)", whiteSpace: "nowrap" }}
-          >
-            · {importPointsUsed !== null && importPointsUsed !== undefined && (
-              <>{importPointsUsed.toLocaleString()} pts this import · </>
-            )}
-            {rateLimit.pointsSpentThisHour.toLocaleString()}/{rateLimit.limitPerHour.toLocaleString()} this hour
-            · resets in {formatWaitTime(rateLimit.secondsUntilReset)}
-          </span>
-        )}
-      </div>
-    );
-  }
-
+  // #7 — "Import Another" was removed (New Session changes reports). Once a
+  // report is loaded the toolbar shows ReportInfo and ReportLink instead.
   if (importing) {
     return (
       <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1 }}>

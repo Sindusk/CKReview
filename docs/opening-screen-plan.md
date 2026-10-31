@@ -91,9 +91,20 @@ onboarding view in place of the panel grid.
 - Done when: a fresh load shows only header + hero; importing swaps to the
   workspace; tsc passes.
 
-### 2. Report context bar (loaded state)
+### 2. Report context bar (loaded state) — done 2026-10-31
 
-Replace the `Log Loaded: <code>` chip in the toolbar with a context bar:
+The user rejected the chip / two-line / breadcrumb mockups for a simpler
+three-part toolbar (page.tsx `ReportInfo` / `ReportLink`): the report's
+title (Cinzel) and "boss · N pulls · K kills" on the left; Damage /
+Mitigation / Strategy centred with line glyphs (`components/ui/
+LineGlyph.tsx`); the report's log URL on the right, whose `InfoTip` holds
+the import's API points, the hourly quota, the live-log state and the
+sample-data flag (a dot beside the URL while Live log is on). The pull
+itself isn't in the bar. **Changing reports stays with New Session** (no
+"Change report" button). The title is kept from the report query
+(`loadedReportTitle`), no new fetch.
+
+Original scope, for reference: replace the `Log Loaded: <code>` chip in the toolbar with a context bar:
 report title, boss / encounter, selected pull number, Kill or Wipe (and
 wipe %), duration, player count, VOD count. Keep the live-log status, the
 sample-data badge and the rate-limit line, de-emphasised at the right.

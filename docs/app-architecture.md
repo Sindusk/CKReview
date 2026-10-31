@@ -61,6 +61,12 @@ file's header comment. Mechanic detection has its own guide:
   provider's token is in localStorage). Import progress is the same
   `WCLImportBar`, passed in. Plan and remaining steps:
   [opening-screen-plan.md](opening-screen-plan.md).
+- **Toolbar** (under the header, once the workspace shows): a three-track
+  grid — report title and encounter (`ReportInfo`) | Damage / Mitigation
+  / Strategy, centred | the log URL (`ReportLink`), whose hover tip holds
+  API points, quota, live-log state and the sample-data flag. Before a
+  report is loaded (a VOD added first) the left track is the import field.
+  New Session is how you change reports.
 - **Header branding.** `components/BrandBanner.tsx` is a component, not an
   image. It lays out at 1500x150 and scales to fit.
   - The band stretches full width; only the artwork is scaled.
