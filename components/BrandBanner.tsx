@@ -24,7 +24,7 @@ const DESIGN_H = 150;
 /* The artwork cluster is centred inside the design width; keeping the full
    1500 here leaves slack at both ends so nothing clips if the title font
    falls back to a wider serif. */
-const CLUSTER_W = DESIGN_W + 140;   // + the crest's balancing spacer
+const CLUSTER_W = DESIGN_W + 140;   // + the second, mirrored crest
 
 /* Scaling by height/DESIGN_H wastes the design's vertical padding: the
    tallest ink (the title column) is only ~120 of the 150. Scaling against
@@ -68,7 +68,9 @@ function DuckMark() {
 const HEX = "polygon(50% 0%, 100% 22%, 100% 66%, 50% 100%, 0% 66%, 0% 22%)";
 
 /** The mark inside its gilded hex frame. */
-function Crest({ size }: { size: number }) {
+/** `mirror` flips the duck (not the frame's lighting) so a right-hand crest
+    faces inward, toward the title. */
+function Crest({ size, mirror = false }: { size: number; mirror?: boolean }) {
   return (
     <div
       style={{
@@ -80,7 +82,7 @@ function Crest({ size }: { size: number }) {
         clipPath: HEX,
       }}
     >
-      <div style={{ width: "100%", height: "100%", overflow: "hidden", clipPath: HEX }}>
+      <div style={{ width: "100%", height: "100%", overflow: "hidden", clipPath: HEX, transform: mirror ? "scaleX(-1)" : undefined }}>
         <DuckMark />
       </div>
     </div>
@@ -223,9 +225,9 @@ export default function BrandBanner({ height = DESIGN_H, title = "Consistency Ki
                 RAID REVIEW
               </div>
             </div>
-            {/* Invisible twin of the crest, so the title (not the crest +
-                title pair) sits on the window's centre line. */}
-            <div aria-hidden="true" style={{ width: "92px", flex: "none" }} />
+            {/* A mirrored twin of the crest, facing inward: it balances the
+                left one so the title sits on the window's centre line. */}
+            <Crest size={92} mirror />
           </div>
   
           <div style={{ display: "flex", alignItems: "center", gap: "16px", flex: "none" }}>
