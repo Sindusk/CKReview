@@ -8,7 +8,8 @@ import BrandBanner from "./BrandBanner";
 const HEADER_H = 80;
 
 type HeaderProps = {
-  onAddVod:             () => void;
+  /** The loaded report's game, for the banner's lit sigils. */
+  game:                 "wow" | "ffxiv" | null;
   onConnectWCL:         () => void;
   onConnectFFL:         () => void;
   onAddReviewToStatic:  () => void;
@@ -22,7 +23,7 @@ type HeaderProps = {
 };
 
 export default function Header({
-  onAddVod,
+  game,
   onConnectWCL,
   onConnectFFL,
   onAddReviewToStatic,
@@ -53,7 +54,7 @@ export default function Header({
           behind the controls rather than sitting as a boxed-in centre panel.
           See BrandBanner.tsx for the 1b/2a design. */}
       <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
-        <BrandBanner height={HEADER_H} />
+        <BrandBanner height={HEADER_H} game={game} />
       </div>
 
       <div style={{ position: "relative", zIndex: 1 }}>
@@ -71,11 +72,7 @@ export default function Header({
         />
       </div>
 
-      <div style={{ position: "relative", zIndex: 1, width: "120px", display: "flex", justifyContent: "flex-end" }}>
-        <button className="ck-btn ck-btn--primary ck-btn--lg" onClick={onAddVod}>
-          Add VOD
-        </button>
-      </div>
+      {/* Add VOD lives in the VODs panel header (VODSidebar). */}
     </header>
   );
 }

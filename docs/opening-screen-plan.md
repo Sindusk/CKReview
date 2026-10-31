@@ -44,8 +44,10 @@ describe", small UI tweaks need no visual verification loop) and the
 - **Selection colour** (step 5): the current rule is "selection and active
   tabs are arcane blue, never gold"; the mockup used gold. Keep blue unless
   the user says otherwise; a change touches the whole app.
-- **VOD before a log** (step 3): Add VOD works with no report today. Keep
-  that flow (an "Add VOD" link on the empty screen) or require a log first?
+- **VOD before a log**: since step 3 moved Add VOD into the VODs panel,
+  the opening screen has no way to add a VOD first (a restored
+  `?session=` link with VODs still opens the workspace). Add a link on the
+  empty screen only if the user asks.
 - **Switching reports** (step 2): "Import Another" was removed on purpose
   (`WCLImportBar` comment #7). Should the context bar get a "Change report"
   action?
@@ -65,8 +67,8 @@ glyphs drawn for the steps and the Import button; Import uses the plain
 gold-framed `.ck-btn` (like Damage / Mitigation / Strategy), not primary
 blue; Live log is a checkbox under the field. No recent reviews and no
 statics list. No background art yet (still open, below). The screen shows
-while there's no report and no VOD, so Add VOD (header) and a restored
-`?session=` link with VODs still open the workspace.
+while there's no report and no VOD, so a restored `?session=` link with
+VODs still opens the workspace.
 
 Original scope, for reference: when no report is loaded (no `loadedReportCode`, not importing), render an
 onboarding view in place of the panel grid.
@@ -117,7 +119,15 @@ sample-data badge and the rate-limit line, de-emphasised at the right.
 - Done when: the bar updates with pull selection; no layout shift in the
   grid below.
 
-### 3. Header and toolbar consolidation
+### 3. Header and toolbar consolidation — done 2026-10-31
+
+User kept the separate toolbar strip ("it earns its place"); no merge into
+the header. Add VOD is now a `.ck-btn` with a plus glyph in the VODs panel
+header (VODSidebar), and the header holds only the burger menu and the
+banner. The banner's sigils for the loaded game stay lit and the other
+game's dim (`BrandBanner`'s `game` prop).
+
+Original scope, for reference:
 
 - Move Add VOD from the header into the VODs panel header (as `+ Add VOD`).
 - Game indicator (FFXIV / WoW crest) in the header once a report is loaded.

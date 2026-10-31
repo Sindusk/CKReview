@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 
 export type LineGlyphName =
   | "connect" | "import" | "review" | "upload"
-  | "damage" | "mitigation" | "strategy";
+  | "damage" | "mitigation" | "strategy" | "add";
 
 const GLYPHS: Record<LineGlyphName, ReactNode> = {
   connect: (
@@ -33,6 +33,7 @@ const GLYPHS: Record<LineGlyphName, ReactNode> = {
       <path d="M5 14v5h14v-5" />
     </>
   ),
+  add: <path d="M12 5v14M5 12h14" />,
   damage: (
     <>
       <path d="M4 20h16" />

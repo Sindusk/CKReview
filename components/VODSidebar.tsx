@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { isLocalVod, isTwitchVod, type Vod } from "../types/Vod";
 import PullList from "../components/PullList";
 import { Panel, PanelHeader } from "./ui/Panel";
+import { LineGlyph } from "./ui/LineGlyph";
 import type { Pull } from "../types/Pull";
 import { coveredRangeLabel, isSynced } from "../lib/vod-sync";
 
@@ -47,6 +48,7 @@ type VODSidebarProps = {
   selectedVodId: number | null;
   onSelectVod: (id: number) => void;
   onOpenTranscript: (id: number) => void;
+  onAddVod: () => void;
 
   pulls: Pull[];
   selectedPullId: number | null;
@@ -58,6 +60,7 @@ export default function VODSidebar({
   selectedVodId,
   onSelectVod,
   onOpenTranscript,
+  onAddVod,
   pulls,
   selectedPullId,
   onSelectPull,
@@ -77,7 +80,12 @@ export default function VODSidebar({
       }}
     >
       <Panel style={{ flex: "0 0 auto" }}>
-        <PanelHeader title="VODs" count={vods.length > 0 ? `(${vods.length})` : undefined} />
+        <PanelHeader title="VODs" count={vods.length > 0 ? `(${vods.length})` : undefined}>
+          <button className="ck-btn" onClick={onAddVod} title="Add a YouTube, Twitch or local VOD to watch alongside the pulls">
+            <LineGlyph name="add" size={14} strokeWidth={2} />
+            Add VOD
+          </button>
+        </PanelHeader>
 
         {/*
           Fixed to the height of a single row of VOD cards. With ~3 VODs this

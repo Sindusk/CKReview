@@ -1523,7 +1523,7 @@ export default function Home() {
       }}
     >
       <Header
-        onAddVod={() => setShowDialog(true)}
+        game={loadedReportCode ? (loadedSource === "ffl" ? "ffxiv" : loadedSource === "wcl" ? "wow" : null) : null}
         onConnectWCL={() => setLogApiSetup("wcl")}
         onConnectFFL={() => setLogApiSetup("ffl")}
         onAddReviewToStatic={() => setShowAddReviewToStaticDialog(true)}
@@ -1771,6 +1771,7 @@ export default function Home() {
           selectedVodId={selectedVodId}
           onSelectVod={setSelectedVodId}
           onOpenTranscript={setTranscriptVodId}
+          onAddVod={() => setShowDialog(true)}
         />
       </div>
       )}

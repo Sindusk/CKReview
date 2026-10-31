@@ -73,6 +73,9 @@ file's header comment. Mechanic detection has its own guide:
   - The band stretches full width; only the artwork is scaled.
   - To make the artwork bigger, raise `ART_H`, not the header height
     (`HEADER_H` stays 80px).
+  - With a report loaded, its game's sigils stay lit and the other
+    game's dim (`game` prop). The header holds only the burger menu;
+    Add VOD is in the VODs panel header.
   - `app/icon.svg` is the favicon.
   - `public/ckreviewv8.png` and `ckreviewv9.png` are dead assets.
 - **The build needs network access to Google Fonts.** Cinzel is loaded via

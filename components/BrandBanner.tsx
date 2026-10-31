@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 /*
   Consistency Kings brand banner.
@@ -122,9 +122,23 @@ type BrandBannerProps = {
   /** Rendered height in px; the 1500x150 artwork scales to match. */
   height?: number;
   title?: string;
+  /** The loaded report's game: its sigils stay lit and the other game's
+      dim. Both lit when null (nothing loaded). */
+  game?: "wow" | "ffxiv" | null;
 };
 
-export default function BrandBanner({ height = DESIGN_H, title = "Consistency Kings Raid Review" }: BrandBannerProps) {
+/** Dims a sigil when another game's report is loaded. */
+function SigilSlot({ dim, children }: { dim: boolean; children: ReactNode }) {
+  return (
+    <div style={{ display: "flex", opacity: dim ? 0.28 : 1, filter: dim ? "grayscale(0.8)" : undefined, transition: "opacity 0.3s, filter 0.3s" }}>
+      {children}
+    </div>
+  );
+}
+
+export default function BrandBanner({ height = DESIGN_H, title = "Consistency Kings Raid Review", game = null }: BrandBannerProps) {
+  const crystal = <SigilSlot dim={game === "wow"}><CrystalSigil w={28} h={40} /></SigilSlot>;
+  const wow     = <SigilSlot dim={game === "ffxiv"}><WowSigil w={34} h={38} /></SigilSlot>;
   const scale = height / ART_H;
   /* scale() runs from the top-left corner, so the 150-tall design box lands
      taller than the band and its contents sit low; lift it by half the
@@ -176,8 +190,8 @@ export default function BrandBanner({ height = DESIGN_H, title = "Consistency Ki
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "16px", flex: "none" }}>
-            <CrystalSigil w={28} h={40} />
-            <WowSigil w={34} h={38} />
+            {crystal}
+            {wow}
             <div style={RULE_LEFT} />
           </div>
   
@@ -213,8 +227,8 @@ export default function BrandBanner({ height = DESIGN_H, title = "Consistency Ki
   
           <div style={{ display: "flex", alignItems: "center", gap: "16px", flex: "none" }}>
             <div style={RULE_RIGHT} />
-            <WowSigil w={34} h={38} />
-            <CrystalSigil w={28} h={40} />
+            {wow}
+            {crystal}
           </div>
         </div>
       </div>
