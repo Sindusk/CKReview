@@ -11,6 +11,7 @@ import ConfirmDialog from "./ConfirmDialog";
 import AddErrorDialog from "./AddErrorDialog";
 import { SeverityIcon, SEVERITY_COLOR, type SeverityKind } from "./SeverityIcon";
 import { PanelHeader } from "./ui/Panel";
+import { EmptyState } from "./ui/EmptyState";
 import { InfoTip } from "./ui/InfoTip";
 import { moduleNamesFor } from "@/lib/mechanics/module-names";
 
@@ -394,23 +395,9 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
     return (
       <div style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <PanelHeader title="Pull Review" />
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "8px",
-            padding: "20px",
-            textAlign: "center",
-          }}
-        >
-          <span style={{ fontSize: "28px", opacity: 0.5 }}>📋</span>
-          <span style={{ fontSize: "13px", color: "var(--ck-text-3)", lineHeight: "1.5" }}>
-            Select a pull to see its timeline
-          </span>
-        </div>
+        <EmptyState glyph="clipboard" title="No pull selected">
+          Select a pull from the list to see its timeline, mechanics and errors.
+        </EmptyState>
       </div>
     );
   }

@@ -8,6 +8,7 @@ import { detectFFRoles } from "@/lib/mechanics/ffxiv/roles";
 import type { PlayerVitals } from "@/lib/replay/ffxiv-replay";
 import { WOW_POWER_COLORS } from "@/lib/replay/wow-replay";
 import { PanelHeader } from "./ui/Panel";
+import { EmptyState } from "./ui/EmptyState";
 import { AbilityHoverTip } from "./ui/AbilityHoverTip";
 
 type Tab = "DamageDone" | "DamageTaken" | "Healing" | "Debuffs" | "Casts";
@@ -551,12 +552,9 @@ export default function RosterPanel({ players, playbackTimeMs, vitals }: RosterP
     return (
       <div style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <PanelHeader title="Roster" />
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "6px", padding: "12px", textAlign: "center" }}>
-          <span style={{ fontSize: "22px", opacity: 0.5 }}>👥</span>
-          <span style={{ fontSize: "12px", color: "var(--ck-text-3)", lineHeight: "1.5" }}>
-            Select a pull to see the roster
-          </span>
-        </div>
+        <EmptyState glyph="roster" title="No roster loaded">
+          Select a pull to see its players, roles and performance.
+        </EmptyState>
       </div>
     );
   }

@@ -428,6 +428,10 @@ export default function Home() {
   // on Load replay, cached per pull for the session. A sample-data load
   // reads a replay saved by scripts/fetch-{ff,wow}-replay.js first.
   const [centerView, setCenterView] = useState<"video" | "replay">("video");
+  // With no VOD added the Video tab is disabled and the centre panel shows
+  // the replay (with its Load replay button); adding the first VOD brings
+  // back whichever view was chosen, Video by default.
+  const centerMode: "video" | "replay" = vods.length === 0 ? "replay" : centerView;
   const [replays, setReplays] = useState<Record<string, ReplayData>>({});
   // The replay's own clock (it can run without a VOD); the roster's HP and
   // MP bars read it while the replay shows.
@@ -1464,7 +1468,7 @@ export default function Home() {
   // A showing replay runs its own clock (the VOD is paused behind it): the
   // roster and analysis panels follow it (highlighting what has happened),
   // and clicking an event seeks the replay instead of the video.
-  const replayClock = centerView === "replay" && !!replayKey && !!replays[replayKey];
+  const replayClock = centerMode === "replay" && !!replayKey && !!replays[replayKey];
   const panelTimeMs = replayClock ? replayTimeMs : timeline.playbackTimeMs;
 
   const syncPointLabels = selectedVod
@@ -1688,7 +1692,7 @@ export default function Home() {
               players={activePull?.players ?? []}
               playbackTimeMs={panelTimeMs}
               vitals={replayKey && replays[replayKey]
-                ? playerVitalsAt(replays[replayKey], centerView === "replay" ? replayTimeMs : timeline.playbackTimeMs)
+                ? playerVitalsAt(replays[replayKey], centerMode === "replay" ? replayTimeMs : timeline.playbackTimeMs)
                 : undefined}
             />
           </Panel>
@@ -1719,13 +1723,23 @@ export default function Home() {
             <VideoPanel
               headerCenter={
                 <div style={{ display: "flex", gap: 4 }}>
-                  <button className={`ck-tab${centerView === "video" ? " ck-tab--active" : ""}`} onClick={showVideoView}>Video</button>
-                  <button className={`ck-tab${centerView === "replay" ? " ck-tab--active" : ""}`} onClick={showReplayView}
+                  {vods.length === 0 ? (
+                    <InfoTip
+                      label="Video is disabled until a VOD is added"
+                      tone="alert"
+                      maxWidth={260}
+                      content={<span style={{ color: "#f87171" }}>No VOD to play. Video is disabled until you add a VOD in the VODs panel.</span>}
+                      trigger={<span className="ck-tab ck-tab--disabled" aria-disabled="true">Video</span>}
+                    />
+                  ) : (
+                    <button className={`ck-tab${centerMode === "video" ? " ck-tab--active" : ""}`} onClick={showVideoView}>Video</button>
+                  )}
+                  <button className={`ck-tab${centerMode === "replay" ? " ck-tab--active" : ""}`} onClick={showReplayView}
                     title="Top-down positions from the log. Pauses the VOD and starts at its time; going back to Video resumes from the replay's time">Replay</button>
                 </div>
               }
-              titleOverride={centerView === "replay" ? "Replay" : undefined}
-              overlay={centerView === "replay" ? (
+              titleOverride={centerMode === "replay" ? "Replay" : undefined}
+              overlay={centerMode === "replay" ? (
                 <ReplayPanel
                   pull={activePull}
                   data={replayKey ? replays[replayKey] ?? null : null}

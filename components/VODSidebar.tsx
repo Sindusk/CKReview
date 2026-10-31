@@ -80,12 +80,7 @@ export default function VODSidebar({
       }}
     >
       <Panel variant="support" style={{ flex: "0 0 auto" }}>
-        <PanelHeader title="VODs" count={vods.length > 0 ? `(${vods.length})` : undefined}>
-          <button className="ck-btn" onClick={onAddVod} title="Add a YouTube, Twitch or local VOD to watch alongside the pulls">
-            <LineGlyph name="add" size={14} strokeWidth={2} />
-            Add VOD
-          </button>
-        </PanelHeader>
+        <PanelHeader title="VODs" count={vods.length > 0 ? `(${vods.length})` : undefined} />
 
         {/*
           Fixed to the height of a single row of VOD cards. With ~3 VODs this
@@ -106,12 +101,6 @@ export default function VODSidebar({
             gap:        "8px",
           }}
         >
-          {vods.length === 0 && (
-            <div style={{ color: "var(--ck-text-3)", fontSize: "13px", alignSelf: "center", paddingLeft: "4px" }}>
-              No VODs added yet
-            </div>
-          )}
-
           {vods.map(vod => (
             <VodCard
               key={vod.id}
@@ -122,6 +111,16 @@ export default function VODSidebar({
               onOpenTranscript={onOpenTranscript}
             />
           ))}
+
+          {/* Always the card after the last VOD: the way to add one. */}
+          <button
+            className="ck-card ck-card--interactive ck-add-card"
+            onClick={onAddVod}
+            title="Add a YouTube, Twitch or local VOD to watch alongside the pulls"
+          >
+            <LineGlyph name="add" size={36} strokeWidth={1.6} />
+            <span style={{ fontSize: "12px", fontWeight: 700 }}>Add VOD</span>
+          </button>
         </div>
       </Panel>
 

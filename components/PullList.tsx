@@ -4,6 +4,7 @@ import type { Pull } from "@/types/Pull";
 import { getPullRaidCutoff } from "@/lib/report-data";
 import { SeverityIcon, SEVERITY_COLOR } from "./SeverityIcon";
 import { PanelHeader } from "./ui/Panel";
+import { EmptyState } from "./ui/EmptyState";
 
 type PullListProps = {
   pulls:          Pull[];
@@ -31,12 +32,12 @@ export default function PullList({ pulls, selectedPullId, onSelectPull }: PullLi
       <PanelHeader title="Pulls" count={pulls.length > 0 ? `(${pulls.length})` : undefined} />
 
       {pulls.length === 0 && (
-        <div style={{ color: "var(--ck-text-3)", fontSize: "12px", padding: "10px 12px" }}>
-          No pull data yet
-        </div>
+        <EmptyState glyph="list" title="No pull data yet">
+          Import a report to see its pulls, phases and encounter information.
+        </EmptyState>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "5px", overflowY: "auto", flex: 1, padding: "8px 6px 8px 8px" }}>
+      {pulls.length > 0 && <div style={{ display: "flex", flexDirection: "column", gap: "5px", overflowY: "auto", flex: 1, padding: "8px 6px 8px 8px" }}>
         {pulls.map(pull => {
           const active = pull.id === selectedPullId;
           const isKill = pull.result === "Kill";
@@ -129,7 +130,7 @@ export default function PullList({ pulls, selectedPullId, onSelectPull }: PullLi
             </div>
           );
         })}
-      </div>
+      </div>}
     </div>
   );
 }

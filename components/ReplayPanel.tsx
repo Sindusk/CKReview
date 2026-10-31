@@ -55,6 +55,7 @@ import { wowEnemyIconUrl } from "@/lib/replay/wow-replay";
 import { buildWowAoeShapes, buildWowRaidwide, wowRaidwideAt } from "@/lib/replay/wow-shapes";
 import { fightReplaysFor } from "@/lib/replay/fights";
 import type { PlayerInfo } from "@/types/PlayerInfo";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 function formatMs(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -253,16 +254,29 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
     return m;
   }, [data]);
 
-  if (!pull) return <Empty>Select a pull to see its replay.</Empty>;
+  if (!pull) {
+    return (
+      <EmptyState glyph="map" title="No pull selected">
+        Select a pull to watch its top-down replay of positions and mechanics.
+      </EmptyState>
+    );
+  }
   if (!data) {
     return (
-      <Empty>
-        <div style={{ marginBottom: 10 }}>Positions for this pull aren&apos;t loaded yet.</div>
-        <button className="ck-btn" onClick={onLoad} disabled={loading}>
-          {loading ? `Loading replay${progress !== null ? ` ${Math.round(progress * 100)}%` : "…"}` : "Load replay"}
-        </button>
-        {error && <div style={{ marginTop: 10, color: "#e06c6c", maxWidth: 420 }}>{error}</div>}
-      </Empty>
+      <EmptyState
+        glyph="map"
+        title="Replay not loaded"
+        action={
+          <>
+            <button className="ck-btn ck-btn--md" onClick={onLoad} disabled={loading}>
+              {loading ? `Loading replay${progress !== null ? ` ${Math.round(progress * 100)}%` : "…"}` : "Load replay"}
+            </button>
+            {error && <div style={{ marginTop: 10, color: "#e06c6c", maxWidth: 420 }}>{error}</div>}
+          </>
+        }
+      >
+        Positions for this pull aren&apos;t loaded yet. Loading fetches them from the log once.
+      </EmptyState>
     );
   }
 
@@ -1065,10 +1079,3 @@ function Toggle({ label, title, checked, onChange }: { label: string; title: str
 // readable on both.
 const LABEL = { stroke: "rgba(0,0,0,0.75)", strokeWidth: 4, paintOrder: "stroke" } as const;
 
-function Empty({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "var(--ck-text-2)", textAlign: "center", padding: 16 }}>
-      {children}
-    </div>
-  );
-}
