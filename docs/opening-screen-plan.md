@@ -56,9 +56,19 @@ describe", small UI tweaks need no visual verification loop) and the
 
 ## Steps
 
-### 1. Empty-state onboarding screen
+### 1. Empty-state onboarding screen — done 2026-10-31
 
-When no report is loaded (no `loadedReportCode`, not importing), render an
+Built as `components/OnboardingView.tsx` (layout A, ChatGPT's centred hero).
+User's choices: three steps, **Connect to Logs → Import Report → Review**;
+the first token shows a check once either provider is connected; line
+glyphs drawn for the steps and the Import button; Import uses the plain
+gold-framed `.ck-btn` (like Damage / Mitigation / Strategy), not primary
+blue; Live log is a checkbox under the field. No recent reviews and no
+statics list. No background art yet (still open, below). The screen shows
+while there's no report and no VOD, so Add VOD (header) and a restored
+`?session=` link with VODs still open the workspace.
+
+Original scope, for reference: when no report is loaded (no `loadedReportCode`, not importing), render an
 onboarding view in place of the panel grid.
 
 - Hero: title, one line of purpose, the report URL field + Import (primary

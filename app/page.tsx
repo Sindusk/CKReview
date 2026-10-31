@@ -9,6 +9,8 @@ import SampleDataFoundDialog from "@/components/SampleDataFoundDialog";
 import LoginDialog, { AUTH_MESSAGES } from "@/components/LoginDialog";
 import AccountDialog from "@/components/AccountDialog";
 import LogApiSetupDialog, { type LogProvider } from "@/components/LogApiSetupDialog";
+import OnboardingView from "@/components/OnboardingView";
+import { isAuthenticated, isFFAuthenticated } from "@/lib/log-auth";
 import AddReviewToStaticDialog from "@/components/AddReviewToStaticDialog";
 import ManageStaticsDialog from "@/components/ManageStaticsDialog";
 import BatchImportDialog, { type BatchItem, type BatchOutcome } from "@/components/BatchImportDialog";
@@ -315,6 +317,13 @@ export default function Home() {
   const [currentUser, setCurrentUser] = useState<{ username: string; role: string } | null>(null);
   const [showLoginDialog, setShowLoginDialog] = useState(false);
   const [logApiSetup, setLogApiSetup] = useState<LogProvider | null>(null);
+  // Which log providers have a token (localStorage, so read on the client),
+  // re-read whenever the setup dialog closes. Drives the opening screen's
+  // "Connect to Logs" check.
+  const [logsConnected, setLogsConnected] = useState({ wcl: false, ffl: false });
+  useEffect(() => {
+    if (logApiSetup === null) setLogsConnected({ wcl: isAuthenticated(), ffl: isFFAuthenticated() });
+  }, [logApiSetup]);
   const [showAddReviewToStaticDialog, setShowAddReviewToStaticDialog] = useState(false);
   const [showManageStaticsDialog, setShowManageStaticsDialog] = useState(false);
 
@@ -1469,6 +1478,31 @@ export default function Home() {
     />
   );
 
+  // The opening screen replaces the toolbar and panel grid until there's
+  // something to review: a loaded report, or a VOD (added first, or
+  // restored from a ?session= link, which loads VODs without importing).
+  const showOnboarding = !loadedReportCode && vods.length === 0;
+
+  const importBar = (
+    <WCLImportBar
+      value={importInput}
+      onChange={setImportInput}
+      importing={importing}
+      importProgress={importProgress}
+      importStatus={importStatus}
+      loadedReportCode={loadedReportCode}
+      error={importError}
+      onImport={handleImportClick}
+      importPointsUsed={importPointsUsed}
+      rateLimit={liveRateLimit}
+      liveLogEnabled={liveLogEnabled}
+      onLiveLogEnabledChange={handleLiveLogEnabledChange}
+      liveLogError={liveLogError}
+      loadedFromSampleData={loadedFromSampleData}
+      onConnect={setLogApiSetup}
+    />
+  );
+
   return (
     <div
       className="ck-app"
@@ -1498,7 +1532,7 @@ export default function Home() {
         hasActiveSession={sessionId != null}
       />
 
-      <div
+      {!showOnboarding && <div
         className="ck-strip"
         style={{
           display:         "flex",
@@ -1510,23 +1544,7 @@ export default function Home() {
           zIndex:          1,
         }}
       >
-        <WCLImportBar
-          value={importInput}
-          onChange={setImportInput}
-          importing={importing}
-          importProgress={importProgress}
-          importStatus={importStatus}
-          loadedReportCode={loadedReportCode}
-          error={importError}
-          onImport={handleImportClick}
-          importPointsUsed={importPointsUsed}
-          rateLimit={liveRateLimit}
-          liveLogEnabled={liveLogEnabled}
-          onLiveLogEnabledChange={handleLiveLogEnabledChange}
-          liveLogError={liveLogError}
-          loadedFromSampleData={loadedFromSampleData}
-          onConnect={setLogApiSetup}
-        />
+        {importBar}
         <button
           className="ck-btn"
           onClick={() => setShowDamage(true)}
@@ -1548,7 +1566,7 @@ export default function Home() {
         >
           Strategy
         </button>
-      </div>
+      </div>}
 
       <StrategyDialog
         open={showStrategy}
@@ -1582,6 +1600,20 @@ export default function Home() {
         onSeek={canSeekFromDialog ? handleDialogSeek : undefined}
       />
 
+      {showOnboarding ? (
+        <OnboardingView
+          value={importInput}
+          onChange={setImportInput}
+          onImport={handleImportClick}
+          importing={importing}
+          progress={importBar}
+          error={importError}
+          liveLogEnabled={liveLogEnabled}
+          onLiveLogEnabledChange={handleLiveLogEnabledChange}
+          connected={logsConnected}
+          onConnect={setLogApiSetup}
+        />
+      ) : (
       <div
         ref={gridRef}
         style={{
@@ -1711,6 +1743,7 @@ export default function Home() {
           onOpenTranscript={setTranscriptVodId}
         />
       </div>
+      )}
 
       <AddVodDialog
         open={showDialog}

@@ -54,6 +54,13 @@ file's header comment. Mechanic detection has its own guide:
   - Fonts: Cinzel (`--font-cinzel`) for titles only; Inter
     (`--font-inter`) for everything else. Use `.ck-num` (tabular numbers)
     for timestamps and counts rather than `monospace`.
+- **Opening screen.** With no report loaded and no VOD added, page.tsx
+  renders `components/OnboardingView.tsx` instead of the import toolbar
+  and the panel grid: the one import field, Live log, and a Connect to
+  Logs → Import Report → Review strip (step 1 checked when either
+  provider's token is in localStorage). Import progress is the same
+  `WCLImportBar`, passed in. Plan and remaining steps:
+  [opening-screen-plan.md](opening-screen-plan.md).
 - **Header branding.** `components/BrandBanner.tsx` is a component, not an
   image. It lays out at 1500x150 and scales to fit.
   - The band stretches full width; only the artwork is scaled.
