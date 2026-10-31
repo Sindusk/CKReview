@@ -1768,11 +1768,11 @@ export default function Home() {
               onDurationKnown={handleVodDuration}
             />
           </div>
-          {/* The VOD's timeline, under the video (and under a replay that
-              hasn't loaded yet). */}
+          {/* The VOD's timeline, under the video. */}
           <div style={{ flexShrink: 0 }}>
-            {/* Hidden while the replay runs its own clock: it seeks the paused VOD. */}
-            {!replayClock && videoBottom}
+            {/* Video only: the sync bar and VOD timeline mean nothing on the
+                Replay view (which also runs its own clock). */}
+            {centerMode === "video" && videoBottom}
           </div>
         </Panel>
 
