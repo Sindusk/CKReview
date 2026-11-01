@@ -73,8 +73,6 @@ import {
   applyPendingWipeCalls,
   buildManualErrorsMap,
   applyPendingManualErrors,
-  canonicalJson,
-  sessionSnapshot,
   type FetchedSession,
   type SessionLookupMatch,
 } from "../lib/session";
@@ -397,10 +395,9 @@ export default function Home() {
   // below always reads current values, even when called synchronously
   // right after a setState (before the closure over state would update).
   const sessionIdRef = useRef<string | null>(null);
-  // Set while the current session belongs to someone else (opened as a
-  // static member, lib/session-access.ts): the payload as loaded, so a save
-  // that changes nothing is skipped and one that does goes to a new session.
-  const sharedSnapshotRef = useRef<string | null>(null);
+  // True while the current session belongs to someone else (opened from its
+  // link, lib/session-access.ts): it's read-only, so nothing is saved.
+  const readOnlySessionRef = useRef(false);
   const vodsRef = useRef<Vod[]>(vods);
   const pullsRef = useRef<Pull[]>(pulls);
   const sessionReportUrlRef = useRef(sessionReportUrl);
@@ -640,17 +637,16 @@ export default function Home() {
 
       // Nothing worth saving yet — don't create an empty session.
       if (!payload.reportUrl && payload.vods.length === 0) return;
-      // Someone else's session, unchanged: nothing of ours to save.
-      if (sharedSnapshotRef.current !== null && canonicalJson(payload) === sharedSnapshotRef.current) return;
+      // Someone else's session: changes aren't saved.
+      if (readOnlySessionRef.current) return;
 
       try {
-        if (sessionIdRef.current && sharedSnapshotRef.current === null) {
+        if (sessionIdRef.current) {
           await updateSession(sessionIdRef.current, payload);
         } else {
           // Null when logged out: sessions belong to an account.
           const id = await createSession(payload);
           if (!id) return;
-          sharedSnapshotRef.current = null;
           sessionIdRef.current = id;
           setSessionId(id);
 
@@ -692,7 +688,7 @@ export default function Home() {
     if (current && current.source === next.source && current.code === next.code) return;
 
     sessionIdRef.current = null;
-    sharedSnapshotRef.current = null;
+    readOnlySessionRef.current = false;
     setSessionId(null);
     pendingWipeCallsRef.current    = {};
     pendingManualErrorsRef.current = {};
@@ -721,7 +717,7 @@ export default function Home() {
       const { session } = fetched;
 
       sessionIdRef.current = id;
-      sharedSnapshotRef.current = fetched.owned ? null : sessionSnapshot(session);
+      readOnlySessionRef.current = !fetched.owned;
       setSessionId(id);
       setSessionReportUrl(session.reportUrl);
       sessionReportUrlRef.current = session.reportUrl;
@@ -1288,7 +1284,7 @@ export default function Home() {
   // the batch importer.
   function adoptSession(id: string, { session, owned }: FetchedSession) {
     sessionIdRef.current = id;
-    sharedSnapshotRef.current = owned ? null : sessionSnapshot(session);
+    readOnlySessionRef.current = !owned;
     setSessionId(id);
     setSessionReportUrl(session.reportUrl);
     // Eagerly, not just via the mirroring effect: the handleImportReport()
@@ -1347,8 +1343,8 @@ export default function Home() {
     if (targetId && targetId !== sessionIdRef.current) {
       const session = await fetchSession(targetId);
       if (!session) throw new Error(`Couldn't load saved session ${targetId}`);
-      // A static member's resync of someone else's review may have saved
-      // into a session of their own; the static still keys it by the review's.
+      // A static member's resync of someone else's review stays keyed by
+      // the review's session, which they open read-only.
       // The previous report's VODs must not be saved into this session
       // (adoptSession keeps them when the session has none).
       vodsRef.current = [];

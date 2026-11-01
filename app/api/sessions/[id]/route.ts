@@ -1,22 +1,20 @@
 // app/api/sessions/[id]/route.ts
 //
-// GET: the owner, or a member of a static it was added to (`owned` says
-// which). PUT: the owner only. See lib/session-access.ts.
+// GET: anyone with the id (`owned` says whether the caller may save).
+// PUT: the owner only. See lib/session-access.ts.
 
 import { NextRequest, NextResponse } from "next/server";
 import { readSession, writeSession } from "@/lib/session-store";
 import type { SavedSession } from "@/types/Session";
 import { sanitizeDutyOverrides } from "@/lib/session";
 import { getCurrentUser } from "@/lib/auth";
-import { sessionAccess } from "@/lib/session-access";
+import { resolveSessionOwner } from "@/lib/session-access";
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Login required" }, { status: 401 });
 
   let session: SavedSession | null;
   try {
@@ -24,12 +22,12 @@ export async function GET(
   } catch {
     return NextResponse.json({ error: "Invalid session id" }, { status: 400 });
   }
-  // Not found and not yours look the same, so ids can't be probed.
-  const access = session ? await sessionAccess(id, session, user.id) : null;
-  if (!session || !access) {
+  if (!session) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  return NextResponse.json({ id, session, owned: access === "owner" });
+  const user = await getCurrentUser();
+  const owner = await resolveSessionOwner(id, session);
+  return NextResponse.json({ id, session, owned: !!user && owner === user.id });
 }
 
 export async function PUT(
@@ -41,7 +39,7 @@ export async function PUT(
   if (!user) return NextResponse.json({ error: "Login required" }, { status: 401 });
 
   const existing = await readSession(id).catch(() => null);
-  if (!existing || (await sessionAccess(id, existing, user.id)) !== "owner") {
+  if (!existing || (await resolveSessionOwner(id, existing)) !== user.id) {
     return NextResponse.json({ error: "Not your session" }, { status: 403 });
   }
 
