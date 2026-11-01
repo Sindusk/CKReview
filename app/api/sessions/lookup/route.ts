@@ -4,13 +4,19 @@
 // stored reportUrl parses to the same log — so pasting a URL with or
 // without a trailing ?fight=N still matches the same session, and if
 // someone insisted on creating multiple sessions for one log, we always
-// suggest the oldest one.
+// suggest the oldest one. Only the caller's own sessions match
+// (lib/session-access.ts); a logged-out caller never gets one.
 
 import { NextRequest, NextResponse } from "next/server";
 import { listSessions } from "@/lib/session-store";
 import { parseLogUrl } from "@/lib/url-parsers";
+import { getCurrentUser } from "@/lib/auth";
+import { resolveSessionOwner } from "@/lib/session-access";
 
 export async function GET(req: NextRequest) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ match: null });
+
   const { searchParams } = new URL(req.url);
   const source = searchParams.get("source");
   const code = searchParams.get("code");
@@ -21,10 +27,14 @@ export async function GET(req: NextRequest) {
 
   const all = await listSessions();
 
-  const matches = all.filter(({ session }) => {
+  const sameLog = all.filter(({ session }) => {
     const parsed = parseLogUrl(session.reportUrl);
     return parsed?.source === source && parsed?.code === code;
   });
+  const matches = [];
+  for (const m of sameLog) {
+    if ((await resolveSessionOwner(m.id, m.session)) === user.id) matches.push(m);
+  }
 
   if (matches.length === 0) {
     return NextResponse.json({ match: null });

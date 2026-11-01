@@ -29,6 +29,20 @@ export function sanitizeDutyOverrides(raw: unknown): Record<string, string | nul
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
+/** JSON with object keys sorted, so equal payloads compare equal as strings. */
+export function canonicalJson(value: unknown): string {
+  return JSON.stringify(value, (_key, v) =>
+    v && typeof v === "object" && !Array.isArray(v)
+      ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, (v as Record<string, unknown>)[k]]))
+      : v);
+}
+
+/** A loaded session in the shape app/page.tsx saves, for "did anything change". */
+export function sessionSnapshot(session: SavedSession): string {
+  const { createdAt: _c, ownerUserId: _o, ...payload } = session;
+  return canonicalJson({ ...payload, dutyOverrides: payload.dutyOverrides && Object.keys(payload.dutyOverrides).length > 0 ? payload.dutyOverrides : undefined });
+}
+
 // ─── Fetch wrappers around /api/sessions ────────────────────────────────────
 
 export type SessionLookupMatch = {
@@ -52,23 +66,29 @@ export async function lookupSessionForLog(
   }
 }
 
-export async function fetchSession(id: string): Promise<SavedSession | null> {
+// `owned` is false when the caller only opens it as a member of a static it
+// was added to (lib/session-access.ts): saving then goes to a new session.
+export type FetchedSession = { session: SavedSession; owned: boolean };
+
+export async function fetchSession(id: string): Promise<FetchedSession | null> {
   try {
     const res = await fetch(`/api/sessions/${id}`);
     if (!res.ok) return null;
     const data = await res.json();
-    return data.session as SavedSession;
+    return { session: data.session as SavedSession, owned: data.owned === true };
   } catch {
     return null;
   }
 }
 
-export async function createSession(session: Omit<SavedSession, "createdAt">): Promise<string> {
+/** The new session's id, or null when it wasn't created (logged out). */
+export async function createSession(session: Omit<SavedSession, "createdAt">): Promise<string | null> {
   const res = await fetch(`/api/sessions`, {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
     body:    JSON.stringify(session),
   });
+  if (!res.ok) return null;
   const data = await res.json();
   return data.id as string;
 }

@@ -181,6 +181,11 @@ file's header comment. Mechanic detection has its own guide:
     the report code changes, and the reviews POST returns 409 on a
     report-code mismatch. Session-adopting paths must set
     `sessionReportUrlRef.current` eagerly.
+  - **Sessions belong to the user who created them**
+    (`lib/session-access.ts`): none is created while logged out, the
+    duplicate-log lookup finds only your own, and members of a static it
+    was added to can open it, but their edits save to a new session of
+    their own.
 - **Data semantics:**
   - `errorRatePct` from `/api/statics/[staticId]/players` is **Majors per
     pull** (shown as "Errors / pull"). The panel's headline and default

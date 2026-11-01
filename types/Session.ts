@@ -42,4 +42,8 @@ export type SavedSession = {
   // assigned". A duty without an entry uses detection. Absent in sessions
   // saved before 2026-10-11.
   dutyOverrides?: Record<string, string | null>;
+  // app_user.id of the account that created it (lib/session-access.ts).
+  // Absent on sessions saved before 2026-11-01; those take the user who
+  // added them to a static, or stay unreachable.
+  ownerUserId?: number;
 };
