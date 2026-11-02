@@ -50,7 +50,7 @@
 //   "GUIDE-DERIVED MODEL (2026-10-14)" / "SOURCES CHECKED 2026-10-14"
 //   "SHAPE, ACTORS AND CLOCK" / "FIREWALL / PACKET FILTER"
 //   "SOLAR RAY AND TWO-BOSS AUTOATTACKS"
-//   "PARTY SYNERGY: CLONES AND GLITCH"
+//   "PARTY SYNERGY: CLONES AND GLITCH" / "GLITCH SPOTS (2026-11-01"
 //   "PARTY SYNERGY: OPTICAL LASER / FIRE / SPOTLIGHT"
 //   "LIMITLESS SYNERGY: ARROW AND BLADEDANCE"
 //   "LIMITLESS: BEYOND DEFENSE / PILE PITCH / METEORS"
@@ -59,7 +59,15 @@
 // Open items: which glitch partner was late (G10 MNK/DNC, G18) is not
 //   separable from the log, so both stay named; Firewall swaps, meteor/Cosmo
 //   Memory survival, B5/C27 mover, second Remote Glitch threshold (34 vs
-//   35y) unbuilt; open questions 1, 3-6 unresolved.
+//   35y) unbuilt; open questions 1, 3-6 unresolved. H19 (both partners ~2.4y
+//   off their spots, one named by the user) and H5 (user can't settle) stay
+//   unseparated.
+// Newer (user, 2026-11-01, report H nbKLdqJkapxmNfzt): glitch pair narrowed
+//   per pull by distance from the symbol's spots (pairSpotDevs: 6.5-20y off
+//   vs partner <= 4.5y; see "GLITCH SPOTS"); Bladedance cone sweeping the
+//   middle (victim within 4y of center) is the tank's, else the party's
+//   (tank's death counts to the Raid; its silent death is a wall); a tank
+//   plus a non-tank hit by Beyond Defense names the non-tank (avoidable).
 // ── END DIGEST ───────────────────────────────────────────────────────────
 //
 // -- VERIFIED AGAINST LOGS (2026-10-14) --
@@ -189,7 +197,10 @@
 // - E40 3:58.6: Pile Pitch hit only the unjumped GNB (clean: all seven
 //   share it, E44, E48): the GNB should have brought it into the party.
 // Report F = hjgk42MDf81arFVY (the user's static, day 3; omega.ts's report
-// D). VOD review 2026-10-28 (user): Pulls 5, 6, 15, 18, 22, 32, 33, 37, 42,
+// D). VOD review 2026-11-01 (user): report H (nbKLdqJkapxmNfzt) Pulls 1, 3,
+// 5, 6, 10, 19, 22; rulings in expectations/rulings.json (Pull 5 and Pull
+// 19's DRK unsettled).
+// VOD review 2026-10-28 (user): Pulls 5, 6, 15, 18, 22, 32, 33, 37, 42,
 // 45; rulings in expectations/rulings.json. The user's cheat sheet puts
 // Mid's square and circle inside, ~12y off the line, and the crosses and
 // triangles 1.5 crystals from the intercards; Remote's square and circle at
@@ -253,6 +264,19 @@
 //   was too late). Same shape: G18, G26 and G30 (one in the laser, one to
 //   the Fire), G39; E19, E24; F15, F17, F37. None of those went on to clear
 //   P2 (G10, G18, G39, E24, F15 reached Limitless Synergy).
+// - H (nbKLdqJkapxmNfzt, user VOD answers 2026-11-01): Pull 1 2:53.5 the RDM
+//   wrong, DRK right (14.7y vs 4.1y off their spots; the WAR died in the
+//   DRK's Fire); Pull 3 2:53.7 SAM too far (6.9y vs 0.6y); Pull 19 2:54.8
+//   (Mid, T pair) WHM "too close to the eye laser, a few steps back" (2.5y vs
+//   2.3y off: not separable, both named); Pull 5 2:54.0 unsettled ("a bit of
+//   both"; a Vulnerability Up removed in the same ms as the Fire cast counts
+//   as held); Pull 10 3:55.8 Beyond Defense hit the DRK and the SCH (3.8y
+//   from him), who was outside the stack (the SCH's error; only two jumps in 16 reports hit
+//   a tank plus a non-tank); Pull 10's 4:55.6 cutoff stands ("practicing for
+//   prog"); Pull 22 3:42.7 the cone swept r6.0 and r8.2 (not the middle): SCH
+//   and DNC at fault, the DRK not for the cone, whose silent death is the
+//   wall; the pull over there. Pull 9 3:42.3 (WAR's cone killed five at
+//   r0.4-1.8, the middle) stays the WAR's.
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-top2-avoidable (Major on death, else Minor: no Damage Down in P2):
@@ -272,6 +296,19 @@
 //   another vulnerable player, D72). synergy-order.ts keeps the partner off their Fire slot
 //   (>= 9y, partner <= 7y; the slot model from the learned order). The
 //   description gives both partners' distance from the eye's line (F5).
+//   Before the learned order: pairSpotDevs (the pair's two spots from its
+//   symbol, "GLITCH SPOTS") names only the partner 6.5-20y off when the other
+//   is within 4.5y (and 4y closer), overriding the Fire-sharing read (user,
+//   2026-11-01, nbKLdqJkapxmNfzt Pull 1 2:53.5: RDM 14.7y off, DRK 4.1y on,
+//   WAR in the DRK's Fire; Pull 3 2:53.7: SAM 6.9y off, WHM 0.6y). Past 20y
+//   the pair stood at the wrong end (22.9-34y: KCX 22, LG 11/28, 2qga 72):
+//   the learned order decides. Both near spots (Pull 19 2:54.8: WHM 2.5y,
+//   DRK 2.3y; the user named the WHM, "too close to the eye laser") stay
+//   both named: no log signal separates them (the last-0.5s movement, 2.0y vs
+//   0.6y, is one pull). Pull 5 2:54.0 (Remote, Fire killed DRK and RPR): the
+//   user couldn't tell from the VOD, "a bit of both", so it stays player-less;
+//   log fact: a Vulnerability Up removed in the same ms as the Fire cast
+//   counts as held.
 //   A pair skipped for the laser but both on one side of the line:
 //   synergy-order.ts names the one whose row is the other side ("Didn't
 //   Flex", user, F5).
@@ -296,18 +333,30 @@
 // ffxiv-top2-bladedance (targeted: both tanks): a tank in both cones held
 //   both tethers, so the other tank took none; a cone no tank took names
 //   the tank no cone reached; a tank's cone that hit 2+ non-tanks names
-//   that tank. Raid when it killed 3+ non-tanks. A tank already dead: no
+//   that tank, but only when the cone swept the middle (a victim within 4y
+//   of the center: user, 2026-11-01, nbKLdqJkapxmNfzt Pull 22 3:42.7); a
+//   cone that hit 2+ non-tanks all off the middle is the party's (each named
+//   in the avoidable table, the tank not). Raid when it killed 3+ non-tanks;
+//   when the party was at fault the cone tank's death counts too (Pull 22:
+//   SCH, DNC, DRK = the pull over at 3:42.7). A tank already dead: no
 //   errors but a Raid when the cone killed 3+ (F45: the DRK's wall death
 //   is the error).
 // ffxiv-top2-beyond-defense (targeted: both tanks): it jumped only
-//   non-tanks (both tanks named). Raid when 3+ died.
+//   non-tanks (both tanks named). Raid when 3+ died. A jump that hit a tank
+//   and also a non-tank (all alive): the non-tank gets an avoidable "Clipped
+//   by Beyond Defense" (Major if knocked out; user, 2026-11-01, Pull 10 3:55.8,
+//   the SCH 3.8y from the jumped DRK; avoidable so that everyone is exposed).
 // ffxiv-top2-pile-pitch (targeted: the jumped player): Pile Pitch on the
 //   player Beyond Defense jumped, with Doom (Major). "Pile Pitch Not
 //   Shared" (Major on death, else Minor): its target, not the jumped one,
 //   hit with at most one other, all eight alive at the jump and at Pile
 //   Pitch (user, E40; E31: a tank raised in between is fallout).
 // ffxiv-top2-wall (Major): a silent death no knockback, reset or hit explains,
-//   including one near the end when mechanic deaths followed it (F45).
+//   including one near the end when mechanic deaths followed it (F45), and a
+//   tank's silent death as its own Bladedance cone resolves, other deaths or
+//   the cone hit notwithstanding (user, 2026-11-01, nbKLdqJkapxmNfzt Pull 22
+//   3:42.7: the DRK walled; the other 14 cone tank deaths in 8 reports carry
+//   the Bladedance blow; one pull, so the silent-death test is the signal).
 // ffxiv-top2-enrage (Laser Shower hits that killed) / -called-wipe (3+
 //   silent deaths within 10s, or within 12s of the end, Beyond Defense
 //   knockbacks excluded) / -collapse (4 dead, pull over within 20s): Raid,
@@ -425,6 +474,19 @@
 // Removal: glitch persists through knockback/stacks, then expires.
 // Not errors: transient bad tether distance while dodging/returning;
 // vulnerability seen outside a damage snapshot is not itself a failure.
+//
+// -- GLITCH SPOTS (2026-11-01; the user's strat diagrams + 16 reports) --
+// Frame: the eye's laser line through the center (lateral = off the line,
+// along = down it), arena radius 20y. Four pairs, one per symbol; eight spots.
+// Mid Glitch diagram: four horizontal rows (across the line), pair at the two
+// ends of each row "just beyond the relative intercardinal markers": both
+// partners |lat| ~11.5y, rows at |along| ~15 (X, T) and ~4.5 (S, O), so a
+// pair is 20-26y apart. Far (Remote) Glitch diagram: S and O pairs on the
+// horizontal rows at the wall (|lat| 18.4, |along| 5, ~37y apart); X and T
+// pairs on the two diagonals through the center (|lat| 11.5, |along| 15,
+// opposite ends, ~36y); "blue and green on the east side swap". Clean players
+// in all reports sit within ~4y of these (a ~2.4y-short lateral is common).
+// A pair's spots follow from its symbol alone: omega-mf-geom.js pairs.
 //
 // -- PARTY SYNERGY: OPTICAL LASER / FIRE / SPOTLIGHT --
 // Candidates: Optical Laser cast/damage 31521 (16y-wide line from eye);
@@ -977,6 +1039,45 @@ function detectSolarRay(players: PlayerInfo[], life: Life, casts: EnemyEvent[], 
 // ── Party Synergy: glitch distance, Fire spreads, Spotlight stacks ─────────
 
 const GLITCH_WHY = "Partners take opposite rows: Mid 20-26y apart, Remote 35+y.";
+
+/**
+ * How far each glitch partner stood (centi-yalms) from the pair's two spots,
+ * in the eye's frame (lineAxis: lateral = off the laser line, along = down
+ * it), with no learned order: the symbol alone gives the pair's spots
+ * (header "GLITCH SPOTS"). X/T pairs |along| 15; S/O pairs |along| 4.5 (Mid)
+ * or 5 (Remote). Mid: both at |lat| 11.5, same along. Remote S/O: |lat| 18.4,
+ * same along (horizontal); Remote X/T: |lat| 11.5, opposite along (diagonal).
+ * The pair may sit at either end, so the best of the two ends and the two
+ * assignments is taken. Clean players (16 reports): within ~4y of a spot.
+ */
+// Narrowing (user, 2026-11-01, nbKLdqJkapxmNfzt Pull 1 2:53.5: RDM 14.7y off,
+// DRK 4.1y; Pull 3 2:53.7: SAM 6.9y off, WHM 0.6y): one partner off by
+// PAIR_OFF_MIN..PAIR_OFF_MAX while the other is within PAIR_PARTNER_MAX.
+// Past PAIR_OFF_MAX (22.9y-34y: KCX Pulls 22, LG 11/28, 2qga 72) the pair
+// stood at the wrong end of the row and the learned order decides, so those
+// stay with synergy-order. Clean players: within ~4y of a spot.
+const PAIR_OFF_MIN = 650;
+const PAIR_OFF_MAX = 2000;
+const PAIR_PARTNER_MAX = 450;
+const PAIR_OFF_GAP = 400;
+function pairSpotDevs(read: SynergyRead, a: string, b: string): [number, number] | undefined {
+  const u = read.lineAxis, qa = read.firePos.get(a), qb = read.firePos.get(b), sym = read.symbol.get(a);
+  if (!u || !qa || !qb || !sym || read.symbol.get(b) !== sym) return undefined;
+  const far = sym === "X" || sym === "T";
+  const g = (far ? 15 : read.remote ? 5 : 4.5) * 100, l = (read.remote && !far ? 18.4 : 11.5) * 100;
+  const diag = read.remote && far;
+  const lat = (q: { x: number; y: number }) => u.x * (q.y - ARENA_CENTER.y) - u.y * (q.x - ARENA_CENTER.x);
+  const al = (q: { x: number; y: number }) => u.x * (q.x - ARENA_CENTER.x) + u.y * (q.y - ARENA_CENTER.y);
+  const d = (q: { x: number; y: number }, s: [number, number]) => Math.hypot(lat(q) - s[0], al(q) - s[1]);
+  let best: [number, number] | undefined;
+  for (const e of [1, -1]) {
+    const s1: [number, number] = [l, e * g], s2: [number, number] = [-l, diag ? -e * g : e * g];
+    for (const [x, y] of [[d(qa, s1), d(qb, s2)], [d(qa, s2), d(qb, s1)]] as [number, number][]) {
+      if (!best || x + y < best[0] + best[1]) best = [x, y];
+    }
+  }
+  return best;
+}
 const FIRE_WHY = "All Fires go off at once: hold your own spot.";
 const STACK_WHY = "Each row stacks its own Spotlight; if both marks share a row, the one nearer the eye swaps.";
 
@@ -1022,7 +1123,19 @@ function detectSynergy(players: PlayerInfo[], life: Life, read: SynergyRead | un
       // 2qgaAkxVypGWv9CN Pull 72's MNK and DRK overlapped in a shuffled row
       // and the user named the MNK's partner.
       const crowded = pair.filter((p) => fires.some((g) => g.includes(p) && g.some((q) => q !== p && !read.vulnHeld.has(q.name))));
-      const named = crowded.length === 1 ? crowded : pair;
+      let named = crowded.length === 1 ? crowded : pair;
+      // Neither shared a Fire: the partner standing off the spot their symbol
+      // gives the pair is the one out of range (see pairSpotDevs).
+      let offSpot = "";
+      {
+        const devs = pairSpotDevs(read, a, b);
+        if (devs) {
+          const [da, db] = devs;
+          const off = (x: number, y: number) => x >= PAIR_OFF_MIN && x <= PAIR_OFF_MAX && y <= PAIR_PARTNER_MAX && x - y >= PAIR_OFF_GAP;
+          const wrong: 0 | 1 | undefined = off(da, db) ? 0 : off(db, da) ? 1 : undefined;
+          if (wrong !== undefined) { named = [pair[wrong]]; offSpot = ` ${yd(devs[wrong])} off their spot, their partner ${yd(devs[1 - wrong])}.`; }
+        }
+      }
       // How far each stood from the eye's line, to gauge who was off (user,
       // 2026-10-28, hjgk42MDf81arFVY Pull 5 2:54.9: the GNB 15.3y, the SGE
       // 11.4y; this static's clean Mid spots sit ~12y off it).
@@ -1033,7 +1146,7 @@ function detectSynergy(players: PlayerInfo[], life: Life, read: SynergyRead | un
         const other = pair.find((x) => x !== p)!;
         errors.push(playerError(p, {
           ruleId: TOP2_GLITCH_RULE_ID, severity: died.length ? "Major" : "Minor", name: "Out of Glitch Range",
-          description: `${kind} (${read.symbol.get(a) ?? "?"} pair with ${other.name}) at Fire: out of range${sameRow ? " (same row)" : ""}, both had Vulnerability Up${died.length ? `; ${namesOf(died)} died` : ""}.${gauge} ${named.length === 1 ? "Their Fire also hit a third player: wrong spot." : "Either could have moved."} ${GLITCH_WHY}`,
+          description: `${kind} (${read.symbol.get(a) ?? "?"} pair with ${other.name}) at Fire: out of range${sameRow ? " (same row)" : ""}, both had Vulnerability Up${died.length ? `; ${namesOf(died)} died` : ""}.${gauge}${offSpot} ${offSpot ? "" : named.length === 1 ? "Their Fire also hit a third player: wrong spot." : "Either could have moved."} ${GLITCH_WHY}`,
           timestamp: read.fireT, abilityId: FIRE, abilityName: "Optimized Fire III",
         }));
       }
@@ -1125,7 +1238,8 @@ function detectSynergy(players: PlayerInfo[], life: Life, read: SynergyRead | un
 
 // ── Limitless Synergy ───────────────────────────────────────────────────────
 
-const BLADEDANCE_WHY = "Each tank takes one Bladedance tether and turns its cone away from the party.";
+const BLADE_MIDDLE_R = 400;
+const BLADEDANCE_WHY ="Each tank takes one Bladedance tether and turns its cone away from the party.";
 
 /**
  * Optimized Bladedance, both tanks alive. Per cone (its caster instance):
@@ -1160,6 +1274,7 @@ function detectBladedance(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
     };
   }
   const errors: PullError[] = [];
+  let partyAtFault = false;
   // Both bosses cast them, with colliding instance numbers (A38: Omega-M#2
   // and Omega-F#2): a cone is its actor and instance.
   const byCone = new Map<string, typeof hits>();
@@ -1190,6 +1305,18 @@ function detectBladedance(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
       }
       cone.forEach((h) => owned.add(h.e));
     } else if (party.length >= 2) {
+      // A cone that didn't sweep the middle is the party's: they stood off
+      // the boss (user, 2026-11-01, nbKLdqJkapxmNfzt Pull 22 3:42.7: the SCH
+      // and DNC "should have been closer under the boss"; the DRK's cone is
+      // not his). Left unowned, each is named in the avoidable table. The
+      // middle: a victim within BLADE_MIDDLE_R of the center (Pull 9 3:42.3,
+      // the five killed at 0.4-1.8y; Pull 22 at 6.0y and 8.2y).
+      const middle = cone.some((h) => {
+        if (isTank(h.p)) return false;
+        const q = positionAt(h.p, h.e.timestamp, h.e);
+        return !q || Math.hypot(q.x - ARENA_CENTER.x, q.y - ARENA_CENTER.y) <= BLADE_MIDDLE_R;
+      });
+      if (!middle) { partyAtFault = true; continue; }
       for (const p of tankHit) {
         errors.push(playerError(p, {
           ruleId: TOP2_BLADEDANCE_RULE_ID, severity, name: "Cone Into the Party",
@@ -1200,8 +1327,10 @@ function detectBladedance(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
       cone.forEach((h) => owned.add(h.e));
     }
   }
-  const killed = died.filter((p) => !isTank(p));
-  if (errors.length && killed.length >= SYNERGY_RAID_DEATHS) {
+  // The cone tank's own death counts when the party stood off the middle
+  // (Pull 22: SCH, DNC and the DRK, who walled; "the pull was over").
+  const killed = partyAtFault ? died : died.filter((p) => !isTank(p));
+  if ((errors.length || partyAtFault) && killed.length >= SYNERGY_RAID_DEATHS) {
     errors.push(raidMarker(TOP2_BLADEDANCE_RULE_ID, "Bladedance Through the Party",
       `Optimized Bladedance killed ${killed.length} (${namesOf(killed)}); treated as the cutoff.`,
       t + RAID_MARKER_SORT_OFFSET_MS, BLADEDANCE, "Optimized Bladedance"));
@@ -1238,6 +1367,22 @@ function detectBeyondDefense(players: PlayerInfo[], life: Life, deaths: DeathEve
       errors.push(raidMarker(TOP2_BEYOND_DEFENSE_RULE_ID, "Beyond Defense on the Party",
         `Beyond Defense knocked ${died.length} into the wall (${namesOf(died)}); treated as the cutoff.`,
         jump.timestamp + RAID_MARKER_SORT_OFFSET_MS, BEYOND_DEF, "Beyond Defense"));
+    }
+  }
+  // The jump landed on a tank and also clipped a non-tank standing outside
+  // the stack: theirs (user, 2026-11-01, nbKLdqJkapxmNfzt Pull 10 3:55.8: the
+  // SCH "outside of the stack in the middle of the arena", knocked out of
+  // the arena). Clean: every other jump hit one tank alone (7/7 there; the
+  // clipped were 3.8y from the jumped tank). Own avoidable row (everyone is
+  // exposed), not the tanks' beyond-defense rule.
+  if (hit.some(isTank) && tanks.every((p) => life.alive(p, jump.timestamp - 500))) {
+    for (const p of hit.filter((x) => !isTank(x) && life.alive(x, jump.timestamp - 500))) {
+      const died = deaths.some((d) => d.player === p.name && d.timestamp > jump.timestamp && d.timestamp - jump.timestamp <= KNOCK_DEATH_MS + 1000);
+      errors.push(playerError(p, {
+        ruleId: TOP2_AVOIDABLE_RULE_ID, severity: died ? "Major" : "Minor", name: "Clipped by Beyond Defense",
+        description: `Beyond Defense jumped a tank and also hit ${p.name}, who stood outside the stack${died ? " and was knocked out of the arena" : ""}. The party stays in the stack behind the tanks.`,
+        timestamp: jump.timestamp, abilityId: BEYOND_DEF, abilityName: "Beyond Defense",
+      }));
     }
   }
   // Only a jump that landed on a tank: after one on the party, a jumped
@@ -1311,8 +1456,13 @@ function detectWallDeaths(players: PlayerInfo[], deaths: DeathEvent[], called: S
     if (d.timestamp < from || d.killingAbilityGameId || called.has(d) || mechanicSilentDeath(players, d)) continue;
     const p = players.find((x) => x.name === d.player);
     if (!p) continue;
-    if (deaths.some((k) => k !== d && k.timestamp <= d.timestamp && d.timestamp - k.timestamp <= RESET_AFTER_DEATH_MS)) continue;
-    if (p.damageTaken.some((e) => (e.amount ?? 0) > 0 && e.timestamp <= d.timestamp && d.timestamp - e.timestamp <= SILENT_HIT_MS)) continue;
+    // A tank dead with no killing blow as its own Bladedance cone resolves
+    // is the wall, whoever else the cone killed (user, 2026-11-01,
+    // nbKLdqJkapxmNfzt Pull 22 3:42.7: "DRK walks into the wall"; the other
+    // 14 tank deaths to a cone, in 8 reports, carry the Bladedance blow).
+    const coneWall = isTank(p) && p.damageTaken.some((e) => e.abilityId === BLADEDANCE && e.timestamp <= d.timestamp && d.timestamp - e.timestamp <= DEATH_EVENT_LAG_MS + 500);
+    if (!coneWall && deaths.some((k) => k !== d && k.timestamp <= d.timestamp && d.timestamp - k.timestamp <= RESET_AFTER_DEATH_MS)) continue;
+    if (!coneWall && p.damageTaken.some((e) => (e.amount ?? 0) > 0 && e.timestamp <= d.timestamp && d.timestamp - e.timestamp <= SILENT_HIT_MS)) continue;
     errors.push(playerError(p, {
       ruleId: TOP2_WALL_RULE_ID, severity: "Major", name: "Walked Into the Wall",
       description: "Died with no killing blow mid-pull, with no knockback behind it: walked (or was knocked by Discharger) into the deathwall at the arena's edge.",

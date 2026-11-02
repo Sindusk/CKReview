@@ -28,7 +28,8 @@
 //   ffxiv-top1-wall          Major  silent death nothing explains
 //   ffxiv-top1-enrage / -called-wipe / -collapse  Raid, earliest only, only
 //     before any mechanic Raid
-// Cutoffs: first Raid error. Collapse 4 dead + over within 20s; called wipe
+// Cutoffs: first Raid error. Loop death with a tower/tether still owed (the
+//   death, even raised; Pull 7 2026-11-01); collapse 4 dead + over within 20s; called wipe
 //   3+ silent deaths within 10-12s of end; enrage; empty tower (Obliteration).
 //   Reports A: 14 P1 clears have none; every wipe has a mechanic error first.
 //   3+ silent deaths before the first towers = reset, no errors (C20, B64).
@@ -219,6 +220,9 @@
 //   and D). D36 0:38.1: the MNK took the DNC's, the SCH's by the pairing,
 //   leaving the RDM's; the SCH then took it from the MNK. User: the MNK.
 // Report E = KCX2qW4khczmZ9T1 (the user's static, same roster and conga).
+// VOD review 2026-11-01 (user): report H (nbKLdqJkapxmNfzt) Pulls 4, 7, 8,
+// 16; rulings in expectations/rulings.json. Pull 16's WAR is unsettled (the
+// take shape matches B Pull 12, ruled the other way).
 // VOD review 2026-10-30 (user); findings:
 // - Tower priority: each round's two towers sit on two cardinals and, by
 //   a clockwise scan from north, the EARLIER player in the reversed conga
@@ -300,7 +304,10 @@
 //   (groups read from the pull's lines), the aimed player taking the line
 //   to the other group, a player in both lines; the aimed player alone in
 //   their line while the two missing members stood within 5y in no line:
-//   the aimed player ("Left the Group"; user, C37).
+//   the aimed player ("Left the Group"; user, C37). Not when a carrier of
+//   that set is "Missile in the Stack" (wrong side from the start: the
+//   aimed player's lone line is fallout; user, 2026-11-01, nbKLdqJkapxmNfzt
+//   Pull 8 1:21.4; one pull on disk shows the shape).
 // ffxiv-top1-diffuse (Major on death, else Minor), both tanks alive: the
 //   farthest non-tank a cone hit, and a tank no cone reached. A tank the
 //   cones killed had no invuln ("Tank Cones Without Invuln", Major; Raid
@@ -315,7 +322,11 @@
 // errors at all (user, C20; also 2qgaAkxVypGWv9CN Pull 64).
 // ffxiv-top1-enrage / -called-wipe (3+ silent deaths within 10s or 12s of
 //   the end, Doom and missile deaths excluded) / -collapse (4 dead, pull
-//   over within 20s): Raid, only the earliest, only before any mechanic
+//   over within 20s) / -collapse "Program Loop Duty Lost" (a player dies
+//   with a round tower or the round n-2 (mod 4) tether still to take; the
+//   death is the cutoff, even if raised; user, 2026-11-01, nbKLdqJkapxmNfzt
+//   Pull 7 0:56.2; moves about 30 wipes' cutoffs earlier on 5 reports (all
+//   wipes end before Pantokrator), no ruling touched): Raid, only the earliest, only before any mechanic
 //   Raid.
 // Not built: who stood where in a Blaster clip beyond the cases above (no
 // assignments, and the radius doesn't separate holder from victim), which
@@ -1389,6 +1400,13 @@ function detectPantokrator(players: PlayerInfo[], life: Life, deaths: DeathEvent
       if (target && own.hit.length === 1 && own.hit[0] === target && missing.length === 2 && missing.every((p) => !inLine(p))) {
         const [a, b] = missing.map((p) => interpolatePlayerPosition(p, s.t, { windowMs: POS_WINDOW_MS, maxSpanMs: POS_SPAN_MS }));
         if (a && b && Math.hypot(a.x - b.x, a.y - b.y) <= GROUP_TOGETHER) {
+          // A carrier of this set stood in a line stack with their missile
+          // ("Missile in the Stack"): they were on the wrong side from the
+          // start, which left the aimed player alone; that is fallout, not
+          // the aimed player's error (user, 2026-11-01, nbKLdqJkapxmNfzt
+          // Pull 8 1:21.4: "RDM went to the wrong side at the start of the
+          // mechanic"; the SCH was alone, the DRK and RPR 1.9y apart).
+          if (errors.some((e) => e.ruleId === TOP1_MISSILE_RULE_ID && e.name === "Missile in the Stack" && e.timestamp === s.t)) continue;
           lineErrors.push(playerError(target, {
             ruleId: TOP1_LINE_RULE_ID, severity, name: "Left the Group",
             description: `Set ${s.k}: took their line away from ${namesOf(missing)}, who stood together, so they took it alone${died.length ? " and died" : ""}. ${LINE_WHY}`,
@@ -1610,6 +1628,37 @@ function detectWallDeaths(players: PlayerInfo[], deaths: DeathEvent[], called: S
   return errors;
 }
 
+/**
+ * A player dying in Program Loop with a tower or tether still to take ends
+ * the pull there: the later numbers' towers and Blasters need every body
+ * (user, 2026-11-01, nbKLdqJkapxmNfzt Pull 7 0:56.2: the SAM, In Line 2,
+ * died to Doom at 0:41.3 with a round-4 tether to take and was raised
+ * 0:49.8; "The pull is basically over when the SAM dies since there's more
+ * towers and blasters that need to be taken. The raid wipe marker should be
+ * after that death."). In Line n has the round n tower and the round
+ * n-2 (mod 4) tether, rounds 1-4. A death within DUTY_MARGIN_MS of the
+ * round's own tower/Blaster doesn't count as before that duty.
+ */
+const DUTY_MARGIN_MS = 1000;
+function loopDutyDeath(players: PlayerInfo[], life: Life, casts: EnemyEvent[], end: number): PullError | undefined {
+  const loop = castsOf(casts, PROGRAM_LOOP, end)[0];
+  const rounds = loopRounds(casts, end);
+  if (!loop || rounds.length < 2) return undefined;
+  const num = numbersIn(players, loop.timestamp, loop.timestamp + 10_000);
+  const lastRound = rounds[rounds.length - 1].t;
+  for (const w of [...life.outIntervals].sort((a, b) => a.start - b.start)) {
+    const n = num.get(w.p);
+    if (n === undefined || w.start >= lastRound - DUTY_MARGIN_MS) continue;
+    const tetherRound = ((n + 1) % 4) + 1;
+    const owed = rounds.filter((rd) => (rd.r === n || rd.r === tetherRound) && rd.t - DUTY_MARGIN_MS > w.start);
+    if (!owed.length) continue;
+    return raidMarker(TOP1_COLLAPSE_RULE_ID, "Program Loop Duty Lost",
+      `${w.p.name} (In Line ${n}) died before their round ${owed.map((r) => r.r).join(" and ")} ${owed.length > 1 ? "duties" : owed[0].r === n ? "tower" : "tether"}: the remaining towers and Blasters need every body. Treated as the cutoff point.`,
+      w.start + DEATH_EVENT_LAG_MS, 0, "Deaths");
+  }
+  return undefined;
+}
+
 // ── entry point ─────────────────────────────────────────────────────────────
 
 /**
@@ -1669,6 +1718,8 @@ export function detectOmegaErrors(
         collapseT + DEATH_EVENT_LAG_MS, 0, "Deaths"));
     }
   }
+  const dutyDeath = loopDutyDeath(players, life, enemyCasts, end);
+  if (dutyDeath) generic.push(dutyDeath);
   const firstRaid = Math.min(...errors.filter((e) => e.severity === "Raid").map((e) => e.timestamp));
   const marker = generic.sort((a, b) => a.timestamp - b.timestamp)[0];
   if (marker && marker.timestamp < firstRaid) errors.push(marker);

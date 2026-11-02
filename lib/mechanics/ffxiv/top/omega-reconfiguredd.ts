@@ -28,7 +28,8 @@
 //   ffxiv-top3-rot-contact Major  rot gained outside a hand-off (swap: both;
 //     else receiver or nearest holder, whoever walked further)
 //   ffxiv-top3-monitor     Major if a death follows, else Minor  picked twice,
-//     all alive: circle over two, or the unpicked living, else player-less
+//     all alive: circle over two (+ a tank south of the DNC there, 2y), or the
+//     unpicked living, else player-less. Layout: see RULES IMPLEMENTED
 //   ffxiv-top3-hello-world Raid  empty tower, uncleansed defect, timeout,
 //     missed requirement, early break or resolution killing 3+
 //   ffxiv-top3-transition  Raid  dead 3s after Hello World's cast, or killed
@@ -70,7 +71,8 @@
 //   GNB's own clip in KCX2 Pull 35, as detected); 10: arm deaths
 //   after a ring death unbuilt; 11: never-broken Remote tethers leave no one
 //   named. Not built: Critical Error, raw-damage deaths, which tether partner
-//   moved, monitor layout/facing.
+//   moved, full monitor layout/facing (only tank-before-DNC), cycle-4 stacks
+//   (Pull 12 unsettled, strat uses eyes). Probe: tools/ffxiv/top/omega-reconfigured-layout.js.
 // ── END DIGEST ───────────────────────────────────────────────────────────
 //
 // -- VERIFIED AGAINST LOGS (2026-10-14) --
@@ -178,6 +180,8 @@
 // Code Smells; the Regression statuses end at the breaks. Tower helpers
 // log their spot at the resolution. Loading 1003452 right / 1003453 left.
 // Built in replay.ts.
+// VOD review 2026-11-01 (user): nbKLdqJkapxmNfzt Pulls 12, 17; rulings in
+// expectations/rulings.json (Pull 12's cycle-4 stack unsettled).
 // VOD review (2026-10-30, KCX2qW4khczmZ9T1, the user's static: GNB DRK SCH
 // SGE MNK SAM DNC RDM):
 // - Hand-offs: the taker walks to the holder, the holder stays put. Over
@@ -238,7 +242,24 @@
 //   the GNB 7.3y; the only non-swap contact on disk, so thin), both without
 //   positions.
 // ffxiv-top3-monitor: a player picked twice, all alive: a circle over two
-//   (both), else the living players no cannon picked, else player-less.
+//   (both; plus any living non-holder tank standing > OWC_TANK_SOUTH (2y)
+//   south of a non-holder DNC in that circle: user, 2026-11-01, nbKLdq Pull 17
+//   7:20.5 "DNC and WAR should be swapped"), else the living players no
+//   cannon picked, else player-less. LAYOUT (learned from 16 reports' clean
+//   volleys, snapshot -1s, arena centre 100,100, mirrored in x with the boss
+//   side; Loading holders take the four diagonal corners ~(+-10, +-9..12)):
+//   the five non-holders fill N (-1,-19), NW (-9,-11), W-N (-18,-5), W-S
+//   (-18,5), S (-1,19) in a fixed job order: WHM, caster (RDM/PCT), RPR/VPR/
+//   WAR/DRK, DRG, DNC, SCH (no contradiction over ~45 clean pulls; a tank is
+//   always north of the DNC). The user's call on Pull 17: SAM belonged NW
+//   (north, slightly east of where it stood), WAR and DNC swapped with the DNC
+//   at the southern wall spot. SAM's rank is unknown (one report), so only the
+//   tank/DNC order is coded; the rest of the order is not.
+// ffxiv-top3-stack covers cycles 1-3 only; cycle 4's stacks are unchecked. The
+//   user could not name who was wrong on nbKLdq Pull 12 6:39.3 (DRK took the
+//   4th-cycle stack alone inside the red tower and died; the other stack had
+//   RPR/WHM/WAR; SAM and SCH in neither): "the strategy is to use eyes". No
+//   attribution, no rule.
 // ffxiv-top3-hello-world (Raid): empty tower, uncleansed defect, timeout,
 //   missed requirement, an early break that killed 3+, a resolution that
 //   killed 3+. ffxiv-top3-transition (Raid): dead 3s after Hello World's
@@ -605,6 +626,12 @@ const REMOTE         = 1003530;
 const HW_AURAS       = [1003436, 1003437, 1003438, 1003439, 1003503, 1003441]; // the six Code Smells
 const OWC            = 31597; // Oversampled Wave Cannon, one cast per selected player
 const OWC_BOSS       = [31595, 31596];
+const OWC_LOADING    = [1003452, 1003453]; // monitor holders, right / left
+// Non-holders stand N->S tank, then DNC (wall spots y -5/+5, DNC south of any
+// tank). Over 16 reports' non-holder tank vs DNC at the snapshot -1s, tank minus
+// DNC y: clean -9.2y .. -31.7y (-0.4y worst on an unreviewed pull). Failure +7.5y
+// (user, 2026-11-01, Pull 17 7:20.5: WAR and DNC should be swapped). Units 1/100 y.
+const OWC_TANK_SOUTH = 200;
 const ION_EFFLUX     = 31560;
 
 type Color = "red" | "blue";
@@ -1227,11 +1254,29 @@ function detectMonitors(players: PlayerInfo[], life: Life, casts: EnemyEvent[], 
     // E19: the pair under one circle wasn't the doubled player; only one of
     // the two was picked, which left a side short.
     const short = !crossed.some((p) => doubled.some((h) => h.p === p));
-    return crossed.map((p) => playerError(p, {
+    const errs = crossed.map((p) => playerError(p, {
       ruleId: TOP3_MONITOR_RULE_ID, severity: sev, name: "Monitor Circles Overlapped",
       description: `Within 7y of ${names(crossed.filter((x) => x !== p).map((x) => x.name))} (either could be off): one circle hit both${short ? ` and only one was picked` : ""}: ${outcome}. ${MONITOR_WHY}`,
       timestamp: t, abilityId: OWC, abilityName: "Oversampled Wave Cannon",
     }));
+    // Layout order (user, 2026-11-01, Pull 17 7:20.5): non-holders stand N->S
+    // with the tank before the DNC; see OWC_TANK_SOUTH.
+    const isHolder = (p: PlayerInfo) => OWC_LOADING.some((id) => heldAt(debuffIntervals(p, id), t - 500));
+    const yAt = (p: PlayerInfo) => interpolatePlayerPosition(p, t - 1000, { windowMs: 2000, maxSpanMs: 3000 })?.y;
+    const dnc = crossed.find((p) => p.className === "Dancer" && !isHolder(p));
+    const dy = dnc ? yAt(dnc) : undefined;
+    if (dnc && dy !== undefined) {
+      for (const p of players) {
+        const py = p.role === "Tank" && !crossed.includes(p) && life.alive(p, t - 500) && !isHolder(p) ? yAt(p) : undefined;
+        if (py === undefined || py - dy <= OWC_TANK_SOUTH) continue;
+        errs.push(playerError(p, {
+          ruleId: TOP3_MONITOR_RULE_ID, severity: sev, name: "Monitor Layout: Tank South of the Dancer",
+          description: `Stood ${((py - dy) / 100).toFixed(0)}y south of ${dnc.name}, who was in the overlapping circle; the tank takes the northern wall spot and the dancer the southern one. ${outcome}. ${MONITOR_WHY}`,
+          timestamp: t, abilityId: OWC, abilityName: "Oversampled Wave Cannon",
+        }));
+      }
+    }
+    return errs;
   }
   const left = hits.filter((h) => !h.hits.length).map((h) => h.p);
   if (left.length) {
