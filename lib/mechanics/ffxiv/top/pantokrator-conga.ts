@@ -40,7 +40,13 @@
 // when the other stood on theirs. The same line pairs the hand-offs: the
 // earlier new holder takes the earlier previous holder's tether, so when
 // both took one tether, the one whose tether stayed put is named
-// (applyTetherPairing).
+// (applyTetherPairing). When both new holders took and a previous holder's
+// tether stayed (omega.ts KEPT_TAG), the earlier new holder owes the tether
+// of the previous holder first in the clockwise scan; whoever owed the kept
+// one is at fault, the other is dropped (applyKeptTether; user, 2026-11-02,
+// nbKLdqJkapxmNfzt Pull 16 0:56.1: RDM west, WAR flexing to south). The
+// same reading on 2qgaAkxVypGWv9CN Pull 12 0:38.2 puts the SCH on the kept
+// tether, so both stay flagged (that ruling holds).
 //
 // 3. Program Loop towers. The round's two In Line players take the two
 // tower cardinals by a priority learned the same way from the rounds where
@@ -62,7 +68,7 @@ import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import {
-  readPantokrator, readProgramLoop, readLoopNumbers, offCardinal, SAME_SIDE_NAME, SAME_TOWER_NAME, HOLDERS_TOGETHER_NAME, TOOK_ANOTHERS_NAME, STAYED_PUT,
+  readPantokrator, readProgramLoop, readLoopNumbers, offCardinal, cardinalOf, KEPT_TAG, SAME_SIDE_NAME, SAME_TOWER_NAME, HOLDERS_TOGETHER_NAME, TOOK_ANOTHERS_NAME, STAYED_PUT,
   TOP1_LINE_RULE_ID, TOP1_BLASTER_RULE_ID, TOP1_TOWER_RULE_ID,
 } from "./omega";
 import { playerError } from "@/lib/mechanics/wow/common";
@@ -214,8 +220,58 @@ export function applyPantokratorConga(
 ): PullError[] {
   if (!conga) return errors;
   const split = applyTetherPairing(applySplits(errors, players, deathEvents, enemyCasts, conga), players, enemyCasts, conga);
-  const held = applyLoopPriority(split, players, deathEvents, enemyCasts, conga.loop);
+  const held = applyLoopPriority(applyKeptTether(split, players, deathEvents, enemyCasts, conga.loop), players, deathEvents, enemyCasts, conga.loop);
   return applyTowerPriority(held, players, deathEvents, enemyCasts, conga.tower);
+}
+
+/**
+ * Both of a round's holders took a tether and one previous holder's stayed
+ * put (omega.ts tags the thief's "Took Another's Tether" with that holder,
+ * KEPT_TAG). By the holder priority the earlier new holder owes the tether
+ * of the previous holder who stands first in the clockwise scan; whoever
+ * owed the kept tether is at fault, and a taker who ended on theirs is
+ * dropped (user, 2026-11-02, nbKLdqJkapxmNfzt Pull 16 0:56.1: "The RDM
+ * should be taking the west tether. WAR is flexing, which results in them
+ * being required to take the southern tether... The WAR takes the correct
+ * tether, and RDM is incorrect"). Unchanged when the fits disagree.
+ */
+function applyKeptTether(
+  errors: PullError[], players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[], loop: LoopPriority | undefined,
+): PullError[] {
+  const tagged = errors.filter((e) => e.ruleId === TOP1_BLASTER_RULE_ID && e.name === TOOK_ANOTHERS_NAME && e.description.includes(KEPT_TAG));
+  if (!loop || !tagged.length) return errors;
+  const rounds = readProgramLoop(players, deathEvents, enemyCasts) ?? [];
+  const drop = new Set<PullError>();
+  const rewrite = new Map<PullError, PullError>();
+  for (const e of tagged) {
+    const thief = e.player!;
+    const v = players.find((p) => p.name !== thief && e.description.includes(`took the tether ${p.name} had taken`))?.name;
+    const keptName = e.description.slice(e.description.indexOf(KEPT_TAG) + KEPT_TAG.length).split("]")[0];
+    const idx = rounds.findIndex((r) => Math.abs(r.t - e.timestamp) <= 1500);
+    const prior = idx > 0 ? rounds[idx - 1].holders : [];
+    const K = prior.find((h) => h.name === keptName), P = prior.find((h) => h.name !== keptName);
+    const victim = errors.find((x) => x.timestamp === e.timestamp && x.player === v && x.name === "Tether Not Taken");
+    if (!v || !K || !P || prior.length !== 2 || !victim) continue;
+    const cK = cardinalOf(K.bearing), cP = cardinalOf(P.bearing);
+    if (cK === cP) continue;
+    const verdicts = new Set<string>();
+    for (const { order, start } of loop.fits) {
+      const rank = new Map(order.map((n, i) => [n, i]));
+      if (!rank.has(v) || !rank.has(thief)) { verdicts.add("?"); continue; }
+      const vFirst = rank.get(v)! < rank.get(thief)!;
+      const kFirst = scanPos(cK, start) < scanPos(cP, start);
+      verdicts.add(vFirst === kFirst ? v : thief); // who owed the kept tether
+    }
+    if (verdicts.size !== 1 || verdicts.has("?") || !verdicts.has(v)) continue;
+    drop.add(e);
+    rewrite.set(victim, {
+      ...victim,
+      description: `${victim.description} Holder priority (${loop.agree}/${loop.rounds} rounds): ${v} owed the ${CARDINAL[cK]} tether and ${thief} the ${CARDINAL[cP]} one, which ${thief} took.`,
+    });
+  }
+  // The tag is for this function only.
+  const untag = (e: PullError) => tagged.includes(e) ? { ...e, description: e.description.slice(0, e.description.indexOf(KEPT_TAG)) } : e;
+  return errors.filter((e) => !drop.has(e)).map((e) => untag(rewrite.get(e) ?? e));
 }
 
 /**

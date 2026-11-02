@@ -221,8 +221,9 @@
 //   leaving the RDM's; the SCH then took it from the MNK. User: the MNK.
 // Report E = KCX2qW4khczmZ9T1 (the user's static, same roster and conga).
 // VOD review 2026-11-01 (user): report H (nbKLdqJkapxmNfzt) Pulls 4, 7, 8,
-// 16; rulings in expectations/rulings.json. Pull 16's WAR is unsettled (the
-// take shape matches B Pull 12, ruled the other way).
+// 16; rulings in expectations/rulings.json. Follow-up 2026-11-02: Pull 4
+// ends at the RDM holder's death; Pull 16's takers are decided by the
+// tether priority (RDM owed west, the flexing WAR south).
 // VOD review 2026-10-30 (user); findings:
 // - Tower priority: each round's two towers sit on two cardinals and, by
 //   a clockwise scan from north, the EARLIER player in the reversed conga
@@ -983,6 +984,10 @@ function blasterClips(
     }
   }
 
+  // Tag for pantokrator-conga.ts: both In Line h players took and one previous
+  // holder kept theirs (read with KEPT_TAG).
+  const keptTag = (v: PlayerInfo, thief: PlayerInfo) =>
+    num.get(thief) === h && lastTake(v) > -Infinity && lastTake(thief) > -Infinity && kept.size === 1 ? `${KEPT_TAG}${[...kept][0].name}]` : "";
   if (held) {
     for (const v of hPlayers.filter((p) => !held!.has(p))) {
       // Someone who took after them took theirs. One who never took was
@@ -996,7 +1001,7 @@ function blasterClips(
       if (thief && num.get(thief) !== rd.r) {
         errors.push(playerError(thief, {
           ruleId: TOP1_BLASTER_RULE_ID, severity: roundDoomed ? "Major" : "Minor", name: "Took Another's Tether",
-          description: `Round ${rd.r}: took the tether ${lastTake(v) > -Infinity ? `${v.name} had taken` : `${v.name} was due to take`}, ${((rd.t - lastTake(thief)) / 1000).toFixed(1)}s before the Blaster.${roundDoomed ? " Doom followed." : ""} ${BLASTER_WHY}`,
+          description: `Round ${rd.r}: took the tether ${lastTake(v) > -Infinity ? `${v.name} had taken` : `${v.name} was due to take`}, ${((rd.t - lastTake(thief)) / 1000).toFixed(1)}s before the Blaster.${roundDoomed ? " Doom followed." : ""} ${BLASTER_WHY}${keptTag(v, thief)}`,
           timestamp: rd.t, abilityId: BLASTER, abilityName: "Blaster",
         }));
       }
@@ -1256,6 +1261,8 @@ export function readProgramLoop(players: PlayerInfo[], deathEvents: DeathEvent[]
 /** Both holders on one tether, the other left behind (pantokrator-conga.ts picks who by the conga). */
 export const TOOK_ANOTHERS_NAME = "Took Another's Tether";
 export const STAYED_PUT = "stayed put";
+/** Suffix of a held-branch "Took Another's Tether": the previous holder whose tether nobody took (pantokrator-conga.ts decides by priority). */
+export const KEPT_TAG = " [kept: ";
 
 /** The error both players of a same-number pair get (pantokrator-conga.ts narrows it to one). */
 export const SAME_SIDE_NAME = "Same Number, Same Side";
@@ -1650,7 +1657,7 @@ function loopDutyDeath(players: PlayerInfo[], life: Life, casts: EnemyEvent[], e
     const n = num.get(w.p);
     if (n === undefined || w.start >= lastRound - DUTY_MARGIN_MS) continue;
     const tetherRound = ((n + 1) % 4) + 1;
-    const owed = rounds.filter((rd) => (rd.r === n || rd.r === tetherRound) && rd.t - DUTY_MARGIN_MS > w.start);
+    const owed = rounds.filter((rd) => (rd.r === n || rd.r === tetherRound) && rd.t - (rd.r === n ? DUTY_MARGIN_MS : 0) > w.start);
     if (!owed.length) continue;
     return raidMarker(TOP1_COLLAPSE_RULE_ID, "Program Loop Duty Lost",
       `${w.p.name} (In Line ${n}) died before their round ${owed.map((r) => r.r).join(" and ")} ${owed.length > 1 ? "duties" : owed[0].r === n ? "tower" : "tether"}: the remaining towers and Blasters need every body. Treated as the cutoff point.`,
