@@ -51,8 +51,11 @@ export function PanelHeader({
   children,
   shrinkTitle,
   center,
+  titleId,
 }: {
   title:        ReactNode;
+  /** id on the heading, for a dialog's aria-labelledby. */
+  titleId?:     string;
   /** Centred in the header between the title and the controls (the video panel's Video | Replay switch). */
   center?:      ReactNode;
   /** Rendered after the title in muted sans, e.g. "(26)". */
@@ -64,7 +67,7 @@ export function PanelHeader({
   shrinkTitle?: boolean;
 }) {
   const heading = (
-    <h2 className={`ck-panel-title${shrinkTitle ? " ck-panel-title--shrink" : ""}`} title={typeof title === "string" ? title : undefined}>
+    <h2 id={titleId} className={`ck-panel-title${shrinkTitle ? " ck-panel-title--shrink" : ""}`} title={typeof title === "string" ? title : undefined}>
       {title}
       {count !== undefined && <span className="ck-panel-title__count">{count}</span>}
     </h2>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import type { Pull } from "@/types/Pull";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, ManualErrorInput } from "@/types/PullError";
@@ -14,6 +14,7 @@ import { PanelHeader } from "./ui/Panel";
 import { EmptyState } from "./ui/EmptyState";
 import { InfoTip } from "./ui/InfoTip";
 import { moduleNamesFor } from "@/lib/mechanics/module-names";
+import { getPullRaidCutoff } from "@/lib/report-data";
 
 type AnalysisPanelProps = {
   pull: Pull | null;
@@ -31,6 +32,9 @@ type AnalysisPanelProps = {
   // Whether playbackTimeMs actually reflects a calibrated VOD right now —
   // used to decide whether to prefill the Add Error dialog's timestamp.
   vodTimeAvailable?: boolean;
+  // Step to the neighbouring pull in list order; undefined at either end.
+  onPrevPull?: () => void;
+  onNextPull?: () => void;
 };
 
 // "Review" is the default tab — the curated raid-review feed showing only
@@ -150,12 +154,16 @@ function FeedRow({
   playbackTimeMs,
   onSeek,
   showKindBadge,
+  afterCutoff,
   onRequestRemove,
 }: {
   entry: FeedEntry;
   playbackTimeMs: number;
   onSeek?: (ms: number) => void;
   showKindBadge?: boolean;
+  // A Major/Minor after the wipe cutoff: dimmed, since the pull list and
+  // statics don't count it.
+  afterCutoff?: boolean;
   // Only wired up for manually-added errors (entry.ruleId === MANUAL_ERROR_RULE_ID)
   onRequestRemove?: (entry: FeedEntry) => void;
 }) {
@@ -173,9 +181,18 @@ function FeedRow({
   return (
     <div
       onClick={() => onSeek?.(seekTarget)}
+      // Keyboard seek; a key on the nested ✕ button is that button's own.
+      onKeyDown={onSeek ? (e) => {
+        if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
+        e.preventDefault();
+        onSeek(seekTarget);
+      } : undefined}
+      role={onSeek ? "button" : undefined}
+      tabIndex={onSeek ? 0 : undefined}
+      aria-label={onSeek ? `Seek to ${formatMs(seekTarget)}: ${entry.player ?? "Raid-Wide"}, ${entry.title}` : undefined}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`ck-entry${onSeek ? " ck-entry--seekable" : ""}`}
+      className={`ck-entry${onSeek ? " ck-entry--seekable" : ""}${afterCutoff ? " ck-entry--after-cutoff" : ""}`}
       style={{
         // Left edge carries the severity colour; it brightens once the
         // playhead passes the entry.
@@ -338,6 +355,7 @@ function StatTabPill({
   active,
   onClick,
   icon,
+  tip,
 }: {
   label: string;
   value: string;
@@ -345,6 +363,7 @@ function StatTabPill({
   active: boolean;
   onClick: () => void;
   icon?: SeverityKind;
+  tip?: string;
 }) {
   // A zero count keeps its severity colour (the colour identifies the
   // category) and only gets a faint green wash to mark a clean result.
@@ -354,6 +373,7 @@ function StatTabPill({
     <button
       onClick={onClick}
       aria-pressed={active}
+      title={tip}
       className={`ck-stat${clear ? " ck-stat--clear" : ""}${active ? " ck-stat--active" : ""}`}
       style={{ ["--ck-accent" as string]: color }}
     >
@@ -385,7 +405,7 @@ function filterRealPlayers(players: Pull["players"]) {
   );
 }
 
-export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCallWipe, onAddError, onRemoveError, vodTimeAvailable }: AnalysisPanelProps) {
+export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCallWipe, onAddError, onRemoveError, vodTimeAvailable, onPrevPull, onNextPull }: AnalysisPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>("Review");
   const [showAddErrorDialog, setShowAddErrorDialog] = useState(false);
   const [confirmRemoveWipe, setConfirmRemoveWipe] = useState(false);
@@ -421,6 +441,18 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
     Minor:   minors.length,
   };
 
+  // The pull list and statics drop Major/Minor after the wipe cutoff; this
+  // panel lists the whole pull, so it says which entries those totals skip.
+  const cutoff = getPullRaidCutoff(pull);
+  const isAfterCutoff = (e: FeedEntry) =>
+    cutoff !== null && (e.kind === "Major" || e.kind === "Minor") && e.timestamp > cutoff;
+  const cutoffTip = (list: PullError[], label: string) => {
+    if (cutoff === null) return undefined;
+    const after = list.filter((e) => e.timestamp > cutoff).length;
+    if (after === 0) return undefined;
+    return `${list.length} ${label} in the whole pull; ${list.length - after} before the wipe cutoff at ${formatCallTime(cutoff)}, which is what the pull list and statics count.`;
+  };
+
   function handleSeek(ms: number) {
     onSeekToTime?.(ms);
   }
@@ -453,6 +485,12 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
     }
   })();
 
+  // Deaths and Raid entries after the cutoff still count, so the divider
+  // sits at the first entry past it, and only when a dimmed entry follows.
+  const firstCutoffIdx = feed.some(isAfterCutoff)
+    ? feed.findIndex((e) => cutoff !== null && e.timestamp > cutoff)
+    : -1;
+
   const emptyState: Record<Tab, { icon: string; text: string; color: string }> = {
     Overall: { icon: "✨", text: "No deaths or errors this pull", color: "#4ade80" },
     Deaths:  { icon: "✨", text: "No deaths this pull", color: "#4ade80" },
@@ -464,8 +502,17 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      <PanelHeader title={pull.name} shrinkTitle>
+      <PanelHeader title={`Pull ${pull.pullNumber} · ${pull.name}`} shrinkTitle>
         <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+          {(onPrevPull || onNextPull) && (
+            <div style={{ display: "flex", gap: "2px" }}>
+              <button className="ck-btn ck-btn--xs" onClick={onPrevPull} disabled={!onPrevPull}
+                title="Previous pull  [" aria-label="Previous pull">‹</button>
+              <button className="ck-btn ck-btn--xs" onClick={onNextPull} disabled={!onNextPull}
+                title="Next pull  ]" aria-label="Next pull">›</button>
+            </div>
+          )}
+
           <span className="ck-badge" style={{ color: isKill ? "#4ade80" : "#f87171", fontSize: "11px" }}>
             {isKill ? "KILL" : "WIPE"}
           </span>
@@ -553,6 +600,7 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
             color={SEVERITY_COLOR.Major}
             active={activeTab === "Major"}
             onClick={() => setActiveTab("Major")}
+            tip={cutoffTip(majors, "major")}
           />
           <StatTabPill
             label="Minor"
@@ -561,6 +609,7 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
             color={SEVERITY_COLOR.Minor}
             active={activeTab === "Minor"}
             onClick={() => setActiveTab("Minor")}
+            tip={cutoffTip(minors, "minor")}
           />
 
         {/* Centred and without hover/active states — makes clear this one
@@ -575,14 +624,24 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
           <>
             <SectionLabel label={activeTab} count={feed.length} />
             {feed.map((entry, i) => (
-              <FeedRow
-                key={entry.id ?? i}
-                entry={entry}
-                playbackTimeMs={playbackTimeMs}
-                onSeek={onSeekToTime ? handleSeek : undefined}
-                showKindBadge={activeTab === "Overall" || activeTab === "Review"}
-                onRequestRemove={onRemoveError ? (e) => setPendingRemoveEntry(e) : undefined}
-              />
+              <Fragment key={entry.id ?? i}>
+                {cutoff !== null && i === firstCutoffIdx && (
+                  <div className="ck-help" style={{ margin: "8px 2px 6px", fontSize: "11px" }}>
+                    <span style={{ color: SEVERITY_COLOR.Raid, fontWeight: 600 }}>
+                      Wipe cutoff {formatCallTime(cutoff)}
+                    </span>
+                    {" "}· majors and minors below aren&apos;t counted in the pull list or statics.
+                  </div>
+                )}
+                <FeedRow
+                  entry={entry}
+                  playbackTimeMs={playbackTimeMs}
+                  onSeek={onSeekToTime ? handleSeek : undefined}
+                  showKindBadge={activeTab === "Overall" || activeTab === "Review"}
+                  afterCutoff={isAfterCutoff(entry)}
+                  onRequestRemove={onRemoveError ? (e) => setPendingRemoveEntry(e) : undefined}
+                />
+              </Fragment>
             ))}
           </>
         ) : (

@@ -269,6 +269,11 @@
 
 /* ─── Dialogs (components/ui/Dialog.tsx) ───────────────────────────────── */
 
+/* Dialog.tsx focuses the box itself when it has no field to focus. */
+.ck-overlay > [role="dialog"]:focus {
+  outline: none;
+}
+
 .ck-overlay {
   position: fixed;
   inset: 0;
@@ -732,6 +737,17 @@
 
 .ck-entry--seekable {
   cursor: pointer;
+}
+
+.ck-entry--seekable:focus-visible {
+  outline: 1px solid var(--ck-arcane-text);
+  outline-offset: 1px;
+}
+
+/* Major/Minor after the wipe cutoff: still listed, but not counted in the
+   pull list or statics totals (see getPullRaidCutoff). */
+.ck-entry--after-cutoff {
+  opacity: 0.55;
 }
 
 .ck-entry--seekable:hover {

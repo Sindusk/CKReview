@@ -511,6 +511,30 @@ export default function Home() {
     });
   }
 
+  // Pull Review's previous/next and the [ / ] keys step through the list
+  // in its order, the same as clicking the neighbouring card.
+  const activeIdx = activePull ? displayPulls.findIndex(p => p.id === activePull.id) : -1;
+  const prevPull  = activeIdx > 0 ? displayPulls[activeIdx - 1] : null;
+  const nextPull  = activeIdx >= 0 && activeIdx < displayPulls.length - 1 ? displayPulls[activeIdx + 1] : null;
+  const stepPullRef = useRef<(dir: -1 | 1) => void>(() => {});
+  stepPullRef.current = (dir) => {
+    const target = dir < 0 ? prevPull : nextPull;
+    if (target) handleSelectPullFromList(target.id);
+  };
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "[" && e.key !== "]") return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest("input, textarea, select, [contenteditable='true']")) return;
+      if (document.querySelector("[role='dialog']")) return;
+      e.preventDefault();
+      stepPullRef.current(e.key === "[" ? -1 : 1);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
   // The synced VOD on screen doesn't cover the selected pull (no VOD did
   // for a list pick, or the user chose this VOD). The video panel shows a
   // card instead, and the timeline holds: no seek, no auto-detection.
@@ -1723,6 +1747,8 @@ export default function Home() {
               onAddError={handleAddError}
               onRemoveError={handleRemoveError}
               vodTimeAvailable={videoUsable}
+              onPrevPull={prevPull ? () => stepPullRef.current(-1) : undefined}
+              onNextPull={nextPull ? () => stepPullRef.current(1) : undefined}
             />
           </Panel>
         </div>

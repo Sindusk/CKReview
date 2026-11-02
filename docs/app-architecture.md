@@ -112,6 +112,11 @@ file's header comment. Mechanic detection has its own guide:
     it: the player-detail drilldown reuses the same container.
   - **AnalysisPanel:** the Deaths/Raid/Major/Minor stat pills double as tab
     buttons. Duration is a plain `MM:SS` pill.
+- **Keyboard** (UX review, 2026-11-01): `[` / `]` step to the previous /
+  next pull (also ‹ › in the Pull Review header, titled "Pull N · Boss"),
+  outside text fields and dialogs; feed entries seek on Enter/Space; the
+  shared `Dialog` handles focus, Tab and Escape (its header says how).
+  Narrow windows are not a supported layout (user, 2026-11-01).
 
 ## Error counting and the raid cutoff
 
@@ -123,7 +128,10 @@ file's header comment. Mechanic detection has its own guide:
     errors after the cutoff.
   - The AnalysisPanel does **not**, so it can show more than the other
     views. That is by design: once the raid is wiping, players scramble to
-    end the pull, and counting that would be unfair.
+    end the pull, and counting that would be unfair. So the gap isn't a
+    mystery, the feed puts a "Wipe cutoff MM:SS" divider before the
+    uncounted Major/Minor entries and dims them, and the Major/Minor pills
+    and the pull card's counts give both totals on hover.
   - When a count looks wrong, check the cutoff and the denominator before
     hunting for an arithmetic bug.
 - **The Report dialog is unreachable** since 2026-10-09: "View Report" was

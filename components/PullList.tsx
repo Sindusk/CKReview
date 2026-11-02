@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import type { Pull } from "@/types/Pull";
 import { getPullRaidCutoff } from "@/lib/report-data";
 import { SeverityIcon, SEVERITY_COLOR } from "./SeverityIcon";
@@ -27,6 +28,13 @@ function buildLogUrl(pull: Pull): string {
 }
 
 export default function PullList({ pulls, selectedPullId, onSelectPull }: PullListProps) {
+  // Keep the selected card in view when the pull changes from elsewhere
+  // (Pull Review's previous/next, VOD auto-detection).
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    listRef.current?.querySelector("[aria-pressed='true']")?.scrollIntoView({ block: "nearest" });
+  }, [selectedPullId]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: 0, flex: 1, overflow: "hidden" }}>
       <PanelHeader title="Pulls" count={pulls.length > 0 ? `(${pulls.length})` : undefined} />
@@ -37,7 +45,7 @@ export default function PullList({ pulls, selectedPullId, onSelectPull }: PullLi
         </EmptyState>
       )}
 
-      {pulls.length > 0 && <div style={{ display: "flex", flexDirection: "column", gap: "5px", overflowY: "auto", flex: 1, padding: "8px 6px 8px 8px" }}>
+      {pulls.length > 0 && <div ref={listRef} style={{ display: "flex", flexDirection: "column", gap: "5px", overflowY: "auto", flex: 1, padding: "8px 6px 8px 8px" }}>
         {pulls.map(pull => {
           const active = pull.id === selectedPullId;
           const isKill = pull.result === "Kill";
@@ -50,6 +58,11 @@ export default function PullList({ pulls, selectedPullId, onSelectPull }: PullLi
           const cutoff = getPullRaidCutoff(pull);
           const majors = pull.errors.filter(e => e.severity === "Major" && (cutoff === null || e.timestamp <= cutoff));
           const minors = pull.errors.filter(e => e.severity === "Minor" && (cutoff === null || e.timestamp <= cutoff));
+          // Pull Review lists the whole pull, so say why its count can be higher.
+          const excluded = cutoff === null ? 0 : pull.errors.filter(e => (e.severity === "Major" || e.severity === "Minor") && e.timestamp > cutoff).length;
+          const countTip = excluded > 0
+            ? `Before the wipe cutoff at ${formatDuration(cutoff!)}. ${excluded} more after it ${excluded === 1 ? "is" : "are"} shown in Pull Review but not counted.`
+            : undefined;
 
           const firstRaidTime = raids.length > 0 ? Math.min(...raids.map(e => e.timestamp)) : null;
           const resultBadgeText = isKill
@@ -117,12 +130,12 @@ export default function PullList({ pulls, selectedPullId, onSelectPull }: PullLi
                   <span style={{ color: "#22c55e" }}>✓ No deaths</span>
                 )}
                 {majors.length > 0 && (
-                  <span style={{ color: SEVERITY_COLOR.Major, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                  <span title={countTip} style={{ color: SEVERITY_COLOR.Major, display: "inline-flex", alignItems: "center", gap: "4px" }}>
                     <SeverityIcon kind="Major" size={12} /> {majors.length} major
                   </span>
                 )}
                 {minors.length > 0 && (
-                  <span style={{ color: SEVERITY_COLOR.Minor, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                  <span title={countTip} style={{ color: SEVERITY_COLOR.Minor, display: "inline-flex", alignItems: "center", gap: "4px" }}>
                     <SeverityIcon kind="Minor" size={12} /> {minors.length} minor
                   </span>
                 )}

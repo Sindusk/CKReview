@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Panel, PanelHeader } from "./Panel";
 
 /*
@@ -19,7 +19,20 @@ import { Panel, PanelHeader } from "./Panel";
   is kept per key in this browser (localStorage, a convenience only) and a
   double-click on a handle goes back to the caller's size. The dialog stays
   centred, so an edge moves by half the drag on each side.
+
+  Keyboard (UX review, 2026-11-01): opening moves focus to the first form
+  field (or the box itself, so Enter can't fire a confirm by accident),
+  Tab cycles inside the box, and closing returns focus to the opener.
+  Escape calls `onClose`, else `onBackdropClick`; a dialog with neither
+  (a form whose typing would be lost) ignores it. Only the topmost of
+  nested dialogs reacts. A popover inside a dialog that closes on Escape
+  listens in the capture phase and stops the event (RosterPullPicker).
 */
+
+// Open dialogs, innermost last.
+const openDialogs: object[] = [];
+const FOCUSABLE = "a[href], button:not([disabled]), input:not([disabled]):not([type='hidden']), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
+const FIRST_FIELD = "[autofocus], input:not([disabled]):not([type='hidden']), select:not([disabled]), textarea:not([disabled])";
 
 const MIN_W = 420;
 const MIN_H = 280;
@@ -70,6 +83,43 @@ export function Dialog({
   const boxRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
   const drag = useRef<{ x: number; y: number; w: number; h: number; dx: boolean; dy: boolean } | null>(null);
+
+  const titleId = useId();
+  const dismiss = onClose ?? onBackdropClick;
+  const dismissRef = useRef(dismiss);
+  useEffect(() => { dismissRef.current = dismiss; });
+
+  useEffect(() => {
+    const token = {};
+    openDialogs.push(token);
+    const opener = document.activeElement as HTMLElement | null;
+    const box = boxRef.current;
+    if (box && !box.contains(document.activeElement)) {
+      (box.querySelector<HTMLElement>(FIRST_FIELD) ?? box).focus();
+    }
+
+    function onKey(e: KeyboardEvent) {
+      if (!box || openDialogs[openDialogs.length - 1] !== token) return;
+      if (e.key === "Escape") {
+        if (dismissRef.current) { e.preventDefault(); dismissRef.current(); }
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const items = Array.from(box.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => el.getClientRects().length > 0);
+      const active = document.activeElement;
+      if (items.length === 0) { e.preventDefault(); box.focus(); return; }
+      const first = items[0], last = items[items.length - 1];
+      if (!box.contains(active)) { e.preventDefault(); first.focus(); }
+      else if (e.shiftKey && (active === first || active === box)) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus(); }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      openDialogs.splice(openDialogs.indexOf(token), 1);
+      if (opener?.isConnected) opener.focus();
+    };
+  }, []);
 
   useEffect(() => {
     if (resizeKey) setSize(loadSize(resizeKey));
@@ -129,6 +179,8 @@ export function Dialog({
         ref={boxRef}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         style={{
           position: "relative", display: "flex", flexDirection: "column", minHeight: 0,
@@ -138,7 +190,7 @@ export function Dialog({
         }}
       >
         <Panel style={{ flex: "1 1 auto", minHeight: 0 }}>
-          <PanelHeader title={title} subtitle={subtitle} shrinkTitle>
+          <PanelHeader title={title} titleId={titleId} subtitle={subtitle} shrinkTitle>
             {headerActions}
             {onClose && (
               <button className="ck-btn ck-btn--sm" onClick={onClose} aria-label="Close" title="Close">
