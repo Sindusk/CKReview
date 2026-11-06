@@ -47,7 +47,45 @@ xivanalysis pages yet.
 - The whole report is now on disk: Dancing Mad pulls 1-4 (4 = the kill)
   and Dragonsong's Reprise pulls 1-22.
 
+## Chauzey Solstice (Dancer), user questions 2026-11-06
+
+Probes (scratchpad, not in the repo): `esprit-whatif.js` (Esprit
+simulation with a GCD swapped), `esprit-mc.js` (random party Esprit).
+
+- **1:52 (Cascade → Reverse Cascade → Technical Step 1:56.6).** Two GCD
+  slots before Technical Step. Early Technical: the Finish would land
+  ~1:57 with the party's buffs at 2:03-2:04; Technical Finish's 5% on
+  0.96M instead of 2.06M of party damage plus her burst GCDs out of the
+  others' buffs, ~−60-80k. Cascade → Fountain: keeps the combo but the
+  Silken Symmetry dies mid-window; about even (the app's 7k). Saber Dance
+  at 1:51.6: Esprit an estimated 79, entering the window at 97 overcapped
+  26; with the Saber, 0 overcap and all four window spenders still fit
+  (Tillana before the second Saber). ~+10k by averages. Best by a little,
+  on an estimated gauge.
+- **7:51 (same pattern, Technical Step 7:56.6).** Esprit an estimated
+  47: no Saber at 7:51; one at 7:53.5 would leave Dance of the Dawn at
+  8:03.6 with ~10. Early Technical: ~−95k (0.78M vs 2.76M of party damage
+  under its 5%). As played (Cascade → Reverse Cascade) was right.
+- **10:15: fixed** (8db0a81). Fan Dance 10:14.96 re-rolled the Threefold
+  held from 10:12.95; the finding named Tillana (first cast within 0.6s).
+- **16:17 window: open, user decision.** 8 GCDs, 2 Esprit spenders
+  (Dance of the Dawn 16:22.9, Saber 16:27.8) plus Last Dance; Fountainfall
+  16:32.8 and Reverse Cascade 16:35.3 instead; Saber 16:37.85, 0.9s after
+  the window. She pressed a Saber Dance at 15:58.3; outside Technical only
+  the partner feeds Esprit, so she likely entered with ~25-40 (the
+  estimate says 52). To have no Saber by 16:35.3 the party (48 GCDs with
+  Esprit, ~9.6 procs expected) gave ≤3 procs from an entry of 52 (0.8%),
+  ≤5 from 30 (6%), ≤6 from 20 (13%). Low entry plus bad luck.
+  The app charges 61k (each missing Saber = its average − the GCD used
+  instead). Esprit is only lost at the cap, so a missing Saber is moved
+  out of the window, not lost: worth the window's bonus on it, ~5-10k each.
+  The same over-valuation applies to every Saber-short window.
+- The whole-fight Esprit Monte Carlo rejects all but 1 of 20000 runs
+  (some logged Sabers have no Esprit under the model): the gauge model
+  drifts over a long fight.
+
 ## Next
 
-No xivanalysis pages yet. If the user wants crit luck per damage check
-in the app, add it to the phase rows (raid-wide, as above).
+Ask the user about the Saber-shortfall valuation (above). No xivanalysis
+pages yet. If the user wants crit luck per damage check in the app, add
+it to the phase rows.
