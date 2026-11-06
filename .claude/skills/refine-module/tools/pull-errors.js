@@ -71,6 +71,7 @@ function parsePulls(s) {
   }
   // Cross-pull passes, learned from every pull in the report as the app does.
   const xp = requireTsFromRoot('lib/cross-pull-passes.ts');
+  const ffCommon = game === 'ff' ? requireTsFromRoot('lib/mechanics/ffxiv/fru/common.ts') : null;
   const state = xp.learnCrossPullState(imported);
   const pulls = imported.map((p) => xp.applyCrossPullPasses(p, state));
 
@@ -120,9 +121,18 @@ function parsePulls(s) {
     if (after) console.log(`  … ${after} more after the cutoff (--all to list)`);
     // Explained: an error on that player, or an error naming them (a missed
     // tower's victims), within the 4s before the death event.
-    const unexplained = (pull.deathEvents ?? []).filter((d) =>
-      !(cut && d.timestamp - 2000 >= cut.timestamp) &&
-      !errors.some((e) => (e.player === d.player || e.description.includes(d.player)) && e.timestamp <= d.timestamp && e.timestamp >= d.timestamp - 4000));
+    // An error that names the player (Doom ticks ~3s + log lag) counts within
+    // 6s (user, 2026-11-06, Pull 13 0:31: Blaster 5.1s before the death).
+    // A no-killing-blow death holding Damage Down is a deliberate reset
+    // (user, 2026-11-06, TOP Pull 24 1:59), listed apart, not unexplained.
+    const resetDeaths = [];
+    const unexplained = (pull.deathEvents ?? []).filter((d) => {
+      if (cut && d.timestamp - 2000 >= cut.timestamp) return false;
+      if (errors.some((e) => (e.player === d.player || e.description.includes(d.player)) && e.timestamp <= d.timestamp && e.timestamp >= d.timestamp - 6000)) return false;
+      const pl = (pull.players ?? []).find((x) => x.name === d.player);      if (pl && ffCommon && ffCommon.diedHoldingDamageDown(pl, d)) { resetDeaths.push(d); return false; }
+      return true;
+    });
+    for (const d of resetDeaths) console.log(`  ${clock(d.timestamp - 2000).padStart(6)} DAMAGE DOWN RESET ${who(d.player)} — no killing blow while holding Damage Down: deliberate reset, no error; death event ${clock(d.timestamp)}`);
     for (const d of unexplained) {
       const blow = d.killingAbilityGameId ? `${d.cause} (${d.killingAbilityGameId})` : 'none';
       console.log(`  ${clock(d.timestamp - 2000).padStart(6)} UNEXPLAINED DEATH ${who(d.player)} — killing blow: ${J.sub(blow)}; death event ${clock(d.timestamp)}`);

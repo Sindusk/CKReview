@@ -637,6 +637,15 @@ Topic (when it applies):
 
 Classify every one before counting a called wipe. Known meanings:
 
+- **A Damage Down reset (standing rule, FFXIV ultimates; user, 2026-11-06,
+  TOP Pull 24 1:59 DRK, Pull 11 1:58 RPR):** no killing blow while holding
+  a Damage Down is deliberate ("jumped into the wall to reset it"): no wall
+  / silent-death error. FFLogs removes the Damage Down at the fatal moment
+  (~2s before the death event), so test "applied, not removed by 2.5s
+  before the event" with `diedHoldingDamageDown` (fru/common.ts), not
+  "active at the event". A death to boss damage while holding one is NOT
+  a reset. pull-errors.js labels these DAMAGE DOWN RESET.
+
 - **A called wipe:**
   - several together;
   - any within ~12s of the end;

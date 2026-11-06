@@ -372,6 +372,12 @@ every mechanic, in every game. When in doubt, come back here.
    Mystery Magic did not end the pull, unlike the first — see phase1.ts's
    GRAVEN_1_DEATH_WIPE_RULE_ID). Phrase these as "unresolvable from here" /
    "treated as a cutoff point," not "the raid wiped."
+11. **FFXIV Damage Down reset deaths are not errors** (standing rule, user,
+   2026-11-06, TOP Pull 24 1:59 and Pull 11 1:58): a death with no killing
+   blow while holding a Damage Down is a deliberate reset, so no wall /
+   silent-death error. Shared test: `diedHoldingDamageDown` in
+   `ffxiv/fru/common.ts` (see PITFALLS "Deaths with no killing blow").
+   Death to boss damage while holding one is not a reset.
 
 ---
 

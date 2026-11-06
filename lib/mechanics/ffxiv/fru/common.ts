@@ -18,6 +18,23 @@ import { joinNames, playerlessMinor } from "@/lib/mechanics/wow/common";
 export const DAMAGE_DOWN = 1002911;
 export const MARK_OF_MORTALITY = 1004372;
 
+/**
+ * A deliberate Damage Down reset: a death with NO killing blow while the
+ * player holds a Damage Down (user, 2026-11-06, WtGX1fYHyJMx3Pr7 Pull 24 1:59
+ * DRK, Pull 11 1:58 RPR: "if someone dies with no killing blow while holding
+ * a damage down, it's almost certainly because they were trying to reset
+ * it"; a standing rule across FFXIV ultimates). FFLogs often removes the
+ * Damage Down at the fatal moment, ~2s before the death event, so "holding"
+ * is read 0.5s before that (applied, not removed by then). A death to boss damage is not
+ * a reset. Wall / silent-death rules skip these; pull-errors.js labels them.
+ */
+export function diedHoldingDamageDown(p: PlayerInfo, d: DeathEvent): boolean {
+  if (d.killingAbilityGameId) return false;
+  let on = false;
+  for (const e of p.debuffs) if (e.abilityId === DAMAGE_DOWN && e.timestamp <= d.timestamp - DEATH_EVENT_LAG_MS - 500) on = e.debuffStatus !== "removed";
+  return on;
+}
+
 // FFLogs logs the death event ~2.0s after the fatal hit (README).
 export const DEATH_EVENT_LAG_MS = 2000;
 export const DIED_FROM_HIT_MS   = 3000;

@@ -637,7 +637,7 @@ import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
 import { distanceBetween } from "@/lib/mechanics/geometry";
 import { interpolatePlayerPosition } from "@/lib/mechanics/player-position";
 import { kFmt, joinNames, playerError, raidMarker, playerlessMinor, clusterByGap } from "@/lib/mechanics/wow/common";
-import { DAMAGE_DOWN, DEATH_EVENT_LAG_MS, PREVIEW_AMOUNT, type Life, bodyHit, buildLife, uniq, realAmount, resetCluster } from "../fru/common";
+import { DAMAGE_DOWN, DEATH_EVENT_LAG_MS, PREVIEW_AMOUNT, type Life, bodyHit, buildLife, uniq, realAmount, resetCluster, diedHoldingDamageDown } from "../fru/common";
 
 export const TOP5_AVOIDABLE_RULE_ID   = "ffxiv-top5-avoidable";
 export const TOP5_WALL_RULE_ID        = "ffxiv-top5-wall";
@@ -865,6 +865,8 @@ function detectWallDeaths(players: PlayerInfo[], deaths: DeathEvent[], called: S
     if (d.killingAbilityGameId || called.has(d) || d.timestamp < start) continue;
     const p = byName(players, d.player);
     if (!p) continue;
+    // Damage Down reset (user, 2026-11-06, TOP Pull 24 1:59: standing rule).
+    if (diedHoldingDamageDown(p, d)) continue;
     const fatal = d.timestamp - DEATH_EVENT_LAG_MS;
     // Any death in P5 is close to a wipe, so a silent death soon after
     // another is the raid resetting (L2: the glitch towers killed two, then

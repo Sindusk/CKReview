@@ -597,7 +597,7 @@ import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
 import { FF_JOB_BY_NAME } from "@/lib/ffl-job-data";
 import { kFmt, joinNames, playerError, playerlessMinor, raidMarker } from "@/lib/mechanics/wow/common";
 import {
-  DEATH_EVENT_LAG_MS, type Life, bodyHit, buildLife, castsOf, uniq, namesOf, realAmount, resetCluster, isTank,
+  DEATH_EVENT_LAG_MS, type Life, bodyHit, buildLife, castsOf, uniq, namesOf, realAmount, resetCluster, isTank, diedHoldingDamageDown,
 } from "@/lib/mechanics/ffxiv/fru/common";
 
 export const BJCC_AVOIDABLE_RULE_ID       = "ffxiv-bjcc-avoidable";
@@ -1309,6 +1309,8 @@ function detectWallDeaths(players: PlayerInfo[], deaths: DeathEvent[], start: nu
     if (d.killingAbilityGameId || resets.has(d) || t < start + 5000 || t > end || afterPhoton(players, d)) continue;
     const p = players.find((x) => x.name === d.player);
     if (!p) continue;
+    // Damage Down reset (user, 2026-11-06, TOP Pull 24 1:59: standing rule across FFXIV ultimates).
+    if (diedHoldingDamageDown(p, d)) continue;
     const pushed = p.damageTaken.some((e) => ([...KNOCKBACK, 18482].includes(e.abilityId)) &&e.timestamp <= d.timestamp && d.timestamp - e.timestamp <= WALL_PUSH_MS);
     if (pushed) continue;
     out.push(playerError(p, {

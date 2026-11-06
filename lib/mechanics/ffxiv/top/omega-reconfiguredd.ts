@@ -614,7 +614,7 @@ import type { PullError, EnemyEvent } from "@/types/PullError";
 import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
 import { interpolatePlayerPosition } from "@/lib/mechanics/player-position";
 import { kFmt, joinNames, playerError, raidMarker, playerlessMinor, clusterByGap, debuffIntervals, type Interval } from "@/lib/mechanics/wow/common";
-import { DEATH_EVENT_LAG_MS, PREVIEW_AMOUNT, type Life, bodyHit, buildLife, castsOf, uniq, realAmount, allAlive, resetCluster } from "../fru/common";
+import { DEATH_EVENT_LAG_MS, PREVIEW_AMOUNT, type Life, bodyHit, buildLife, castsOf, uniq, realAmount, allAlive, resetCluster, diedHoldingDamageDown } from "../fru/common";
 
 export const TOP3_AVOIDABLE_RULE_ID   = "ffxiv-top3-avoidable";
 export const TOP3_SNIPER_RULE_ID      = "ffxiv-top3-sniper";
@@ -1425,6 +1425,8 @@ function detectWallDeaths(players: PlayerInfo[], deaths: DeathEvent[], called: S
     if (d.killingAbilityGameId || called.has(d)) continue;
     const p = players.find((x) => x.name === d.player);
     if (!p) continue;
+    // Damage Down reset (user, 2026-11-06, TOP Pull 24 1:59: standing rule).
+    if (diedHoldingDamageDown(p, d)) continue;
     if (deaths.some((k) => k !== d && k.timestamp <= d.timestamp && d.timestamp - k.timestamp <= RESET_AFTER_DEATH_MS)) continue;
     if (p.damageTaken.some((e) => (e.amount ?? 0) > 0 && e.timestamp <= d.timestamp && d.timestamp - e.timestamp <= SILENT_HIT_MS)) continue;
     errors.push(playerError(p, {

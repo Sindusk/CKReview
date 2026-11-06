@@ -660,7 +660,7 @@ import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
 import type { HeadMarker } from "@/lib/mechanics/ffxiv/fru/usurper-of-frost";
 import { kFmt, joinNames, playerError, raidMarker } from "@/lib/mechanics/wow/common";
 import {
-  DEATH_EVENT_LAG_MS, type Life, bodyHit, buildLife, castsOf, uniq, namesOf, realAmount, resetCluster, isTank,
+  DEATH_EVENT_LAG_MS, type Life, bodyHit, buildLife, castsOf, uniq, namesOf, realAmount, resetCluster, isTank, diedHoldingDamageDown,
 } from "@/lib/mechanics/ffxiv/fru/common";
 
 export const AP_STASIS_TETHER_RULE_ID   = "ffxiv-ap-stasis-tether";
@@ -1538,6 +1538,8 @@ function detectApWall(c: Ctx, start: number, end: number, lastEvent: number) {
     if (called.has(d) || t > end) continue;
     const p = c.players.find((x) => x.name === d.player);
     if (!p) continue;
+    // Damage Down reset (user, 2026-11-06, TOP Pull 24 1:59: standing rule across FFXIV ultimates).
+    if (diedHoldingDamageDown(p, d)) continue;
     // Not a knock-off from a longer flight (C9: a Super Jump 8s before),
     // nor a reset once the pull is over (4+ already dead: E30, B28).
     if (p.damageTaken.some((e) => [WH_SWORD, WH_CHARGE, SUPER_JUMP, ALPHA_SWORD_P3].includes(e.abilityId) && e.timestamp <= d.timestamp && d.timestamp - e.timestamp <= WALL_KNOCK_MS)) continue;

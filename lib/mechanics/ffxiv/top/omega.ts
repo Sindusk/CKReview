@@ -574,7 +574,7 @@ import { interpolatePlayerPosition } from "@/lib/mechanics/player-position";
 import { kFmt, yd, joinNames, playerError, raidMarker, clusterByGap, RAID_MARKER_SORT_OFFSET_MS } from "@/lib/mechanics/wow/common";
 import {
   DAMAGE_DOWN, DEATH_EVENT_LAG_MS, PREVIEW_AMOUNT, type Hit, type Life,
-  bodyHit, buildLife, castsOf, gotAura, uniq, namesOf, isTank, realAmount, allAlive, resetCluster, immuneHit,
+  bodyHit, buildLife, castsOf, gotAura, uniq, namesOf, isTank, realAmount, allAlive, resetCluster, immuneHit, diedHoldingDamageDown,
 } from "../fru/common";
 
 export const TOP1_AVOIDABLE_RULE_ID   = "ffxiv-top1-avoidable";
@@ -1655,7 +1655,9 @@ function detectWallDeaths(players: PlayerInfo[], deaths: DeathEvent[], called: S
     // Still holding Damage Down at the fatal moment: a deliberate death to
     // drop it, raised after (user, 2026-10-24, LG64YVQy2KZbtpN8 Pull 28
     // 1:57.8: the GNB, 20.2s after the Flame Thrower; "the correct thing").
-    if (holdsAt(p, DAMAGE_DOWN, d.timestamp - DEATH_EVENT_LAG_MS - 500)) continue;
+    // Now the shared diedHoldingDamageDown (fru/common.ts; user, 2026-11-06,
+    // Pull 24 1:59 DRK, Pull 11 1:58 RPR: standing rule).
+    if (diedHoldingDamageDown(p, d)) continue;
     if (p.damageTaken.some((e) => (e.amount ?? 0) > 0 && e.timestamp <= d.timestamp && d.timestamp - e.timestamp <= SILENT_HIT_MS)) continue;
     errors.push(playerError(p, {
       ruleId: TOP1_WALL_RULE_ID, severity: "Major", name: "Walked Into the Wall",

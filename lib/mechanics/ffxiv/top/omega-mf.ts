@@ -623,7 +623,7 @@ import { interpolatePlayerPosition } from "@/lib/mechanics/player-position";
 import { kFmt, yd, joinNames, playerError, raidMarker, clusterByGap, RAID_MARKER_SORT_OFFSET_MS } from "@/lib/mechanics/wow/common";
 import {
   DEATH_EVENT_LAG_MS, PREVIEW_AMOUNT, type Life,
-  bodyHit, buildLife, castsOf, gotAura, uniq, namesOf, isTank, realAmount, allAlive, resetCluster,
+  bodyHit, buildLife, castsOf, gotAura, uniq, namesOf, isTank, realAmount, allAlive, resetCluster, diedHoldingDamageDown,
 } from "../fru/common";
 
 export const TOP2_AVOIDABLE_RULE_ID      = "ffxiv-top2-avoidable";
@@ -1509,6 +1509,8 @@ function detectWallDeaths(players: PlayerInfo[], deaths: DeathEvent[], called: S
     if (d.timestamp < from || d.killingAbilityGameId || called.has(d) || mechanicSilentDeath(players, d)) continue;
     const p = players.find((x) => x.name === d.player);
     if (!p) continue;
+    // Damage Down reset (user, 2026-11-06, TOP Pull 24 1:59: standing rule).
+    if (diedHoldingDamageDown(p, d)) continue;
     // A tank dead with no killing blow as its own Bladedance cone resolves
     // is the wall, whoever else the cone killed (user, 2026-11-01,
     // nbKLdqJkapxmNfzt Pull 22 3:42.7: "DRK walks into the wall"; the other
