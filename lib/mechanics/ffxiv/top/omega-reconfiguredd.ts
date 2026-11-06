@@ -18,8 +18,11 @@
 //   ffxiv-top3-rot-pass    Major  missed/late hand-off behind an empty tower
 //     or uncleansed defect: the taker, or the holder if they moved > HOLDER_MOVED
 //   ffxiv-top3-stack       Major, targeted (Remote, cycles 1-3)  in no stack
+//     (not when the stack's owner stood in another's defamation: theirs)
 //   ffxiv-top3-defamation  Major if a death follows, else Minor  extra player
-//     in a defamation (extras/owner)
+//     in a defamation (extras/owner; owner = the holder whose 20y circle
+//     reaches the group, a raised 0-damage holder counts; of two owners
+//     hitting each other, only the one that also hit strangers)
 //   ffxiv-top3-patch       Major (early break Minor if none died), targeted
 //     (4 tethered)  early/overlapping breaks, 4th-cycle Remote with Local
 //     pair, timeout with both alive
@@ -29,7 +32,9 @@
 //     else receiver or nearest holder, whoever walked further)
 //   ffxiv-top3-monitor     Major if a death follows, else Minor  picked twice,
 //     all alive: circle over two (+ a tank south of the DNC there, 2y), or the
-//     unpicked living, else player-less. Layout: see RULES IMPLEMENTED
+//     unpicked living, else player-less. Layout: see RULES IMPLEMENTED. With
+//     SGE RDM RPR GNB DRK MNK DNC SCH in the party: players > 5y off their
+//     spot ("Monitor Layout: Off the Spot", OWC_ORDER), instead of the above
 //   ffxiv-top3-hello-world Raid  empty tower, uncleansed defect, timeout,
 //     missed requirement, early break or resolution killing 3+
 //   ffxiv-top3-transition  Raid  dead 3s after Hello World's cast, or killed
@@ -71,8 +76,13 @@
 //   GNB's own clip in KCX2 Pull 35, as detected); 10: arm deaths
 //   after a ring death unbuilt; 11: never-broken Remote tethers leave no one
 //   named. Not built: Critical Error, raw-damage deaths, which tether partner
-//   moved, full monitor layout/facing (only tank-before-DNC), cycle-4 stacks
-//   (Pull 12 unsettled, strat uses eyes). Probe: tools/ffxiv/top/omega-reconfigured-layout.js.
+//   moved, monitor layout for other job sets (tank-before-DNC only), cycle-4
+//   stacks (Pull 12 unsettled, strat uses eyes). Rot clip on a new holder:
+//   WtGX Pull 15 6:25 the user blames the carrier who walked in (RDM, gap 8.3y
+//   -> 5.2y over 3s) but the module names the victim; only that one clip shows
+//   it (clipmove probe, 17 reports), so unbuilt. A rot-clip death does not end
+//   the pull generally (one case). Probe: tools/ffxiv/top/omega-reconfigured-layout.js,
+//   omega-reconfigured-clipmove.js. Probe: tools/ffxiv/top/omega-reconfigured-layout.js.
 // ── END DIGEST ───────────────────────────────────────────────────────────
 //
 // -- VERIFIED AGAINST LOGS (2026-10-14) --
@@ -182,6 +192,10 @@
 // Built in replay.ts.
 // VOD review 2026-11-01 (user): nbKLdqJkapxmNfzt Pulls 12, 17; rulings in
 // expectations/rulings.json (Pull 12's cycle-4 stack unsettled).
+// VOD review 2026-11-06 (user): WtGX1fYHyJMx3Pr7 Pulls 2, 6, 15, 17, 24, 31;
+// rulings in expectations/rulings.json. Open: Pull 15 6:25 rot clip was the
+// red-rot RDM moving in, not the DNC (one clip on disk shows the signal, not
+// built), and that death ended the pull.
 // VOD review (2026-10-30, KCX2qW4khczmZ9T1, the user's static: GNB DRK SCH
 // SGE MNK SAM DNC RDM):
 // - Hand-offs: the taker walks to the holder, the holder stays put. Over
@@ -223,9 +237,19 @@
 //   resolution to the hand-off (user, 2026-10-30, KCX2qW4khczmZ9T1 Pull 38
 //   6:23.8 / 6:25.8: "The person who takes the rot is the one who should be
 //   moving"; the DNC walked 9.9y in, the DRK stayed). Both without positions.
-// ffxiv-top3-stack (targeted: Remote players, cycles 1-3): in no stack.
+// ffxiv-top3-stack (targeted: Remote players, cycles 1-3): in no stack. Not
+//   when every lone stack owner stood in someone else's defamation (user,
+//   2026-11-06, WtGX Pull 6 5:58: the MNK in the SCH's defamation took the
+//   stack alone; the GNB at its spot "is correct"; Pull 28, no defamation on
+//   the MNK, the SCH's miss stands).
 // ffxiv-top3-defamation: an extra player in a defamation (the extras; the
-//   owner when it hit 3+; both owners when they hit each other).
+//   owner when it hit 3+; both owners when they hit each other, except when
+//   only one circle also hit strangers: then that one alone). Owner = the
+//   holder in the group, or when that holder is 20y+ from a member and has a
+//   circle of their own, a holder whose 0-damage hit (raised, Transcendent)
+//   is in the group (user, 2026-11-06, WtGX Pull 15 6:36: the DNC's defamation
+//   at r8.5 hit four and the RPR, whose own r16 one hit nobody: "RPR was
+//   correct"). KCX2 Pull 20 5:40 (post-cutoff) moves the same way.
 // ffxiv-top3-patch (targeted: the four tethered players): a Remote break
 //   before the towers or before the resolution's vulnerability ended, a Local
 //   break within 1s of the Remote one, a fourth-cycle Remote break with the
@@ -255,6 +279,14 @@
 //   (north, slightly east of where it stood), WAR and DNC swapped with the DNC
 //   at the southern wall spot. SAM's rank is unknown (one report), so only the
 //   tank/DNC order is coded; the rest of the order is not.
+//   THIS STATIC (user, 2026-11-06, WtGX Pull 17 7:22: DRK east as 3rd
+//   non-holder, MNK east late, GNB southwest as 2nd holder; SGE and RPR "on
+//   their spots" are not errors): job order SGE RDM RPR GNB DRK MNK DNC SCH
+//   (no contradiction over Pulls 17, 24, 31, 32). Non-holders fill N, NW, W-N,
+//   W-S, S in it; holders (3) the corners NE, SE, SW in it, boss-R frame
+//   (x mirrored for boss L). "Monitor Layout: Off the Spot": more than
+//   OWC_OFF_SPOT (5y) from the spot at the snapshot -1s, only with all eight
+//   jobs in the order and 3 holders; replaces the circle-overlap naming.
 // ffxiv-top3-stack covers cycles 1-3 only; cycle 4's stacks are unchecked. The
 //   user could not name who was wrong on nbKLdq Pull 12 6:39.3 (DRK took the
 //   4th-cycle stack alone inside the red tower and died; the other stack had
@@ -632,6 +664,19 @@ const OWC_LOADING    = [1003452, 1003453]; // monitor holders, right / left
 // DNC y: clean -9.2y .. -31.7y (-0.4y worst on an unreviewed pull). Failure +7.5y
 // (user, 2026-11-01, Pull 17 7:20.5: WAR and DNC should be swapped). Units 1/100 y.
 const OWC_TANK_SOUTH = 200;
+// This static's full layout (user, 2026-11-06, WtGX Pull 17 7:22: "DRK should
+// have been east, the 3rd non-monitor player; MNK east, late; GNB southwest, the
+// second monitor player"). Job order, derived from clean Pull 24 and dirty 31/32
+// plus Pull 17, no contradiction: SGE RDM RPR GNB DRK MNK DNC SCH. Non-holders
+// fill N, NW, W-N, W-S, S in that order and holders the corners NE, SE, SW (the
+// "boss R" frame, x mirrored for boss L; yalms from the centre). Clean
+// non-holders stand 0.3-3.3y off their spot (Pulls 24, 31); failures 5.0y
+// (Pull 32 MNK, unreviewed), 8.3y (Pull 23 GNB, unreviewed), 18-21y (Pull 17).
+const OWC_ORDER = ["Sage", "Red Mage", "Reaper", "Gunbreaker", "Dark Knight", "Monk", "Dancer", "Scholar"];
+const OWC_SPOTS_FREE = [[-1, -19], [-9, -11], [-18, -5], [-18, 5], [-1, 19]];
+const OWC_SPOTS_HOLD = [[10, -9], [10, 9], [-10, 10]];
+const OWC_OFF_SPOT = 5;
+const DEFAM_RADIUS = 2000; // a defamation reaches 20y (units 1/100 y)
 const ION_EFFLUX     = 31560;
 
 type Color = "red" | "blue";
@@ -839,13 +884,39 @@ function readCycles(players: PlayerInfo[], life: Life, casts: EnemyEvent[], star
       const held = COLORS.filter((c) => heldAt(r[c], res));
       if (held.length) rot.set(p.name, held);
     }
-    const owned = (id: number, bug: number) => [...groupsOf(players, life, [id], res - 300, res + RESOLUTION_MS).values()].map((g) => ({
-      ...g, owner: g.players.find((p) => heldAt(debuffIntervals(p, bug), res - 1000))?.name,
-    }));
+    // Owner of a hit group: the bug holder in it. With two holders in one group
+    // (4th cycle: each hit the other) it is the one whose circle reaches the
+    // rest of the group (smallest max distance to the non-holders), the other
+    // holder owning the group left over (user, 2026-11-06, WtGX Pull 15 6:36:
+    // the DNC's defamation at r8.5 hit four; the RPR's at r16 hit no one).
+    const owned = (id: number, bug: number, radius?: number) => {
+      const gs = [...groupsOf(players, life, [id], res - 300, res + RESOLUTION_MS).values()].map((g) => ({
+        ...g, owner: g.players.find((p) => heldAt(debuffIntervals(p, bug), res - 1000))?.name,
+      }));
+      const taken = new Set<string>();
+      const at = (p: PlayerInfo) => interpolatePlayerPosition(p, res + 600, { windowMs: 2000, maxSpanMs: 3000 });
+      const all = players.filter((p) => heldAt(debuffIntervals(p, bug), res - 1000));
+      for (const g of [...gs].sort((a, b) => b.players.length - a.players.length)) {
+        // A holder can be missing from its own group (the raised DNC under
+        // Transcendent takes 0 damage and reads dead): any holder counts, and
+        // one whose 20y circle can't reach every member isn't the owner.
+        const reach = (h: PlayerInfo) => { const a = at(h); return Math.max(0, ...g.players.filter((o) => o !== h).map((o) => { const b = at(o); return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : Infinity; })); };
+        const fits = radius === undefined ? [] : all.filter((h) => !g.players.includes(h) && reach(h) <= radius && h.damageTaken.some((e) => e.abilityId === id && g.hits.some((x) => x.sourceInstance === e.sourceInstance && x.source === e.source)));
+        const free = fits.filter((h) => !taken.has(h.name));
+        const def = all.find((h) => h.name === g.owner);
+        // ...and only when the default owner is accounted for by a circle of
+        // their own (WtGX Pull 15: the RPR's, hitting only itself).
+        if (free.length && def && reach(def) > (radius ?? 0) && gs.some((o) => o !== g && o.players.includes(def))) {
+          g.owner = [...free].sort((a, b) => reach(a) - reach(b))[0].name;
+        }
+        if (g.owner) taken.add(g.owner);
+      }
+      return gs;
+    };
     const towers = COLORS.flatMap((c) => [...groupsOf(players, life, [COL[c].tower], res - 300, res + RESOLUTION_MS).values()].map((g) => ({ color: c, players: g.players })));
     return {
       k: i + 1, res, defam: holding(DEFAM_BUG), stack: holding(STACK_BUG), local: tethered(LOCAL), remote: tethered(REMOTE),
-      rot, towers, defams: owned(DEFAM_HIT, DEFAM_BUG), stacks: owned(STACK_HIT, STACK_BUG),
+      rot, towers, defams: owned(DEFAM_HIT, DEFAM_BUG, DEFAM_RADIUS), stacks: owned(STACK_HIT, STACK_BUG),
     };
   });
 }
@@ -973,7 +1044,14 @@ function detectHelloWorld(players: PlayerInfo[], life: Life, deaths: DeathEvent[
       occurrences?.push({ mechanicKey: TOP3_STACK_RULE_ID, timestamp: cy.res, players: cy.remote });
       const inStack = new Set(cy.stacks.flatMap((g) => g.players.map((p) => p.name)));
       const alone = cy.stacks.filter((g) => g.players.length === 1 && g.owner).map((g) => g.owner!);
-      for (const n of cy.remote.filter((x) => aliveAt(x) && !inStack.has(x) && life.hitAlive(P(x), cy.res + 600))) {
+      // A stack owner who stood in another's defamation was off the layout: the
+      // stack miss is theirs (their Stood in a Defamation), not the partner's
+      // who waited at the spot (user, 2026-11-06, WtGX Pull 6 5:58: GNB correct,
+      // MNK in the SCH's defamation took the stack alone; Pull 28, SCH misses
+      // with the MNK in no defamation: still the partner's).
+      const offLayout = (o: string) => cy.defams.some((d) => d.owner !== o && d.players.some((p) => p.name === o) && !(cy.k <= 3 && cy.local.includes(o)));
+      const ownerOff = alone.length > 0 && alone.every(offLayout);
+      for (const n of cy.remote.filter((x) => aliveAt(x) && !inStack.has(x) && life.hitAlive(P(x), cy.res + 600) && !ownerOff)) {
         const ownerDied = alone.filter((o) => life.diedFrom(P(o), cy.res));
         errors.push(playerError(P(n), {
           ruleId: TOP3_STACK_RULE_ID, severity: "Major", name: "Missed the Stack",
@@ -993,7 +1071,18 @@ function detectHelloWorld(players: PlayerInfo[], life: Life, deaths: DeathEvent[
       const died = uniq(cy.defams.flatMap((d) => d.players).filter((p) => life.diedFrom(p, cy.res)));
       const sev = died.length ? "Major" : "Minor";
       const outcome = died.length ? ` ${names(died.map((p) => p.name))} died.` : "";
-      const owners = extra.filter((p) => cy.defam.includes(p.name));
+      // Owners standing in each other's circle: when only one of the circles
+      // also reached other players (a stranger beyond the owner pair and the
+      // Local partner), that owner alone is at fault and the other, whose
+      // circle hit only the intruder, is correct (user, 2026-11-06, WtGX Pull 15
+      // 6:36.2: the DNC's r8.5 defamation hit GNB/DRK/MNK/RDM and the RPR; the
+      // RPR's r16 one reached no one: "RPR was correct").
+      const reach = (d: { owner?: string; players: PlayerInfo[] }) => d.players.filter((p) => p.name !== d.owner && !cy.defam.includes(p.name) && !(cy.k <= 3 && cy.local.includes(p.name))).length;
+      const pairOwners = extra.filter((p) => cy.defam.includes(p.name));
+      const otherReach = pairOwners.map((o) => cy.defams.find((d) => d.owner === o.name)).filter((d): d is NonNullable<typeof d> => !!d).map(reach);
+      const pairKnown = pairOwners.length > 0 && otherReach.length === pairOwners.length;
+      if (pairKnown && reach(g) === 0 && otherReach.some((r) => r > 0)) continue;
+      const owners = pairKnown && reach(g) > 0 && otherReach.every((r) => r === 0) ? [] : pairOwners;
       const blamed = owners.length ? [P(g.owner), ...owners] : extra.length >= RAID_DEATHS ? [P(g.owner)] : extra;
       for (const p of blamed) {
         const desc = owners.length
@@ -1250,6 +1339,30 @@ function detectMonitors(players: PlayerInfo[], life: Life, casts: EnemyEvent[], 
   const byShot = new Map<number, PlayerInfo[]>();
   for (const h of hits) for (const e of h.hits) byShot.set(e.sourceInstance ?? -1, uniq([...(byShot.get(e.sourceInstance ?? -1) ?? []), h.p]));
   const crossed = uniq([...byShot.values()].filter((ps) => ps.length >= 2).flat());
+  // This static's layout (OWC_ORDER): the players off their spot, if any, are
+  // the error; those on theirs who got two circles are not.
+  const holderOf = (p: PlayerInfo) => OWC_LOADING.some((id) => heldAt(debuffIntervals(p, id), t - 500));
+  const rank = players.map((p) => OWC_ORDER.indexOf(p.className ?? ""));
+  if (players.length === 8 && rank.every((r) => r >= 0) && new Set(rank).size === 8 && players.filter(holderOf).length === 3) {
+    const sg = boss.abilityId === 31595 ? 1 : -1;
+    const byRank = (hold: boolean) => players.filter((p) => holderOf(p) === hold).sort((a, b) => OWC_ORDER.indexOf(a.className!) - OWC_ORDER.indexOf(b.className!));
+    const off: PullError[] = [];
+    for (const [hold, spots] of [[true, OWC_SPOTS_HOLD], [false, OWC_SPOTS_FREE]] as const) {
+      byRank(hold).forEach((p, i) => {
+        const q = interpolatePlayerPosition(p, t - 1000, { windowMs: 2000, maxSpanMs: 3000 });
+        const s = spots[i];
+        if (!q || !s) return;
+        const d = Math.hypot((q.x / 100 - 100) * sg - s[0], q.y / 100 - 100 - s[1]);
+        if (d <= OWC_OFF_SPOT) return;
+        off.push(playerError(p, {
+          ruleId: TOP3_MONITOR_RULE_ID, severity: sev, name: "Monitor Layout: Off the Spot",
+          description: `Stood ${d.toFixed(0)}y from ${hold ? "monitor holder" : "non-holder"} spot ${i + 1} of ${spots.length} (${hold ? "holders go NE, SE, SW" : "non-holders N, NW, W-N, W-S, S"} in job order SGE RDM RPR GNB DRK MNK DNC SCH):${outcome}. ${MONITOR_WHY}`,
+          timestamp: t, abilityId: OWC, abilityName: "Oversampled Wave Cannon",
+        }));
+      });
+    }
+    if (off.length) return off;
+  }
   if (crossed.length >= 2) {
     // E19: the pair under one circle wasn't the doubled player; only one of
     // the two was picked, which left a side short.

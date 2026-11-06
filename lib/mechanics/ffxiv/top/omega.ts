@@ -17,7 +17,8 @@
 //     number soaking early; "Tower Out of Turn" skips a covering player
 //   ffxiv-top1-blaster       Major on Doom/death, else Minor  Blaster clips,
 //     "Wrong Tether Spot", "Took Another's Tether", "Died From a Blaster Clip"
-//   ffxiv-top1-missile       Major on death, else Minor  missile hit others
+//   ffxiv-top1-missile       Major on death (missile >= merged lines on the
+//     victim, else the line's death), else Minor  missile hit others
 //     or carrier in a line; "Stood by a Missile" (stray, E14 1:33.2)
 //   ffxiv-top1-line          Major on death, else Minor  a member in no line,
 //     both marked in one line, "Didn't Cross", "Left the Group"; groups
@@ -61,6 +62,13 @@
 //   "STRATEGY VARIANCE AND AGREEMENT"  guide disagreements
 //   "WHAT ENDS A PULL"  end conditions
 //   "OPEN QUESTIONS / SOURCE DISAGREEMENTS FOR LOG VERIFICATION"  7 items
+// Q8 (user, 2026-11-06, WtGX1fYHyJMx3Pr7 Pull 11 1:58.8 / Pull 24 1:59.3): a
+//   no-killing-blow death holding Damage Down is a deliberate reset; the wall
+//   rule already skips it (holdsAt), but pull-errors.js still lists it
+//   UNEXPLAINED (it wants an error within 4s). Same for Doom deaths whose
+//   Blaster error is >4s before the death event (Pull 13 0:31.9).
+//   Wave Cannon Overlap on the player who moved (Q11) needs a per-job usual
+//   bearing across pulls: not per-pull derivable (tools/ffxiv/top/omega-wavecannon.js).
 // Open items: three-total vs three-other line split (Q1); Blaster visual vs
 //   31498 IDs; all-eight-unique tower spots; Doom/Ruin removal; cone
 //   reselect/angle; +127.7 vs +130 enrage. Not built: who stood where in a
@@ -220,6 +228,12 @@
 //   and D). D36 0:38.1: the MNK took the DNC's, the SCH's by the pairing,
 //   leaving the RDM's; the SCH then took it from the MNK. User: the MNK.
 // Report E = KCX2qW4khczmZ9T1 (the user's static, same roster and conga).
+// VOD review 2026-11-06 (user): WtGX1fYHyJMx3Pr7 Pulls 5, 6, 11; rulings in
+// expectations/rulings.json. Open: Pull 21 1:48 Wave Cannon overlap was the
+// RDM alone (moved late into the RPR's line) but needs per-job usual
+// bearings across pulls (cross-pull pass), not built; Damage-Down reset
+// deaths (Pull 11 1:58) and Doom deaths >4s after their Blaster (Pull 13)
+// still list as UNEXPLAINED in pull-errors.js (shared tool, not fixed).
 // VOD review 2026-11-01 (user): report H (nbKLdqJkapxmNfzt) Pulls 4, 7, 8,
 // 16; rulings in expectations/rulings.json. Follow-up 2026-11-02: Pull 4
 // ends at the RDM holder's death; Pull 16's takers are decided by the
@@ -289,6 +303,12 @@
 //   Missile", having left their stack; user, E14 1:33.2; not with the
 //   groups broken), or the carrier in a line.
 //   One per carrier and set (a dead carrier's missile can land on the other).
+//   A death counts toward Major and the text only where the missile did at
+//   least as much as the set's merged lines to that player (missile share of
+//   missile+line 0.60-1.00 killed by missile; 0.00-0.41 by the lines, whose
+//   "Didn't Cross" names it; log 2026-11-06, WtGX1fYHyJMx3Pr7 Pull 26 1:21.3:
+//   missile 0-15k, lines 277-440k each; same Major -> Minor on 2qgaAkxVypGWv9CN
+//   Pulls 3, 24, 54, 57, 67). A silent knockback death still counts.
 // ffxiv-top1-line "Pantokrator One Short" (Raid, player-less): a player
 //   alive at Pantokrator but dead at set 1, 2 or 3, when a later set's line
 //   or missile then killed someone, not in a P1 clear; at their fatal hit
@@ -1323,7 +1343,18 @@ function detectPantokrator(players: PlayerInfo[], life: Life, deaths: DeathEvent
         }));
         continue;
       }
-      const died = m.hit.filter((p) => diedOf(p, life, deaths, s.t) || deaths.some((d) => d.player === p.name && !d.killingAbilityGameId && d.timestamp > s.t && d.timestamp - s.t <= KNOCK_DEATH_MS));
+      // A death goes to the missile only when it did at least as much as the
+      // set's merged lines to that player (log, 2026-11-06, WtGX1fYHyJMx3Pr7
+      // Pull 26 1:21.3: the SGE's missile 0k, the merged lines 277-440k each,
+      // all four dead of the lines, which "Didn't Cross" names). missile
+      // share of missile+line damage: killed by the missile 0.60-1.00 (E 37/25,
+      // 50/23, 551/46), by the lines 0.00-0.41 (29/41, 44/81, 14/510).
+      const missileKilled = (p: PlayerInfo) => {
+        const sum = (id: number) => p.damageTaken.filter((e) => e.abilityId === id && Math.abs(e.timestamp - m.c.timestamp) <= 2000).reduce((a, e) => a + realAmount(e), 0);
+        const mi = sum(MISSILE), li = sum(LINE);
+        return mi >= li;
+      };
+      const died = m.hit.filter((p) => (diedOf(p, life, deaths, s.t) && missileKilled(p)) || deaths.some((d) => d.player === p.name && !d.killingAbilityGameId && d.timestamp > s.t && d.timestamp - s.t <= KNOCK_DEATH_MS));
       // One other, not a carrier this set and in no line: every non-carrier
       // belongs in a line stack, so they left theirs for the drop and the
       // carrier, out of the stacks, is excused (user, 2026-10-30,

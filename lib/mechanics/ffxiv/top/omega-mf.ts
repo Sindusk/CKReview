@@ -12,8 +12,9 @@
 //   (cross-pull learned slots/rows) only narrows glitch/fire/stack errors to
 //   one partner. Firewall group swaps are not built.
 // Rules (ruleId, severity: meaning; exposure default = everyone unless noted):
-//   ffxiv-top2-avoidable      Major on death else Minor  laser, clones, Arrow,
-//     lone non-tank in a Bladedance cone (no Damage Down in P2)
+//   ffxiv-top2-avoidable      Major on death else Minor  laser, clones, lone
+//     non-tank in a Bladedance cone (no Damage Down in P2); Arrow: one
+//     player-less Minor per Arrow (baiter unknown, user 2026-11-06)
 //   ffxiv-top2-solar-ray      both tanks  both Solar Rays on one tank
 //   ffxiv-top2-glitch         pair under glitch Vulnerability Up at the Fire
 //   ffxiv-top2-fire           players in a shared Fire (Fire Overlap)
@@ -27,7 +28,8 @@
 //     Shared" Major on death else Minor
 //   ffxiv-top2-wall           Major  silent death nothing explains
 //   ffxiv-top2-enrage / -called-wipe / -collapse  Raid, earliest only
-// Cutoffs (first Raid error): Party Synergy 3 deaths at Spotlight/clones, the
+// Cutoffs (first Raid error): anyone dead at the Fire incl. a death to the
+//   Optical Laser on the Fire tick (user 2026-11-06), Party Synergy 3 deaths at Spotlight/clones, the
 //   Fire/laser killing 2 (FIRE_RAID_DEATHS, user 2026-10-30 report G Pull 10
 //   2:54.6: "the pull was over"; G Pulls 18, 26, 30, 39 same), Laser Shower
 //   enrage, called wipe (3 silent deaths in 10s / 12s of end), Bladedance 3+,
@@ -199,7 +201,9 @@
 // Report F = hjgk42MDf81arFVY (the user's static, day 3; omega.ts's report
 // D). VOD review 2026-11-01 (user): report H (nbKLdqJkapxmNfzt) Pulls 1, 3,
 // 5, 6, 10, 19, 22; rulings in expectations/rulings.json (Pull 5 and Pull
-// 19's DRK unsettled).
+// 19's DRK unsettled). VOD review 2026-11-06 (user): WtGX1fYHyJMx3Pr7
+// Pulls 4, 8, 28; rulings in expectations/rulings.json (Pull 28's RDM
+// Bladedance and who baited the Arrow unsettled).
 // VOD review 2026-10-28 (user): Pulls 5, 6, 15, 18, 22, 32, 33, 37, 42,
 // 45; rulings in expectations/rulings.json. The user's cheat sheet puts
 // Mid's square and circle inside, ~12y off the line, and the crosses and
@@ -282,8 +286,13 @@
 // ffxiv-top2-avoidable (Major on death, else Minor: no Damage Down in P2):
 //   Optical Laser (timed at the Fire it snapshots with, F6), the clones
 //   (Efficient Bladework, Beyond Strength, Optimized Blizzard III,
-//   Superliminal Steel), Sagittarius Arrow, a lone non-tank in a Bladedance
-//   cone (none with a tank already dead: fallout, F45).
+//   Superliminal Steel), a lone non-tank in a Bladedance cone (none with a
+//   tank already dead: fallout, F45). Sagittarius Arrow is NOT per player: one
+//   player-less Minor per Arrow listing its victims (the baiter isn't in the
+//   log; user, 2026-11-06, WtGX1fYHyJMx3Pr7 Pull 28 3:42: "not at fault ...
+//   a team failure"). The Arrow cast carries the line's helper position and
+//   facing (x, y, facing) and, only when it hit someone, that victim as
+//   target; no marker or tether names a baiter (tools/ffxiv/top/omega-mf-arrow.js).
 // ffxiv-top2-solar-ray (targeted: both tanks): both Solar Rays on one tank,
 //   both alive: the tank with none didn't hold their Omega.
 // ffxiv-top2-glitch: at the Fire, all eight alive, a pair under the glitch
@@ -296,8 +305,13 @@
 //   another vulnerable player, D72). synergy-order.ts keeps the partner off their Fire slot
 //   (>= 9y, partner <= 7y; the slot model from the learned order). The
 //   description gives both partners' distance from the eye's line (F5).
+//   Remote X/T pairs use different diagonals (clean: T at lateral*along > 0,
+//   X at < 0; 102/102 in 17 reports), so the T pair's spots are fixed by the
+//   symbol (user, 2026-11-06, WtGX1fYHyJMx3Pr7 Pull 4 2:53: GNB right, the
+//   DRK on the X diagonal; only the DRK is named).
 //   Before the learned order: pairSpotDevs (the pair's two spots from its
-//   symbol, "GLITCH SPOTS") names only the partner 6.5-20y off when the other
+//   symbol, "GLITCH SPOTS") names only the partner 6.5-35y off (PAIR_OFF_MAX
+//   3500: the other pair's diagonal is ~31y away) when the other
 //   is within 4.5y (and 4y closer), overriding the Fire-sharing read (user,
 //   2026-11-01, nbKLdqJkapxmNfzt Pull 1 2:53.5: RDM 14.7y off, DRK 4.1y on,
 //   WAR in the DRK's Fire; Pull 3 2:53.7: SAM 6.9y off, WHM 0.6y). Past 20y
@@ -325,7 +339,9 @@
 //   a player in both stacks or none.
 // ffxiv-top2-synergy (Raid): anyone dead at the Fire, at their fatal hit
 //   ("Dead Before the Fire"; user, F46: "if they are dead to the AoEs in
-//   Party Synergy, the pull is effectively over"), placed after the rest of
+//   Party Synergy, the pull is effectively over"; also a death to the Optical
+//   Laser on the Fire tick, user, 2026-11-06, Pull 8 2:53 / Pull 9 2:50: "the
+//   laser effectively ends the pull"; the laser Major stays), placed after the rest of
 //   that death's resolution (G2: a second clone victim +0.1s); the Fire
 //   (with the laser) killed 2+ (user, G10) or Spotlight 3+; the clones
 //   killed 4+ in one resolution, at the last victim's hit (G19) (player-less, alongside each victim's own
@@ -357,6 +373,8 @@
 //   the cone hit notwithstanding (user, 2026-11-01, nbKLdqJkapxmNfzt Pull 22
 //   3:42.7: the DRK walled; the other 14 cone tank deaths in 8 reports carry
 //   the Bladedance blow; one pull, so the silent-death test is the signal).
+//   Not for a death within ~2.5s after a Sagittarius Arrow hit on that
+//   player: the team's bait failure, not a wall walk (user, 2026-11-06, Pull 28).
 // ffxiv-top2-enrage (Laser Shower hits that killed) / -called-wipe (3+
 //   silent deaths within 10s, or within 12s of the end, Beyond Defense
 //   knockbacks excluded) / -collapse (4 dead, pull over within 20s): Raid,
@@ -928,7 +946,7 @@ function detectAvoidable(players: PlayerInfo[], life: Life, from: number, end: n
   const errors: PullError[] = [];
   const ids = Object.keys(AVOIDABLE).map(Number);
   for (const p of players) {
-    const hits = p.damageTaken.filter((e) => ids.includes(e.abilityId) && e.timestamp >= from && e.timestamp <= end && !bodyHit(e) && !skip.has(e) &&
+    const hits = p.damageTaken.filter((e) => ids.includes(e.abilityId) && e.abilityId !== ARROW && e.timestamp >= from && e.timestamp <= end && !bodyHit(e) && !skip.has(e) &&
       life.hitAlive(p, e.timestamp) && (e.abilityId !== BLADEDANCE || !isTank(p)) && (realAmount(e) > 0 || (e.amount ?? 0) >= PREVIEW_AMOUNT));
     for (const g of clusterByGap(hits, (e) => e.timestamp, EPISODE_MS)) {
       const kinds = uniq(g.map((e) => AVOIDABLE[e.abilityId]));
@@ -942,6 +960,26 @@ function detectAvoidable(players: PlayerInfo[], life: Life, from: number, end: n
         timestamp: g[0].timestamp, abilityId: g[0].abilityId, abilityName: g[0].abilityName,
       }));
     }
+  }
+  // Sagittarius Arrow: the bait is the party's, and the log doesn't say who
+  // baited (user, 2026-11-06, WtGX1fYHyJMx3Pr7 Pull 28 3:42: "The DRK is not at
+  // fault here. The bait was done incorrectly. It's more of a team failure").
+  // One player-less Minor per Arrow, listing who it hit. Minor even when it
+  // killed: README "Attribution philosophy" 4 says a Major must name a player
+  // (report-data.ts asserts e.player!) and a failure nobody can be blamed for
+  // is Minor or Raid (user, 2026-11-06, Pull 28 3:42: team failure, baiter unknown).
+  const arrowHits = players.flatMap((p) => p.damageTaken
+    .filter((e) => e.abilityId === ARROW && e.timestamp >= from && e.timestamp <= end && !bodyHit(e) && !skip.has(e) &&
+      life.hitAlive(p, e.timestamp) && (realAmount(e) > 0 || (e.amount ?? 0) >= PREVIEW_AMOUNT))
+    .map((e) => ({ p, e }))).sort((a, b) => a.e.timestamp - b.e.timestamp);
+  for (const g of clusterByGap(arrowHits, (h) => h.e.timestamp, EPISODE_MS)) {
+    const victims = uniq(g.map((h) => h.p));
+    const died = victims.filter((p) => life.diedFrom(p, g[g.length - 1].e.timestamp));
+    errors.push({
+      ruleId: TOP2_AVOIDABLE_RULE_ID, severity: "Minor", name: "Hit by Optimized Sagittarius Arrow",
+      description: `Optimized Sagittarius Arrow hit ${namesOf(victims)}${died.length ? `; ${namesOf(died)} died` : ""}. The party's bait went wrong; the log doesn't show who baited, so no one is named. ${AVOIDABLE[ARROW].why}`,
+      timestamp: g[0].e.timestamp, abilityId: ARROW, abilityName: g[0].e.abilityName,
+    });
   }
   return errors;
 }
@@ -968,9 +1006,19 @@ const CLONE_COLLAPSE_DEAD = 4;
 function deadAtFire(players: PlayerInfo[], life: Life, casts: EnemyEvent[], read: SynergyRead | undefined, from: number, end: number): PullError[] {
   const ps = read && castsOf(casts, PARTY_SYNERGY, end).find((c) => c.timestamp > from);
   if (!read || !ps) return [];
-  const dead = players.filter((p) => !life.alive(p, read.fireT - 500));
+  // A death to the Optical Laser on the Fire tick itself ends it the same
+  // way (user, 2026-11-06, WtGX1fYHyJMx3Pr7 Pull 8 2:53 and Pull 9 2:50:
+  // "Detection is correct. DNC dies to the laser, which effectively ends the
+  // pull"; before, the cutoff was the Spotlight 11s later). Only the laser:
+  // the Fire's own hits are the FIRE_RAID_DEATHS cutoff in detectSynergy.
+  const laserHit = (p: PlayerInfo) => p.damageTaken.find((e) => e.abilityId === OPTICAL_LASER && !bodyHit(e) && Math.abs(e.timestamp - read.fireT) <= RESOLUTION_MS && life.diedFrom(p, e.timestamp));
+  const early = players.filter((p) => !life.alive(p, read.fireT - 500));
+  const lasered = players.filter((p) => !early.includes(p) && laserHit(p));
+  const dead = [...early, ...lasered];
   if (!dead.length) return [];
   const fatal = (p: PlayerInfo) => {
+    const lh = lasered.includes(p) ? laserHit(p) : undefined;
+    if (lh) return { t: read.fireT, how: "Optical Laser" as string | undefined };
     const w = life.outIntervals.find((x) => x.p === p && read.fireT - 500 >= x.start && read.fireT - 500 < x.end)!;
     const deathT = w.start + 100 + DEATH_EVENT_LAG_MS;
     const hit = p.damageTaken.filter((e) => !bodyHit(e) && e.timestamp <= deathT && deathT - e.timestamp <= DEATH_EVENT_LAG_MS + 1500)
@@ -1057,7 +1105,7 @@ const GLITCH_WHY = "Partners take opposite rows: Mid 20-26y apart, Remote 35+y."
 // stood at the wrong end of the row and the learned order decides, so those
 // stay with synergy-order. Clean players: within ~4y of a spot.
 const PAIR_OFF_MIN = 650;
-const PAIR_OFF_MAX = 2000;
+const PAIR_OFF_MAX = 3500;
 const PAIR_PARTNER_MAX = 450;
 const PAIR_OFF_GAP = 400;
 function pairSpotDevs(read: SynergyRead, a: string, b: string): [number, number] | undefined {
@@ -1070,7 +1118,12 @@ function pairSpotDevs(read: SynergyRead, a: string, b: string): [number, number]
   const al = (q: { x: number; y: number }) => u.x * (q.x - ARENA_CENTER.x) + u.y * (q.y - ARENA_CENTER.y);
   const d = (q: { x: number; y: number }, s: [number, number]) => Math.hypot(lat(q) - s[0], al(q) - s[1]);
   let best: [number, number] | undefined;
-  for (const e of [1, -1]) {
+  // Remote X/T: the two pairs use different diagonals. Clean players in 17
+  // reports (102 of 102 at a spot): T at lateral*along > 0, X at < 0 (the
+  // product is the same whichever way the axis points). User, 2026-11-06,
+  // WtGX1fYHyJMx3Pr7 Pull 4 2:53: the T pair's GNB was right, the DRK stood on
+  // the X diagonal (beside the MNK); without this the GNB was "29y off".
+  for (const e of diag ? [sym === "T" ? 1 : -1] : [1, -1]) {
     const s1: [number, number] = [l, e * g], s2: [number, number] = [-l, diag ? -e * g : e * g];
     for (const [x, y] of [[d(qa, s1), d(qb, s2)], [d(qa, s2), d(qb, s1)]] as [number, number][]) {
       if (!best || x + y < best[0] + best[1]) best = [x, y];
@@ -1460,6 +1513,11 @@ function detectWallDeaths(players: PlayerInfo[], deaths: DeathEvent[], called: S
     // is the wall, whoever else the cone killed (user, 2026-11-01,
     // nbKLdqJkapxmNfzt Pull 22 3:42.7: "DRK walks into the wall"; the other
     // 14 tank deaths to a cone, in 8 reports, carry the Bladedance blow).
+    // Not when the Arrow had just hit them: that death is the team's bad bait,
+    // already the Arrow's error (user, 2026-11-06, WtGX1fYHyJMx3Pr7 Pull 28
+    // 3:43: the DRK took the Arrow and its cone, died silent 0.5s later,
+    // "not at fault ... more of a team failure").
+    if (p.damageTaken.some((e) => e.abilityId === ARROW && !bodyHit(e) && e.timestamp <= d.timestamp && d.timestamp - e.timestamp <= DEATH_EVENT_LAG_MS + 2000)) continue;
     const coneWall = isTank(p) && p.damageTaken.some((e) => e.abilityId === BLADEDANCE && e.timestamp <= d.timestamp && d.timestamp - e.timestamp <= DEATH_EVENT_LAG_MS + 500);
     if (!coneWall && deaths.some((k) => k !== d && k.timestamp <= d.timestamp && d.timestamp - k.timestamp <= RESET_AFTER_DEATH_MS)) continue;
     if (!coneWall && p.damageTaken.some((e) => (e.amount ?? 0) > 0 && e.timestamp <= d.timestamp && d.timestamp - e.timestamp <= SILENT_HIT_MS)) continue;

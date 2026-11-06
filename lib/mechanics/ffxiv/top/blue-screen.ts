@@ -144,6 +144,11 @@
 // ffxiv-top4-called-wipe, -collapse (3 dead at once; no pull with 3 dead in
 //   P4 passed, passes had 1 at most): the earliest, only before the
 //   mechanic Raid, never in a pull that passed.
+// A ring death does NOT end the pull in general (2026-11-06, 17 reports):
+//   WtGX Pulls 31/32 are over at the 8:07/8:06 ring death (a stack kill
+//   follows, already the cutoff), but C8bQ Pull 4 and FqWy Pulls 1 and 4 lost
+//   a player to a ring at 8:14-8:16 and passed Blue Screen; Vbcz 3/5 and bhXT
+//   2 went on 10s to a failed Blue Screen. No cutoff built on it.
 // Not built: who was early or late on a ring (positions at the pulse aren't
 //   modeled; the hit is the error); a stack's raw-damage deaths (D42 R1);
 //   the LB plan and DPS per player (the Damage dialog's job).
