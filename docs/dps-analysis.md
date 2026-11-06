@@ -188,6 +188,12 @@ howbadwasmycritinxiv.com and the `ffxiv_stats` package
 - **FFXIV DoT ticks never crit in FFLogs.** They're logged at their
   expected value, so they carry no measurable luck and are left out.
 - **A dance partner's hits list Devilment twice.** Count each buff once.
+- **Rates pool only pulls at the same sync level** (`sameSyncPlayers`).
+  GKnDWAxdbmhNaV7c has 22 Dragonsong's Reprise pulls (level 90) beside
+  its Dancing Mad kill. Pooled, the DSR ticks' 0% direct hit won the
+  most-common-value vote, and Kairu, Aniyun and Ayumi read 100th on the
+  kill (user, 2026-11-06). Gear stats are skipped below the cap: the
+  level-100 formulas don't apply there.
 - **Check:** `node scripts/validate.js crit-rates <folder> --calibrate`.
   The percentiles over all players and pulls should fall about 10% in
   each tenth; they do on both FF samples. `--luck=<boss>:<pull>` prints

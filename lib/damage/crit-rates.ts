@@ -22,6 +22,7 @@
 // jN3XDrf2z8PmLgRJ (scripts/validate.js crit-rates).
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
+import type { Pull } from "@/types/Pull";
 import type { DamageGame } from "./types";
 
 export type HitRates = {
@@ -87,9 +88,26 @@ export function tickHitRates(players: PlayerInfo[], game: DamageGame): HitRates 
   return { crit: c, directHit: d, critMult: Math.round((1.35 + c) * 1000) / 1000, hits: n, source: "ticks" };
 }
 
-/** The log recorder's real stats when the log has them, else the estimate. */
-export function playerHitRates(players: PlayerInfo[], game: DamageGame, guaranteedStatusIds: Set<number>): HitRates | undefined {
-  const stats = players.find((p) => p.stats)?.stats;
+/**
+ * The player's entries in every loaded pull at the same sync level as
+ * `pull`, the pool their rates come from. A synced ultimate is a different
+ * stat budget: GKnDWAxdbmhNaV7c's 22 Dragonsong's Reprise pulls (level 90)
+ * beside its Dancing Mad kill made the ticks' most common direct-hit rate
+ * 0% for Kairu and Aniyun (18.1% / 12.5% at 100), and the kill read 100th.
+ */
+export function sameSyncPlayers(pull: Pull, pulls: Pull[], name: string, game: DamageGame): PlayerInfo[] {
+  const level = game.levelOf?.(pull);
+  return pulls.filter((p) => p.game === pull.game && game.levelOf?.(p) === level)
+    .flatMap((p) => p.players.filter((x) => x.name === name));
+}
+
+/**
+ * The log recorder's real stats when the log has them, else the estimate.
+ * `synced`: the pulls are below the cap, where the level-100 stat formulas
+ * don't apply, so gear stats are skipped.
+ */
+export function playerHitRates(players: PlayerInfo[], game: DamageGame, guaranteedStatusIds: Set<number>, synced = false): HitRates | undefined {
+  const stats = synced ? undefined : players.find((p) => p.stats)?.stats;
   if (stats) return { ...ratesFromStats(stats.criticalHit, stats.directHit), hits: 0, source: "stats" };
   return estimateHitRates(players, game, guaranteedStatusIds);
 }

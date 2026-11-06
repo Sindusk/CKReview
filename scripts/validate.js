@@ -1016,8 +1016,15 @@ MECHANICS['crit-rates'] = {
       const [name, crit, dh] = a.slice('--stats='.length).split(':');
       return [name, mod.ratesFromStats(Number(crit), Number(dh))];
     }));
+    // Grouped by name and sync level: a level-90 ultimate beside a level-100
+    // fight has other rates (crit-rates.ts sameSyncPlayers).
+    const lvl = (pull) => mod.FFXIV_DAMAGE.levelOf?.(pull);
+    const keyOf = (pull, name) => (lvl(pull) ? `${name} @${lvl(pull)}` : name);
     const byName = new Map();
-    for (const pull of pulls) for (const p of pull.players) byName.set(p.name, [...(byName.get(p.name) ?? []), p]);
+    for (const pull of pulls) for (const p of pull.players) {
+      const k = keyOf(pull, p.name);
+      byName.set(k, [...(byName.get(k) ?? []), p]);
+    }
     const pct = (x) => `${(x * 100).toFixed(1)}%`;
     for (const [name, players] of byName) {
       const r = mod.estimateHitRates(players, mod.FFXIV_DAMAGE, mod.GUARANTEED_HIT_STATUS_IDS);
@@ -1035,7 +1042,7 @@ MECHANICS['crit-rates'] = {
       const bins = new Array(10).fill(0);
       let n = 0;
       for (const pull of pulls) for (const p of pull.players) {
-        const r = rates.get(p.name);
+        const r = rates.get(keyOf(pull, p.name));
         const l = r && mod.critLuck(p, Infinity, r, mod.FFXIV_DAMAGE, mod.GUARANTEED_HIT_STATUS_IDS);
         if (!l || l.hits < 50) continue;
         bins[Math.min(9, Math.floor(l.percentile * 10))]++; n++;
@@ -1050,7 +1057,8 @@ MECHANICS['crit-rates'] = {
       if (!pull) { console.log(`  no pull ${boss} ${num}`); continue; }
       console.log(`  luck: ${boss} pull ${num}`);
       for (const p of pull.players) {
-        const r = mod.playerHitRates(byName.get(p.name), mod.FFXIV_DAMAGE, mod.GUARANTEED_HIT_STATUS_IDS);
+        const r = mod.playerHitRates(mod.sameSyncPlayers(pull, pulls, p.name, mod.FFXIV_DAMAGE), mod.FFXIV_DAMAGE,
+          mod.GUARANTEED_HIT_STATUS_IDS, lvl(pull) !== undefined);
         if (r && !mod.reliableRates(r)) { console.log(`    ${p.name.padEnd(22)} needs more pulls (${r.hits} unbuffed hits)`); continue; }
         const l = r && mod.critLuck(p, Infinity, r, mod.FFXIV_DAMAGE, mod.GUARANTEED_HIT_STATUS_IDS);
         if (!l) continue;

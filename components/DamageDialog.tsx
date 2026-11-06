@@ -29,7 +29,7 @@ import { aggregateDamage, type PlayerDamageAggregate } from "@/lib/damage/aggreg
 import { getDamageContext } from "@/lib/damage/contexts";
 import { moduleNamesFor } from "@/lib/mechanics/module-names";
 import { FFXIV_DAMAGE, GUARANTEED_HIT_STATUS_IDS } from "@/lib/damage/ffxiv/game";
-import { MIN_ESTIMATE_HITS, playerHitRates, reliableRates } from "@/lib/damage/crit-rates";
+import { MIN_ESTIMATE_HITS, playerHitRates, reliableRates, sameSyncPlayers } from "@/lib/damage/crit-rates";
 import { critLuck } from "@/lib/damage/crit-luck";
 import { WOW_DAMAGE } from "@/lib/damage/wow/game";
 import type { DamageFinding, PhaseDamageSummary, PlayerDamageSummary, PullDamageAnalysis } from "@/lib/damage/types";
@@ -572,8 +572,11 @@ function PlayerDetail({ summary, analysis, colorFor, iconFor, pull, pulls, onSee
   const luck = useMemo(() => {
     if (!pull || pull.game !== "ffxiv") return undefined;
     const player = pull.players.find((p) => p.name === summary.player);
-    const same = pulls.filter((p) => p.game === "ffxiv").flatMap((p) => p.players.filter((x) => x.name === summary.player));
-    const rates = player ? playerHitRates(same, FFXIV_DAMAGE, GUARANTEED_HIT_STATUS_IDS) : undefined;
+    // Only pulls at this pull's sync level (a level-90 ultimate in the same
+    // report has other rates).
+    const same = sameSyncPlayers(pull, pulls, summary.player, FFXIV_DAMAGE);
+    const rates = player
+      ? playerHitRates(same, FFXIV_DAMAGE, GUARANTEED_HIT_STATUS_IDS, FFXIV_DAMAGE.levelOf?.(pull) !== undefined) : undefined;
     if (!player || !rates) return undefined;
     // One pull: hidden (its own hits would set the rates it's judged
     // against). Two or more but under the hit threshold: shown as rough.
