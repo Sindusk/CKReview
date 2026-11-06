@@ -62,6 +62,23 @@ simulation with a GCD swapped), `esprit-mc.js` (random party Esprit).
   26; with the Saber, 0 overcap and all four window spenders still fit
   (Tillana before the second Saber). ~+10k by averages. Best by a little,
   on an estimated gauge.
+- **1:52 with the real gauge (user, from the VOD): 80 before the Cascade,
+  85 after.** `esprit-anchor.js` (party gains random, +10 at each party
+  GCD's rate) from that value to the window's end, Cascade line vs Saber
+  Dance at 1:51.6 (then Cascade at 1:54.1, no Symmetry). Per starting
+  Esprit: Cascade overcaps 10/20/25/30/35/40 at 50/60/70/75/80/85 (mean,
+  rounded to 5) and the window runs one spender short 2-15% of the time;
+  the Saber line overcaps ~0-5 and runs short 82/73/62/50/50/36%.
+  Valued: the Saber line keeps the overcap Cascade loses (each Esprit
+  ~0.84k: a Saber's 71k − a 29k filler, per 50), gives up Reverse
+  Cascade's 10, and a short window moves one spender out (~14k).
+  Break-even at **60-65 Esprit** before the press; at 80 the Saber is
+  ~+15k. Answer: Saber Dance at 1:52 was the better play. Holds while
+  the party feeds ~20% per GCD and the window has Tillana plus four
+  spenders to place.
+- **Presenting Esprit (user, 2026-11-06):** it only moves in steps of 5.
+  The simulation's average party rate gives values like 79: round to 5
+  when quoting, and say it's an estimate.
 - **7:51 (same pattern, Technical Step 7:56.6).** Esprit an estimated
   47: no Saber at 7:51; one at 7:53.5 would leave Dance of the Dawn at
   8:03.6 with ~10. Early Technical: ~−95k (0.78M vs 2.76M of party damage

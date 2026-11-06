@@ -188,6 +188,9 @@ howbadwasmycritinxiv.com and the `ffxiv_stats` package
 - **FFXIV DoT ticks never crit in FFLogs.** They're logged at their
   expected value, so they carry no measurable luck and are left out.
 - **A dance partner's hits list Devilment twice.** Count each buff once.
+- **Quote Dancer Esprit in steps of 5** (user, 2026-11-06). The game
+  only moves it by 5 or 10; the simulation's average party share gives
+  values like 79. Round, and say it's an estimate.
 - **Rates pool only pulls at the same sync level** (`sameSyncPlayers`).
   GKnDWAxdbmhNaV7c has 22 Dragonsong's Reprise pulls (level 90) beside
   its Dancing Mad kill. Pooled, the DSR ticks' 0% direct hit won the
