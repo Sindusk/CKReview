@@ -40,6 +40,15 @@
 //   consumer's average minus the GCD used instead (inference). Last Dance
 //   Ready also logs a "refreshed" 2s after every Finishing Move with no
 //   cast near it: a log artifact, not an overwrite, so it isn't tracked.
+//   The overwrite names the cast nearest the refresh that isn't the proc's
+//   own consumer (GKnDWAxdbmhNaV7c 10:15, user VOD review 2026-11-06:
+//   Tillana, 0.54s before the Fan Dance that re-rolled Threefold, was named).
+//   Same study, Chauzey: the two GCDs before Technical Step (1:52, 7:51)
+//   were judged on Cascade vs Saber Dance vs an early Technical. Early
+//   Technical lands its Finish ~5s before the party's buffs (~50-95k);
+//   Saber Dance there is worth it only with Esprit to spare (1:52, an
+//   estimated 79: ~+10k, no overcap in the window; 7:51, an estimated 47:
+//   it would leave Dance of the Dawn without Esprit). No change built.
 //   Feathers and Esprit (user, 2026-10-14): simulated as xivanalysis does
 //   (jobs/gauges.ts), drawn on the timeline, and their overcap named as
 //   "gauge-estimate" findings with no loss: the log shows neither gauge
@@ -365,9 +374,16 @@ const procOverwrites = (list: [string, string[], boolean, string?][]): JobCheck 
     if (e.buffStatus !== "refreshed" || e.source !== ctx.player.name || e.timestamp >= ctx.endMs) continue;
     const proc = procs.get(e.abilityId);
     if (!proc) continue;
-    const cast = ctx.player.casts.find((c) => c.timestamp <= e.timestamp + 100 && c.timestamp >= e.timestamp - OVERWRITE_CAST_MS);
-    if (!cast) continue;
+    // The cast nearest the refresh, not the first in reach, and never the
+    // proc's own consumer: GKnDWAxdbmhNaV7c 10:14.96, Fan Dance re-rolled a
+    // held Threefold Fan Dance and the Tillana 0.54s before it was named
+    // (user, 2026-11-06); nearest alone named Fan Dance III at
+    // K6qfMamL7rN8yz2Q 2:23.
     const consumerIds = ids(...proc.consumers);
+    const cast = ctx.player.casts
+      .filter((c) => c.timestamp <= e.timestamp + 100 && c.timestamp >= e.timestamp - OVERWRITE_CAST_MS && !consumerIds.includes(c.abilityId))
+      .sort((a, b) => Math.abs(a.timestamp - e.timestamp) - Math.abs(b.timestamp - e.timestamp))[0];
+    if (!cast) continue;
     const best = consumerIds.sort((a, b) => ctx.values.perUse(b) - ctx.values.perUse(a))[0];
     const avg = best === undefined ? 0 : ctx.values.perUse(best);
     const consumerName = ctx.player.casts.find((c) => c.abilityId === best)?.abilityName ?? proc.consumers[0];
