@@ -58,6 +58,9 @@
 // tower was left empty keeps it, "Wrong Tower" (user, 2026-10-30,
 // KCX2qW4khczmZ9T1 Pull 17 0:37.7), via applyTowerPriority.
 //
+// 4. Wave Cannon Kyrios (applyWaveMover, below): a two-player overlap
+// narrows to the player whose line is outside their report-learned range.
+//
 // ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
 //   - Two players with the same line number on one side (report
 //     b9FcR6vxAPd3zhkH, Pull 46 and Pull 55 at 1:21): settled by the
@@ -69,8 +72,9 @@ import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import {
   readPantokrator, readProgramLoop, readLoopNumbers, offCardinal, cardinalOf, KEPT_TAG, SAME_SIDE_NAME, SAME_TOWER_NAME, HOLDERS_TOGETHER_NAME, TOOK_ANOTHERS_NAME, STAYED_PUT,
-  TOP1_LINE_RULE_ID, TOP1_BLASTER_RULE_ID, TOP1_TOWER_RULE_ID,
+  TOP1_LINE_RULE_ID, TOP1_BLASTER_RULE_ID, TOP1_TOWER_RULE_ID, TOP1_WAVE_CANNON_RULE_ID,
 } from "./omega";
+import { bodyHit, isTank } from "../fru/common";
 import { playerError } from "@/lib/mechanics/wow/common";
 
 export type PantokratorConga = {
@@ -83,7 +87,12 @@ export type PantokratorConga = {
   loop?: LoopPriority;
   /** The Program Loop tower priority (which of a round's two In Line players takes which tower), when the clean rounds give one. */
   tower?: LoopPriority;
+  /** Per player name, the bearing range of that player's clean Wave Cannon Kyrios lines (waveUsual), when 6+ volleys give one. */
+  wave?: Record<string, WaveUsual>;
 };
+
+/** Where one player's own Wave Cannon Kyrios line usually lands, in degrees from the boss. */
+export type WaveUsual = { median: number; lo: number; hi: number; n: number };
 
 /** Best fits of (order, scan start) for the holders: start 0 N .. 3 W, scanning clockwise. */
 export type LoopPriority = { fits: { order: string[]; start: number }[]; rounds: number; agree: number };
@@ -113,8 +122,9 @@ export function learnPantokratorConga(pulls: PullLike[]): PantokratorConga | und
   const panto = learnSplits(pulls);
   const loop = learnLoopPriority(pulls);
   const tower = learnTowerPriority(pulls);
-  if (!panto && !loop && !tower) return undefined;
-  return { ...(panto ?? { orders: [], pulls: 0, fits: 0 }), loop, tower };
+  const wave = learnWaveUsual(pulls);
+  if (!panto && !loop && !tower && !wave) return undefined;
+  return { ...(panto ?? { orders: [], pulls: 0, fits: 0 }), loop, tower, wave };
 }
 
 function learnSplits(pulls: PullLike[]): Omit<PantokratorConga, "loop"> | undefined {
@@ -221,7 +231,148 @@ export function applyPantokratorConga(
   if (!conga) return errors;
   const split = applyTetherPairing(applySplits(errors, players, deathEvents, enemyCasts, conga), players, enemyCasts, conga);
   const held = applyLoopPriority(applyKeptTether(split, players, deathEvents, enemyCasts, conga.loop), players, deathEvents, enemyCasts, conga.loop);
-  return applyTowerPriority(held, players, deathEvents, enemyCasts, conga.tower);
+  return applyWaveMover(applyTowerPriority(held, players, deathEvents, enemyCasts, conga.tower), players, deathEvents, enemyCasts, conga.wave);
+}
+
+// ── Wave Cannon Kyrios: who moved ───────────────────────────────────────────
+//
+// A line that hit two non-tanks (omega.ts names both, "Wave Cannon Overlap")
+// was one player's line walked into by the other. Each player's own line has
+// a usual bearing from the boss (the report's clean volleys: a line that hit
+// that player alone). The one whose bearing lies outside its usual range
+// while the partner is on theirs is the mover; the partner is dropped (user,
+// 2026-11-06, Pull 21 1:48 of WtGX1fYHyJMx3Pr7: the RDM "greeds a cast and
+// moves slowly, getting clipped by the laser in the RPR position... the RPR
+// was completely correct... they should not even get a minor"). Per-pull
+// signals fail (cast.target blank on overlaps; "has a line elsewhere" picks
+// the wrong player; facing is the pre-aim value), so it is learned per report.
+// Thresholds (degrees; tools/ffxiv/top/omega-wavecannon.js prints the data):
+//   WAVE_MIN_CLEAN 6 clean volleys to learn a player's range, else both named.
+//   WAVE_TRIM 30: clean bearings farther than this from the median are strays
+//     (a clean RDM line 72 off) and don't widen the range.
+//   Range = min..max of the rest. Clean spread 7-27 deg (SGE 2qgaAkxVypGWv9CN
+//   -27..7). Distance outside it: WAVE_OFF_MIN 10 for the mover (Pull 21: 13;
+//   below it 2qgaAkxVypGWv9CN Pull 67 MNK 7 stays both), the partner at most
+//   WAVE_ON_MAX 12 (LG64YVQy2KZbtpN8 Pull 7: partner 12, mover 84) and at
+//   least WAVE_GAP_MIN 10 less than the mover (KCX2qW4khczmZ9T1 Pull 25
+//   1:57: 11 vs 20 stays both; nbKLdqJkapxmNfzt Pull 21: 41 vs 80 stays both).
+//   Other movers on disk: 41-121 outside (KCX Pull 25 1:48 71, hjgk42MDf81arFVY
+//   Pull 23 103). Only lines hitting exactly two non-tanks are read.
+// Major when the mover's vulnerability from the overlap leads to its death:
+// a later Wave Cannon hit on it within 15s with that Magic Vulnerability Up
+// still on (no removal since the overlap) that kills it (Pull 21: 73.9k,
+// 9.96s later). Otherwise the severity omega.ts gave stands.
+const WAVE_CANNON_ID = 31505;
+const WAVE_MIN_CLEAN = 6;
+const WAVE_TRIM = 30;
+const WAVE_OFF_MIN = 10;
+const WAVE_ON_MAX = 12;
+const WAVE_GAP_MIN = 10;
+const WAVE_FATAL_MS = 15000;
+const WAVE_DEATH_LAG_MS = 6000;
+const WAVE_BUCKET_MS = 5000;
+const angDiff = (a: number, m: number) => ((a - m + 540) % 360) - 180;
+
+type WaveLine = { t: number; hits: { p: PlayerInfo; b: number }[] };
+
+function waveLines(players: PlayerInfo[], enemyCasts: EnemyEvent[]): WaveLine[] {
+  const out: WaveLine[] = [];
+  for (const c of enemyCasts) {
+    if (c.abilityId !== WAVE_CANNON_ID || c.x === undefined || c.y === undefined) continue;
+    const hits: WaveLine["hits"] = [];
+    for (const p of players) {
+      const e = p.damageTaken.find((x) => x.abilityId === WAVE_CANNON_ID && x.sourceInstance === c.sourceInstance &&
+        Math.abs(x.timestamp - c.timestamp) <= 1000 && !bodyHit(x));
+      if (e && e.x !== undefined && e.y !== undefined) hits.push({ p, b: Math.atan2(e.x - c.x, e.y - c.y) * 180 / Math.PI });
+    }
+    out.push({ t: c.timestamp, hits });
+  }
+  return out;
+}
+
+function learnWaveUsual(pulls: PullLike[]): Record<string, WaveUsual> | undefined {
+  const by = new Map<string, number[]>();
+  for (const pull of pulls) {
+    for (const l of waveLines(pull.players, pull.enemyCasts)) {
+      if (l.hits.length === 1 && !isTank(l.hits[0].p)) by.set(l.hits[0].p.name, [...(by.get(l.hits[0].p.name) ?? []), l.hits[0].b]);
+    }
+  }
+  const out: Record<string, WaveUsual> = {};
+  for (const [name, bs] of by) {
+    if (bs.length < WAVE_MIN_CLEAN) continue;
+    const median = [...bs].sort((a, b) => a - b)[bs.length >> 1];
+    const devs = bs.map((b) => angDiff(b, median)).filter((d) => Math.abs(d) <= WAVE_TRIM);
+    out[name] = { median, lo: Math.min(...devs), hi: Math.max(...devs), n: bs.length };
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** Degrees bearing b lies outside p's usual range (0 inside); undefined when no range is known. */
+function waveOutside(wave: Record<string, WaveUsual>, name: string, b: number): number | undefined {
+  const u = wave[name];
+  if (!u) return undefined;
+  const d = angDiff(b, u.median);
+  return Math.max(u.lo - d, d - u.hi, 0);
+}
+
+/** The mover's later Wave Cannon hit that killed it with the overlap's vulnerability still on, if any. */
+function waveFatalHit(p: PlayerInfo, deathEvents: DeathEvent[], t: number): number | undefined {
+  const isVuln = (e: { abilityName?: string }) => /Magic Vulnerability Up/.test(e.abilityName ?? "");
+  for (const h of p.damageTaken) {
+    if (h.abilityId !== WAVE_CANNON_ID || h.timestamp <= t + 1000 || h.timestamp > t + WAVE_FATAL_MS || bodyHit(h) || !((h.amount ?? 0) > 0)) continue;
+    const died = deathEvents.some((d) => d.player === p.name && d.killingAbilityGameId === WAVE_CANNON_ID && d.timestamp >= h.timestamp && d.timestamp - h.timestamp <= WAVE_DEATH_LAG_MS);
+    const on = p.debuffs.some((e) => isVuln(e) && e.debuffStatus === "applied" && e.timestamp <= t + 500) &&
+      !p.debuffs.some((e) => isVuln(e) && e.debuffStatus === "removed" && e.timestamp > t + 500 && e.timestamp < h.timestamp - 200);
+    if (died && on) return h.timestamp;
+  }
+  return undefined;
+}
+
+function applyWaveMover(
+  errors: PullError[], players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[], wave: Record<string, WaveUsual> | undefined,
+): PullError[] {
+  const overlaps = errors.filter((e) => e.ruleId === TOP1_WAVE_CANNON_RULE_ID && e.name === "Wave Cannon Overlap");
+  if (!wave || !overlaps.length) return errors;
+  const bucket = (t: number) => Math.round(t / WAVE_BUCKET_MS);
+  const kept = new Set<string>();
+  const dropped = new Set<string>();
+  const rewrite = new Map<PullError, PullError>();
+  for (const l of waveLines(players, enemyCasts)) {
+    if (l.hits.length < 2) continue;
+    let mover: { p: PlayerInfo; b: number } | undefined;
+    if (l.hits.length === 2 && !l.hits.some((h) => isTank(h.p))) {
+      const [a, b] = l.hits.map((h) => waveOutside(wave, h.p.name, h.b));
+      if (a !== undefined && b !== undefined) {
+        if (a >= WAVE_OFF_MIN && b <= WAVE_ON_MAX && a - b >= WAVE_GAP_MIN) mover = l.hits[0];
+        else if (b >= WAVE_OFF_MIN && a <= WAVE_ON_MAX && b - a >= WAVE_GAP_MIN) mover = l.hits[1];
+      }
+    }
+    for (const h of l.hits) {
+      const key = `${h.p.name}@${bucket(l.t)}`;
+      if (!mover || h === mover) kept.add(key); else dropped.add(key);
+    }
+    if (!mover) continue;
+    const err = overlaps.find((e) => e.player === mover!.p.name && Math.abs(e.timestamp - l.t) <= 2500);
+    if (!err) continue;
+    const away = waveOutside(wave, mover.p.name, mover.b)!;
+    const hit = waveFatalHit(mover.p, deathEvents, l.t);
+    const other = l.hits.find((h) => h !== mover)!.p.name;
+    rewrite.set(err, {
+      ...err,
+      severity: hit !== undefined ? "Major" : err.severity,
+      description: `${err.description} ${mover.p.name}'s line was ~${Math.round(away)}° outside its usual spot while ${other}'s was on theirs: ${mover.p.name} moved into it.` +
+        (hit !== undefined ? ` The Magic Vulnerability Up from it was still on when ${mover.p.name}'s own next line killed them.` : ""),
+    });
+  }
+  const out: PullError[] = [];
+  for (const e of errors) {
+    if (e.ruleId === TOP1_WAVE_CANNON_RULE_ID && e.name === "Wave Cannon Overlap" && e.player) {
+      const key = `${e.player}@${bucket(e.timestamp)}`;
+      if (dropped.has(key) && !kept.has(key)) continue;
+    }
+    out.push(rewrite.get(e) ?? e);
+  }
+  return out;
 }
 
 /**

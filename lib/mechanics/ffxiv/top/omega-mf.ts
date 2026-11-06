@@ -203,7 +203,10 @@
 // 5, 6, 10, 19, 22; rulings in expectations/rulings.json (Pull 5 and Pull
 // 19's DRK unsettled). VOD review 2026-11-06 (user): WtGX1fYHyJMx3Pr7
 // Pulls 4, 8, 28; rulings in expectations/rulings.json (Pull 28's RDM
-// Bladedance and who baited the Arrow unsettled).
+// Bladedance and who baited the Arrow unsettled). Follow-up: Pull 9 ends at
+// the RDM's laser death; Pull 28's RDM Bladedance death is "the fault of the
+// bait for the most part" (user), not separable further, kept as detected
+// and unruled.
 // VOD review 2026-10-28 (user): Pulls 5, 6, 15, 18, 22, 32, 33, 37, 42,
 // 45; rulings in expectations/rulings.json. The user's cheat sheet puts
 // Mid's square and circle inside, ~12y off the line, and the crosses and

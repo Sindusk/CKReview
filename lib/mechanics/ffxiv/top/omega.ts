@@ -25,7 +25,10 @@
 //     broken: Major + Raid; "Pantokrator One Short" Raid, player-less
 //   ffxiv-top1-diffuse       Major on death, else Minor  farthest non-tank
 //     hit, tank missed; "Tank Cones Without Invuln" (Raid if 3+ die next)
-//   ffxiv-top1-wave-cannon   line hit 2+ players, all six non-tanks alive
+//   ffxiv-top1-wave-cannon   line hit 2+ players, all six non-tanks alive;
+//     pantokrator-conga.ts narrows a two-player overlap to the one whose line
+//     bearing is outside its report-learned usual range (Major if the
+//     overlap's vulnerability killed them; user, 2026-11-06, Pull 21 1:48)
 //   ffxiv-top1-wall          Major  silent death nothing explains
 //   ffxiv-top1-enrage / -called-wipe / -collapse  Raid, earliest only, only
 //     before any mechanic Raid
@@ -67,8 +70,9 @@
 //   rule already skips it (holdsAt), but pull-errors.js still lists it
 //   UNEXPLAINED (it wants an error within 4s). Same for Doom deaths whose
 //   Blaster error is >4s before the death event (Pull 13 0:31.9).
-//   Wave Cannon Overlap on the player who moved (Q11) needs a per-job usual
-//   bearing across pulls: not per-pull derivable (tools/ffxiv/top/omega-wavecannon.js).
+//   Wave Cannon Overlap on the player who moved is not per-pull derivable;
+//   pantokrator-conga.ts learns each player's usual bearing across the report
+//   (tools/ffxiv/top/omega-wavecannon.js) and keeps only the mover.
 // Open items: three-total vs three-other line split (Q1); Blaster visual vs
 //   31498 IDs; all-eight-unique tower spots; Doom/Ruin removal; cone
 //   reselect/angle; +127.7 vs +130 enrage. Not built: who stood where in a
@@ -335,7 +339,16 @@
 //   when the next cones killed 3+; user, B51); an invuln cast up to 3s
 //   before their first cone is named as too late (user, D1).
 // ffxiv-top1-wave-cannon: a line hitting 2+ players, all six non-tanks
-//   alive (everyone it hit named: the log can't say who moved).
+//   alive (everyone it hit named here: one pull can't say who moved).
+//   Cross-pull (pantokrator-conga.ts applyWaveMover): a line on exactly two
+//   non-tanks keeps only the one whose bearing is 10+ deg outside its usual
+//   range while the partner is within 12 and 10+ less off (user, 2026-11-06,
+//   WtGX1fYHyJMx3Pr7 Pull 21 1:48: the RDM moved slowly into the RPR's
+//   correct line, "entirely on the RDM"); Major when the mover's next line
+//   killed it with that vulnerability on (the RDM died 9.96s later). VERIFIED
+//   on the 17 TOP reports: also changes LG64YVQy2KZbtpN8 Pull 7 1:57 (MNK
+//   84 outside, SCH 12: SCH dropped); KCX2qW4khczmZ9T1 Pull 25 and
+//   hjgk42MDf81arFVY Pull 23 unchanged (line not flagged there).
 // ffxiv-top1-wall (Major): a silent death no Doom, missile, reset or own
 //   Damage Down explains (applied within 20s, or still held at the fatal
 //   moment: user, C28).

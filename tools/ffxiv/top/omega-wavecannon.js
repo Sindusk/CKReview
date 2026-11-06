@@ -27,11 +27,22 @@ for (const pl of pulls({ game: 'ff', reports: { R: code }, boss: 'The Omega Prot
     rows.push({ n: pl.n, t: c.timestamp, owner: c.target ? job[c.target] : '?', hits });
   }
 }
+// Per-job usual = median of single-hit (clean) bearings; wrap-safe deviation. Also prints, per job,
+// the clean count n, median, and the largest clean |deviation| (the clean extreme for the mover threshold).
+const dev = (a, m) => ((a - m + 540) % 360) - 180;
 const by = {};
-for (const r of rows) if (r.hits.length === 1) (by[r.hits[0].j] ??= []).push(r.hits[0].b);
+for (const r of rows) if (r.hits.length === 1 && !TANK.has(r.hits[0].j)) (by[r.hits[0].j] ??= []).push(r.hits[0].b);
 const med = (a) => [...a].sort((x, y) => x - y)[a.length >> 1];
 const usual = Object.fromEntries(Object.entries(by).map(([j, a]) => [j, med(a)]));
+// Usual range = min..max of the clean bearings within TRIM deg of the median (stray single hits dropped);
+// `out` = degrees a bearing lies beyond it (0 inside). Needs MIN_N clean volleys, else '?'.
+const TRIM = 30, MIN_N = 6;
+const range = {};
+for (const [j, a] of Object.entries(by)) { const k = a.map((b) => dev(b, usual[j])).filter((d) => Math.abs(d) <= TRIM); if (a.length >= MIN_N) range[j] = [Math.min(...k), Math.max(...k)]; }
+const out = (j, b) => { if (!range[j]) return '?'; const d = dev(b, usual[j]); return Math.max(range[j][0] - d, d - range[j][1], 0).toFixed(0); };
+console.log('clean: ' + Object.entries(by).map(([j, a]) => `${j} n${a.length} med${usual[j].toFixed(0)} range${range[j] ? range[j].map((x) => x.toFixed(0)).join('..') : '?'}`).join('; '));
 for (const r of rows) {
-  if (r.hits.length < 2 || (only && !only.includes(r.n))) continue;
-  console.log(`P${r.n} ${mmss(r.t)} tg=${r.owner} hits ${r.hits.map((h) => `${h.j}${h.other}@${h.b.toFixed(0)}(${usual[h.j] === undefined ? '?' : `${usual[h.j].toFixed(0)}, ${(h.b - usual[h.j]).toFixed(0)}`})`).join(' ')}`);
+  const hs = r.hits.filter((h) => !TANK.has(h.j));
+  if (hs.length < 2 || (only && !only.includes(r.n))) continue;
+  console.log(`P${r.n} ${mmss(r.t)} hits ${hs.map((h) => `${h.j}@${h.b.toFixed(0)}(out ${out(h.j, h.b)})`).join(' ')}`);
 }
