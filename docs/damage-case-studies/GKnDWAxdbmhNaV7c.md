@@ -101,8 +101,16 @@ simulation with a GCD swapped), `esprit-mc.js` (random party Esprit).
   (some logged Sabers have no Esprit under the model): the gauge model
   drifts over a long fight.
 
+- **16:17: built (user: "value as moved").** A missing Last Dance /
+  Saber Dance in a Technical window is now (its average − the GCD used
+  instead) × the window's observed bonus (`ExpectedAction.observed`):
+  16:17 61k → 8k. Other kills: qjCMx4bRfgNKwX9T 6:03 65k → 13k, 14:05
+  40k → 13k; gTkMH91DWRmLbNCn 14:08 71k → 20k, 16:18 58k → 0k (that
+  wipe's window ran under Damage Down, multiplier 0.11-0.12: no bonus to
+  lose). The four-Saber expectation and its count are unchanged.
+
 ## Next
 
-Ask the user about the Saber-shortfall valuation (above). No xivanalysis
+Nothing open for Chauzey. No xivanalysis
 pages yet. If the user wants crit luck per damage check in the app, add
 it to the phase rows.

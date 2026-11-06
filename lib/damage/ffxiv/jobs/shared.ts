@@ -163,6 +163,10 @@ export type ExpectedAction = {
   got?:   (ctx: PlayerCheckContext, w: Window, casts: PlayerEvent[]) => number;
   // `value` is the action's worth before the window's bonus: multiply it in.
   scaled?: boolean;
+  // With `scaled`: the bonus to multiply by is the window's observed one
+  // (observedBonus), not the spec's. Dancer's Saber Dances live in the
+  // party's burst, worth far more than Technical Finish's own 5%.
+  observed?: boolean;
   // How many this window expects, when it depends on the window (Monk's
   // Blitzes: one per Perfect Balance charge it had time for). Overrides count.
   countIn?: (ctx: PlayerCheckContext, w: Window) => number;
@@ -333,7 +337,8 @@ export function burstWindowFindings(ctx: PlayerCheckContext, specIn: BurstWindow
           readyAgain(ctx, c.timestamp) > w.endMs).length);
       }
       if (n === 0) continue;
-      const each = e.value ? e.value(ctx) * (e.scaled ? spec.bonus : 1) : Math.max(...e.ids.map((id) => ctx.values.perUse(id))) * spec.bonus;
+      const scale = e.scaled ? (e.observed ? observedBonus(ctx, w) : spec.bonus) : 1;
+      const each = e.value ? e.value(ctx) * scale : Math.max(...e.ids.map((id) => ctx.values.perUse(id))) * spec.bonus;
       missing.push({ name: e.name, n, value: n * each });
     }
     if (missingGcds === 0 && missing.length === 0) return;

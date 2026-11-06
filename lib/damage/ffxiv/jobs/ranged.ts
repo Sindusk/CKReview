@@ -10,7 +10,9 @@
 //   - Dance of the Dawn, Finishing Move, Starfall Dance and Tillana once
 //     each, and four Last Dance / Saber Dance (three when the window has
 //     no filler: out of Esprit, one Fountainfall is allowed). A missing
-//     one is its average minus the GCD used instead. The opener's window
+//     dance GCD is its average minus the GCD used instead; a missing Last
+//     Dance / Saber Dance was moved, not lost, so it's that difference ×
+//     the window's observed bonus (user, 2026-11-06). The opener's window
 //     expects only the Last Dances its pre-pull dance allows plus the
 //     Saber Dances pressed, and allows fillers for the rest (openerSabers;
 //     user, 2026-10-24, gTkMH91DWRmLbNCn: the party's Esprit and the
@@ -302,15 +304,25 @@ export function dncTechHoldValue(ctx: PlayerCheckContext, gap: { gcdStartMs: num
 
 const technical: JobCheck = (ctx) => burstWindowFindings(ctx, {
   statusId: S.TECHNICAL_FINISH.id, name: "Technical Finish", bonus: 0.05, spanMs: () => TECH_SPAN_MS,
-  bonusBasis: "a missing GCD = its average minus the GCD used instead; Fan Dance IV × 5% (Technical Finish, FFLogs multiplier 1.05)",
+  bonusBasis: "a missing dance GCD = its average minus the GCD used instead; a missing Last Dance / Saber Dance was moved, not lost " +
+    "(Esprit and Last Dance Ready carry over): its average minus the GCD used instead, × the window's observed bonus; " +
+    "Fan Dance IV × 5% (Technical Finish, FFLogs multiplier 1.05)",
   expectedGcds: () => 8,
   // The four Sabers are the cap's plan; synced (TEA 80, no Tillana or
   // Starfall Dance) the window is filled otherwise and only its GCD count
   // is judged.
+  // A missing Saber Dance is moved, not lost (user, 2026-11-06,
+  // GKnDWAxdbmhNaV7c 16:17): Esprit is only lost at the cap (a
+  // gauge-estimate, no loss), so one the window didn't get is pressed
+  // outside it, before (15:58) or after (16:37.85), and a filler takes
+  // its slot. Whether the party's Esprit ran dry (it rolls 20% a GCD) or
+  // the Dancer held it, the cost is the window's bonus on the swap: 61k →
+  // 8k there. Until then each read as its full average minus the filler.
   expected: (c, casts): ExpectedAction[] => [
     ...TECH_EXPECTED.map(([key, count]) => ({ ids: ids(key), count, name: A[key].name, value: replacedGcd(key) })),
     ...(c.level === undefined
-      ? [{ ids: ids(...SABERS), count: sabersExpected(casts, c.player.casts), name: "Last Dance / Saber Dance", value: replacedGcd("SABER_DANCE") }] : []),
+      ? [{ ids: ids(...SABERS), count: sabersExpected(casts, c.player.casts), name: "Last Dance / Saber Dance",
+          value: replacedGcd("SABER_DANCE"), scaled: true, observed: true }] : []),
     { ids: ids("FAN_DANCE_IV"), count: 1, name: "Fan Dance IV" },
   ],
 });
