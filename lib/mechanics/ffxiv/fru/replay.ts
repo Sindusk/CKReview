@@ -11,6 +11,7 @@ import type { CasterEffect, FightReplay, FloorStatus, HeadMarkerDef, MarkerAoe, 
 import type { AoeShape } from "@/lib/replay/action-shapes";
 import { poseAt, sampleNear, type ReplayData } from "@/lib/replay/ffxiv-replay";
 import { facingToCompassBearing } from "@/lib/mechanics/geometry";
+import { presetFromYalms } from "@/lib/replay/waymarks";
 
 // ── Shape overrides ─────────────────────────────────────────────────────────
 
@@ -889,4 +890,11 @@ export const FRU_REPLAY: FightReplay = {
     ...exalines(data), ...wingCleaves(data), ...cruelAfterblasts(data)],
   floorStatuses: FLOOR_STATUSES,
   jailStatuses: JAIL_STATUSES,
+  // NAUR's "FRU PF - Inner Circle" (naurffxiv.com/ultimate/fru, WaymarkPresetPlugin
+  // X / Z): letters 10y out on the cardinals, numbers 10y out on the intercardinals.
+  waymarkPresets: [
+    presetFromYalms("NAUR", [[100, 90], [110, 100], [100, 110], [90, 100],
+      [92.93, 92.93], [107.07, 92.93], [107.07, 107.07], [92.93, 107.07]],
+      "NAUR's FRU PF - Inner Circle preset, naurffxiv.com"),
+  ],
 };
