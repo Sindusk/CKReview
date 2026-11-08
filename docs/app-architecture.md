@@ -99,10 +99,12 @@ file's header comment. Mechanic detection has its own guide:
     switches back to Video.
   - `app/icon.svg` is the favicon.
   - `public/ckreviewv8.png` and `ckreviewv9.png` are dead assets.
-- **The build needs network access to Google Fonts.** Cinzel is loaded via
-  `next/font/google` in `app/layout.tsx`, and the font is fetched at build
-  time. If the network is ever unavailable, self-host a woff2 under
-  `public/`.
+- **Fonts are bundled, not fetched.** Cinzel and Inter (latin and
+  latin-ext woff2, SIL OFL) live in `app/fonts/` and are declared in
+  `app/fonts.css`, which sets `--font-cinzel` / `--font-inter`. They used
+  to come from `next/font/google`, which downloads at build time; a deploy
+  failed with "module not found" on the Cinzel files when the server
+  couldn't reach Google (2026-11-08).
 - **Severity colors.** `components/SeverityIcon.tsx` is the single source of
   the Death/Raid/Major/Minor icons and `SEVERITY_COLOR`. Import the
   constant; never hardcode a severity hex.

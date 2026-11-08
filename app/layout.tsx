@@ -1,25 +1,12 @@
 import type { Metadata } from "next";
 import Script from "next/script";
-import { Cinzel, Inter } from "next/font/google";
+// Cinzel is the display face for the brand banner (BrandBanner.tsx) and
+// panel titles (.ck-panel-title); Inter is the UI face for everything else.
+// Both are bundled in app/fonts/ and set as --font-cinzel / --font-inter by
+// fonts.css, so the build fetches nothing from Google.
+import "./fonts.css";
 import "./globals.css";
 import "./theme.css";
-
-// Display face for the brand banner (BrandBanner.tsx) and panel titles
-// (.ck-panel-title in globals.css). Self-hosted by next/font so headings
-// don't flash in an unstyled fallback.
-const cinzel = Cinzel({
-  subsets:  ["latin"],
-  weight:   ["600", "700", "900"],
-  variable: "--font-cinzel",
-  display:  "swap",
-});
-
-// UI face for everything else — names, timestamps, counts, log text.
-const inter = Inter({
-  subsets:  ["latin"],
-  variable: "--font-inter",
-  display:  "swap",
-});
 
 export const metadata: Metadata = {
   title: "Consistency Kings Raid Review",
@@ -28,7 +15,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${cinzel.variable} ${inter.variable}`}>
+    <html lang="en">
       <body>
         {children}
 
