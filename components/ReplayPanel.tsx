@@ -54,6 +54,7 @@ import { getClassColor, getPlayerClassIcon, getPlayerSpecIcon, getRoleColor } fr
 import { wowEnemyIconUrl } from "@/lib/replay/wow-replay";
 import { buildWowAoeShapes, buildWowRaidwide, wowRaidwideAt } from "@/lib/replay/wow-shapes";
 import { fightReplaysFor } from "@/lib/replay/fights";
+import { WAYMARK_COLORS, WAYMARK_LABELS, waymarksAt, type Waymark, type WaymarkEvent, type WaymarkPreset } from "@/lib/replay/waymarks";
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import { EmptyState } from "@/components/ui/EmptyState";
 
@@ -94,7 +95,19 @@ type Props = {
   startTimeMs?:  number;
   // The own clock's play state, so the page can resume the VOD the same way.
   onPlayingChange?: (playing: boolean) => void;
+  // FFXIV waymarks from a picked ACT / IINACT log (hooks/useLogWaymarks.ts),
+  // ms from pull start; null when no loaded log covers this pull.
+  logWaymarks?:  WaymarkEvent[] | null;
+  // Picks a log file to read waymarks from; progress 0..1 while it reads.
+  onWaymarkLogFile?: (file: File) => void;
+  waymarkLogProgress?: number | null;
+  waymarkLogError?: string | null;
 };
+
+// The Layers menu's waymark choice, remembered across pulls and reloads:
+// "auto" (the log's when one covers the pull, else the fight's first
+// preset), "log", "off", or a preset's name.
+const WAYMARK_CHOICE_KEY = "ckreview.replay.waymarks";
 
 const SPEEDS = [0.5, 1, 2, 4];
 // How far past the last VOD report the panel extrapolates. A little over
@@ -136,7 +149,8 @@ const TETHER_COLOR = "#ff5fd2";
 const TETHER_LOOKUP_MS = 20000;
 const GRID_STEP = 500;    // 5y, centi-yalms
 
-export default function ReplayPanel({ pull, data, loading, progress, error, onLoad, syncedTimeMs, vodPlaying = false, onVodPlay, onVodPause, onTimeChange, seekRequest, startTimeMs = 0, onPlayingChange }: Props) {
+export default function ReplayPanel({ pull, data, loading, progress, error, onLoad, syncedTimeMs, vodPlaying = false, onVodPlay, onVodPause, onTimeChange, seekRequest, startTimeMs = 0, onPlayingChange,
+  logWaymarks = null, onWaymarkLogFile, waymarkLogProgress = null, waymarkLogError = null }: Props) {
   const synced = syncedTimeMs !== undefined;
   const durationMs = data?.durationMs ?? (pull ? (pull.endTime - pull.startTime) * 1000 : 0);
 
@@ -158,6 +172,13 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   const [layersOpen, setLayersOpen] = useState(false);
   const [hoverKey, setHoverKey] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [waymarkChoice, setWaymarkChoiceState] = useState("auto");
+  useEffect(() => { try { setWaymarkChoiceState(localStorage.getItem(WAYMARK_CHOICE_KEY) ?? "auto"); } catch { /* blocked storage */ } }, []);
+  const setWaymarkChoice = (v: string) => {
+    setWaymarkChoiceState(v);
+    try { localStorage.setItem(WAYMARK_CHOICE_KEY, v); } catch { /* blocked storage */ }
+  };
+  const waymarkFileRef = useRef<HTMLInputElement>(null);
 
   // The last VOD time report and when it arrived. Whether the video plays
   // comes from the player itself (`vodPlaying`): a paused player's repeated
@@ -233,6 +254,20 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   const raidwide = useMemo(() => (data?.game === "wow" ? buildWowRaidwide(data) : []), [data]);
   const fightNotes = useMemo(() => (data ? fightReplaysFor(data).flatMap((f) => f.notes ?? []) : []), [data]);
   const fightHitboxes = useMemo(() => new Map<string, number>(data ? fightReplaysFor(data).flatMap((f) => Object.entries(f.hitboxes ?? {})) : []), [data]);
+  const waymarkPresets = useMemo(() => (data && data.game !== "wow" ? fightReplaysFor(data).flatMap((f) => f.waymarkPresets ?? []) : []), [data]);
+  const logHasWaymarks = !!logWaymarks?.some((e) => e[2] !== null);
+  // What the waymark choice resolves to for this pull: log events, a
+  // preset's fixed marks, or nothing.
+  const waymarkSource: { kind: "log" } | { kind: "preset"; preset: WaymarkPreset } | null = (() => {
+    if (!data || data.game === "wow" || waymarkChoice === "off") return null;
+    if (waymarkChoice === "log") return logHasWaymarks ? { kind: "log" } : null;
+    if (waymarkChoice !== "auto") {
+      const p = waymarkPresets.find((x) => x.name === waymarkChoice);
+      if (p) return { kind: "preset", preset: p };
+    }
+    if (logHasWaymarks) return { kind: "log" };
+    return waymarkPresets[0] ? { kind: "preset", preset: waymarkPresets[0] } : null;
+  })();
   const tethers = useMemo(() => (data && data.game !== "wow" ? buildTethers(data) : []), [data]);
   const players = useMemo(() => new Map((pull?.players ?? []).map((p) => [p.name, p])), [pull]);
   const slotByName = useMemo(() => {
@@ -346,6 +381,10 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             )}
             {showGrid && <Grid cx={cx} cy={cy} half={half} toX={toX} toY={toY} S={S} />}
             {showRings && <Rings cx={cx} cy={cy} half={half} toX={toX} toY={toY} scale={scale} />}
+            {/* Waymarks on the floor, under every AoE (lib/replay/waymarks.ts). */}
+            {waymarkSource && (waymarkSource.kind === "log" ? waymarksAt(logWaymarks ?? [], t) : waymarkSource.preset.marks).map((w) => (
+              <WaymarkIcon key={w.mark} w={w} x={toX(w.x)} y={toY(w.y)} scale={scale} />
+            ))}
             {/* Floor effects (FRU Thin Ice) under everything else. */}
             {showAoes && casterEffects.filter((e) => e.layer === "floor" && t >= e.start && t <= e.end).map((e) => {
               const Art = EFFECT_ART[e.kind];
@@ -555,6 +594,37 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             <Toggle label="5y grid" title={`A 5-${unit.slice(0, -1)} grid with 0,0 at the ${wow ? "party's median position" : "arena centre"}`} checked={showGrid} onChange={setShowGrid} />
             <Toggle label="Helper actors" title="Untargetable actors that place AoEs" checked={showHelpers} onChange={setShowHelpers} />
             {!wow && <Toggle label="Statuses" title="Debuffs enemies put on each player, with time left and stacks, and head markers" checked={showStatuses} onChange={setShowStatuses} />}
+            {!wow && (
+              <label style={{ color: "var(--ck-text-2)", fontSize: 13, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}
+                title={"FFLogs has no waymarks. Auto shows them from a loaded ACT / IINACT log when one covers this pull, else the fight's default preset."
+                  + (waymarkSource?.kind === "preset" && waymarkSource.preset.note ? `\nShowing: ${waymarkSource.preset.note}` : "")}>
+                Waymarks
+                <select value={waymarkChoice} onChange={(e) => setWaymarkChoice(e.target.value)}>
+                  <option value="auto">Auto{waymarkChoice === "auto" ? ` (${waymarkSource ? (waymarkSource.kind === "log" ? "log" : waymarkSource.preset.name) : "none"})` : ""}</option>
+                  <option value="log" disabled={!logHasWaymarks}>From log{logHasWaymarks ? "" : " (none loaded)"}</option>
+                  {waymarkPresets.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
+                  {waymarkChoice !== "auto" && waymarkChoice !== "log" && waymarkChoice !== "off" && !waymarkPresets.some((p) => p.name === waymarkChoice) && (
+                    <option value={waymarkChoice}>{waymarkChoice} (not in this fight)</option>
+                  )}
+                  <option value="off">Off</option>
+                </select>
+              </label>
+            )}
+            {!wow && onWaymarkLogFile && (
+              <>
+                <button className="ck-btn" style={{ fontSize: 12 }} disabled={waymarkLogProgress !== null}
+                  title="Reads only the waymark and zone lines of an ACT / IINACT Network_*.log. The file stays on this computer."
+                  onClick={() => waymarkFileRef.current?.click()}>
+                  {waymarkLogProgress !== null ? `Reading log ${Math.round(waymarkLogProgress * 100)}%` : "Waymarks from log file…"}
+                </button>
+                <input ref={waymarkFileRef} type="file" accept=".log,.txt" style={{ display: "none" }}
+                  onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) onWaymarkLogFile(f); }} />
+                {waymarkLogError && <div style={{ color: "#e06c6c", fontSize: 12, maxWidth: 240 }}>{waymarkLogError}</div>}
+                {!waymarkLogError && logWaymarks === null && waymarkLogProgress === null && (
+                  <div style={{ color: "var(--ck-text-3)", fontSize: 11, maxWidth: 240 }}>No loaded log covers this pull.</div>
+                )}
+              </>
+            )}
             <label style={{ color: "var(--ck-text-2)", fontSize: 13, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }} title="Size of the player icons">
               Icons
               <input type="range" min={0.5} max={2} step={0.1} value={iconScale} onChange={(e) => setIconScale(Number(e.target.value))} style={{ width: 90 }} />
@@ -1065,6 +1135,26 @@ function FacingWedge({ x, y, r, b, color, size }: { x: number; y: number; r: num
   const at = (dist: number, ang: number) => `${x + Math.sin(ang) * dist} ${y - Math.cos(ang) * dist}`;
   const spread = size / (r + 2);
   return <path d={`M${at(r + size + 4, b)} L${at(r + 1, b - spread)} L${at(r + 1, b + spread)} Z`} fill={color} stroke="rgba(0,0,0,0.7)" strokeWidth={1.5} pointerEvents="none" />;
+}
+
+/**
+ * One waymark as the game draws it: letters in a circle, numbers in a
+ * square, in the mark's colour, about 2.4y across (never under 26px).
+ */
+function WaymarkIcon({ w, x, y, scale }: { w: Waymark; x: number; y: number; scale: number }) {
+  const r = Math.max(13, 120 * scale);
+  const color = WAYMARK_COLORS[w.mark];
+  const label = WAYMARK_LABELS[w.mark];
+  const letter = w.mark < 4;
+  return (
+    <g pointerEvents="none">
+      {letter
+        ? <circle cx={x} cy={y} r={r} fill={color} fillOpacity={0.28} stroke={color} strokeWidth={3} />
+        : <rect x={x - r * 0.9} y={y - r * 0.9} width={r * 1.8} height={r * 1.8} rx={3} fill={color} fillOpacity={0.28} stroke={color} strokeWidth={3} />}
+      <text x={x} y={y} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={Math.max(14, r * 1.05)} fontWeight={800}
+        stroke="#000" strokeWidth={3} paintOrder="stroke">{label}</text>
+    </g>
+  );
 }
 
 function Toggle({ label, title, checked, onChange }: { label: string; title: string; checked: boolean; onChange: (v: boolean) => void }) {

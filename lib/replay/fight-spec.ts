@@ -25,6 +25,9 @@
 //   notes         standing limits shown top right: a mechanic the log can't
 //                 place, said outright instead of drawn as a guess
 //   hitboxes      WoW: enemy hitbox radii by name (WCL gives none)
+//   waymarkPresets FFXIV: default waymark layouts (A-D, 1-4) offered in the
+//                 Layers menu for pulls no loaded ACT log covers
+//                 (lib/replay/waymarks.ts); the first is the default
 //
 // A spec applies to a pull when any of its `signature` ability ids, or any
 // ability id it overrides or names, shows up in the pull's casts, hits or
@@ -40,6 +43,7 @@
 
 import type { AoeShape } from "./action-shapes";
 import type { ReplayData } from "./ffxiv-replay";
+import type { WaymarkPreset } from "./waymarks";
 
 /**
  * Per-ability corrections the game data can't give, each from a log or the
@@ -167,4 +171,7 @@ export type FightReplay = {
   // WoW: enemy hitbox radii (centi-yards) by name, which WCL doesn't give:
   // the target ring's size, and the boss icon grows to fit it.
   hitboxes?: Record<string, number>;
+  // FFXIV: default waymark layouts in absolute arena coordinates. The first
+  // shows when no loaded log covers the pull; the rest are choices.
+  waymarkPresets?: WaymarkPreset[];
 };

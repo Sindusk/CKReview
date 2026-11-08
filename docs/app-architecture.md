@@ -148,7 +148,8 @@ file's header comment. Mechanic detection has its own guide:
 ## Statics (cross-report history for a raid group)
 
 - **Schema** (`prisma/schema.prisma`):
-  - `Static`, `StaticMember` (OWNER/MEMBER) and `StaticReview`.
+  - `Static`, `StaticMember` (OWNER/MODERATOR/MEMBER, see **Roles**
+    below) and `StaticReview`.
   - `StaticReviewPull`, one row per pull.
   - `StaticReviewPullPlayerError`, one row per roster player per pull,
     **including 0/0 rows**, so the "pulls played" rates work for subs.
@@ -218,8 +219,20 @@ file's header comment. Mechanic detection has its own guide:
   another app joins are in [shared-auth.md](shared-auth.md). They share the `app_user`/`session` users
   database and the parent-domain `ck_session` cookie, so data keyed by
   `app_user.id` (statics here, the portfolio in Stonks) follows the account.
-  Every statics route checks the logged-in user (401) and static membership
-  (403). Two ways in:
+  Every statics route checks the logged-in user (401) and the caller's
+  static role (403) through `requireStaticRole` (`lib/static-access.ts`).
+  - **Roles**, ranked OWNER > MODERATOR > MEMBER. MEMBER is view-only
+    (every GET). MODERATOR also adds/resyncs and relabels sessions, edits
+    pull notes, merges/renames players, and removes sessions (or players)
+    only from sessions they added. OWNER does everything, incl. deleting
+    the static and managing members. The owner shares a static from its
+    page's Members dialog (`components/StaticMembersDialog.tsx`): add an
+    existing account by username as Member or Moderator, change a role,
+    remove; others can leave. The OWNER row can't be changed or removed;
+    the UI hides edit controls the role can't use, and the add-to-static
+    dialogs list only OWNER/MODERATOR statics.
+
+  Two ways in:
   - **Username + 4-digit PIN.** Signup (`/api/auth/signup`) is separate
     from login, and PIN attempts are throttled (`lib/login-throttle.ts`).
     Both are ported from Stonks.
@@ -459,8 +472,14 @@ file's header comment. Mechanic detection has its own guide:
   the FFXIV roster is a fixed 300px, and taller tiles clipped its last row.
 - **Hitboxes** are the game's: BNpcBase (FFLogs actor `gameID`) gives the
   model and Scale, ModelSkeleton the Radius; radius × scale.
-- **Waymarks: not available yet.** FFLogs' API has no marker field or
-  event. Tomestone shows them from its own copy of each log.
+- **Waymarks** (`lib/replay/waymarks.ts`, `hooks/useLogWaymarks.ts`).
+  FFLogs' API has none, so they come from an ACT / IINACT log (line 28)
+  the user picks in the Layers menu, matched to pulls by wall-clock time
+  and saved per file in localStorage (only the zone and waymark lines;
+  the log never leaves the browser), or from the fight's default presets
+  (`FightReplay.waymarkPresets`). The Layers menu's Waymarks dropdown:
+  Auto (log when one covers the pull, else the first preset), From log,
+  each preset, Off; remembered across pulls.
 - **Facing:** players get a wedge, bosses the game's target ring (orange
   arc open at the back, front marker, side chevrons) at hitbox size, from
   geometry.ts's `facingToCompassBearing`. The replay's

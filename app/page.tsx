@@ -51,6 +51,7 @@ import type { Pull } from "../types/Pull";
 import { createCallWipeError, CALL_WIPE_RULE_ID, createManualError, type ManualErrorInput } from "@/types/PullError";
 import type { SavedSession, SavedSessionVod } from "@/types/Session";
 import useTimelineController from "@/hooks/useTimelineController";
+import { useLogWaymarks } from "@/hooks/useLogWaymarks";
 import { fetchReport, fetchFightData, fetchWowReplayData, buildFightLogLabels, getWCLRateLimitStatus, isWCLQuotaExhausted, beginWCLImportMeasure, endWCLImportMeasure, type WCLReport } from "@/lib/wcl-client";
 import {
   transformReportToPulls,
@@ -444,6 +445,14 @@ export default function Home() {
   const [replaySeek, setReplaySeek] = useState({ ms: 0, n: 0 });
   const [replayLoad, setReplayLoad] = useState<{ key: string; progress: number | null; error: string | null } | null>(null);
   const replayKey = activePull ? `${activePull.reportCode}:${activePull.fightId}` : null;
+  // FFXIV waymarks from ACT / IINACT logs the user picked, matched to the
+  // pull by wall-clock time (hooks/useLogWaymarks.ts).
+  const logWaymarks = useLogWaymarks();
+  const activePullWaymarks = useMemo(() => {
+    if (!activePull || activePull.game !== "ffxiv" || activePull.reportStartedAt === undefined) return null;
+    const start = activePull.reportStartedAt + activePull.startTime * 1000;
+    return logWaymarks.eventsForPull(start, activePull.reportStartedAt + activePull.endTime * 1000);
+  }, [activePull, logWaymarks.eventsForPull]);
 
   async function handleLoadReplay() {
     if (!activePull || !replayKey) return;
@@ -1791,6 +1800,10 @@ export default function Home() {
                   seekRequest={replaySeek}
                   startTimeMs={replayStartMs}
                   onPlayingChange={handleReplayPlayingChange}
+                  logWaymarks={activePullWaymarks}
+                  onWaymarkLogFile={logWaymarks.addFile}
+                  waymarkLogProgress={logWaymarks.progress}
+                  waymarkLogError={logWaymarks.error}
                 />
               ) : undefined}
               vod={selectedVod}

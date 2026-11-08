@@ -14,6 +14,7 @@
 import type { AoeShape } from "@/lib/replay/action-shapes";
 import type { CasterEffect, FightReplay, HeadMarkerDef, Override, TetherKind } from "@/lib/replay/fight-spec";
 import { poseAt, type ReplayData } from "@/lib/replay/ffxiv-replay";
+import { presetFromYalms } from "@/lib/replay/waymarks";
 
 const CENTRE = { x: 10000, y: 10000 };
 const ARENA_R = 2000;
@@ -865,6 +866,13 @@ export const DANCING_MAD_REPLAY: FightReplay = {
   game: "ffxiv",
   name: "Dancing Mad",
   signature: [50179, 47764, GRAVITAS],
+  // The static's own preset, as their IINACT logs placed it on 2026-07-18
+  // and 07-23 (identical both nights): letters 12y out on the cardinals,
+  // numbers on the 6y intercardinals.
+  waymarkPresets: [
+    presetFromYalms("Static preset", [[100, 88], [112, 100], [100, 112], [88, 100], [94, 94], [106, 94], [106, 106], [94, 106]],
+      "From the static's IINACT logs, 2026-07-18 and 07-23"),
+  ],
   overrides: OVERRIDES,
   headMarkers: HEAD_MARKERS,
   tethers: TETHERS,
