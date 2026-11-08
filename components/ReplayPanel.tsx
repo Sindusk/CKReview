@@ -54,7 +54,9 @@ import { getClassColor, getPlayerClassIcon, getPlayerSpecIcon, getRoleColor } fr
 import { wowEnemyIconUrl } from "@/lib/replay/wow-replay";
 import { buildWowAoeShapes, buildWowRaidwide, wowRaidwideAt } from "@/lib/replay/wow-shapes";
 import { fightReplaysFor } from "@/lib/replay/fights";
-import { WAYMARK_COLORS, WAYMARK_LABELS, waymarksAt, type Waymark, type WaymarkEvent, type WaymarkPreset } from "@/lib/replay/waymarks";
+import { MINE_PREFIX, WAYMARK_COLORS, WAYMARK_LABELS, waymarksAt, type Waymark, type WaymarkEvent, type WaymarkPreset } from "@/lib/replay/waymarks";
+import { useUserWaymarks } from "@/hooks/useUserWaymarks";
+import WaymarkImportDialog from "./WaymarkImportDialog";
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import { EmptyState } from "@/components/ui/EmptyState";
 
@@ -173,7 +175,13 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   const [hoverKey, setHoverKey] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [waymarkChoice, setWaymarkChoiceState] = useState("auto");
-  useEffect(() => { try { setWaymarkChoiceState(localStorage.getItem(WAYMARK_CHOICE_KEY) ?? "auto"); } catch { /* blocked storage */ } }, []);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(WAYMARK_CHOICE_KEY) ?? "auto";
+      // Dancing Mad's "Static preset" was renamed "12y Waymarks" (2026-11-08).
+      setWaymarkChoiceState(saved === "Static preset" ? "12y Waymarks" : saved);
+    } catch { /* blocked storage */ }
+  }, []);
   const setWaymarkChoice = (v: string) => {
     setWaymarkChoiceState(v);
     try { localStorage.setItem(WAYMARK_CHOICE_KEY, v); } catch { /* blocked storage */ }
@@ -254,21 +262,57 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   const raidwide = useMemo(() => (data?.game === "wow" ? buildWowRaidwide(data) : []), [data]);
   const fightNotes = useMemo(() => (data ? fightReplaysFor(data).flatMap((f) => f.notes ?? []) : []), [data]);
   const fightHitboxes = useMemo(() => new Map<string, number>(data ? fightReplaysFor(data).flatMap((f) => Object.entries(f.hitboxes ?? {})) : []), [data]);
-  const waymarkPresets = useMemo(() => (data && data.game !== "wow" ? fightReplaysFor(data).flatMap((f) => f.waymarkPresets ?? []) : []), [data]);
+  // The fight user presets and defaults are saved under (FightReplay.key).
+  const waymarkFight = useMemo(() => (data && data.game !== "wow" ? fightReplaysFor(data)[0] ?? null : null), [data]);
+  const userWaymarks = useUserWaymarks(waymarkFight?.key ?? null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [waymarkError, setWaymarkError] = useState<string | null>(null);
+  // Every preset the dropdown offers: the fight's own, then the user's
+  // imports (value "mine:<name>").
+  const waymarkPresets = useMemo(() => {
+    const builtIn = data && data.game !== "wow" ? fightReplaysFor(data).flatMap((f) => f.waymarkPresets ?? []) : [];
+    return [
+      ...builtIn.map((p) => ({ value: p.name, label: p.name, preset: p })),
+      ...userWaymarks.presets.map((p) => ({ value: MINE_PREFIX + p.name, label: `${p.name} (yours)`,
+        preset: { name: p.name, marks: p.marks, note: "your imported preset" } as WaymarkPreset })),
+    ];
+  }, [data, userWaymarks.presets]);
   const logHasWaymarks = !!logWaymarks?.some((e) => e[2] !== null);
+  // Auto's fallback when no log covers the pull: the user's default for
+  // this fight if it still exists ("off" = none), else the fight's first preset.
+  const userDefault = userWaymarks.defaultChoice;
+  const defaultOption = userDefault === "off" ? null
+    : waymarkPresets.find((p) => p.value === userDefault) ?? waymarkPresets.find((p) => !p.value.startsWith(MINE_PREFIX)) ?? null;
   // What the waymark choice resolves to for this pull: log events, a
   // preset's fixed marks, or nothing.
   const waymarkSource: { kind: "log" } | { kind: "preset"; preset: WaymarkPreset } | null = (() => {
     if (!data || data.game === "wow" || waymarkChoice === "off") return null;
     if (waymarkChoice === "log") return logHasWaymarks ? { kind: "log" } : null;
     if (waymarkChoice !== "auto") {
-      const p = waymarkPresets.find((x) => x.name === waymarkChoice);
-      if (p) return { kind: "preset", preset: p };
+      const p = waymarkPresets.find((x) => x.value === waymarkChoice);
+      if (p) return { kind: "preset", preset: p.preset };
     }
     if (logHasWaymarks) return { kind: "log" };
-    return waymarkPresets[0] ? { kind: "preset", preset: waymarkPresets[0] } : null;
+    return defaultOption ? { kind: "preset", preset: defaultOption.preset } : null;
   })();
-  const hasWaymarkChoice = !!data && data.game !== "wow" && (waymarkPresets.length > 0 || logHasWaymarks);
+  const hasWaymarkChoice = !!data && data.game !== "wow" && (!!waymarkFight || waymarkPresets.length > 0 || logHasWaymarks);
+  // "Set as default" offers the picked preset (or Off) when it isn't already the default.
+  const canSetDefault = userWaymarks.signedIn && !!waymarkFight && waymarkChoice !== "auto" && waymarkChoice !== "log"
+    && (waymarkChoice === "off" || waymarkPresets.some((p) => p.value === waymarkChoice)) && waymarkChoice !== userDefault;
+  const pickedMine = waymarkChoice.startsWith(MINE_PREFIX) && waymarkPresets.some((p) => p.value === waymarkChoice);
+  const setWaymarkDefault = async () => {
+    setWaymarkError(null);
+    const err = await userWaymarks.setDefault(waymarkChoice);
+    // Back to Auto, which now resolves to the new default on every pull of this fight.
+    if (err) setWaymarkError(err); else setWaymarkChoice("auto");
+  };
+  const deleteMine = async () => {
+    const name = waymarkChoice.slice(MINE_PREFIX.length);
+    if (!window.confirm(`Delete your waymark preset “${name}” for ${waymarkFight?.name ?? "this fight"}?`)) return;
+    setWaymarkError(null);
+    const err = await userWaymarks.deletePreset(name);
+    if (err) setWaymarkError(err); else setWaymarkChoice("auto");
+  };
   // Shown waymarks that come from a preset, not this pull's log: flagged on the arena.
   const inferredWaymarks = waymarkSource?.kind === "preset" ? waymarkSource.preset : null;
   const tethers = useMemo(() => (data && data.game !== "wow" ? buildTethers(data) : []), [data]);
@@ -530,7 +574,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             {/* Waymarks drawn from a fight preset rather than a log of this pull. */}
             {inferredWaymarks && (
               <div style={{ background: "rgba(10,10,14,0.82)", border: "1px dashed #d9a441", borderRadius: 4, padding: "3px 8px", fontSize: 11, color: "#f0d9a8", fontStyle: "italic", whiteSpace: "nowrap", pointerEvents: "auto", cursor: "help" }}
-                title={"These waymarks aren't from this pull. FFLogs doesn't record waymarks, so this is the fight's default layout"
+                title={`These waymarks aren't from this pull. FFLogs doesn't record waymarks, so this is the "${inferredWaymarks.name}" preset`
                   + (inferredWaymarks.note ? ` (${inferredWaymarks.note})` : "")
                   + ". Load an ACT / IINACT log covering this pull (Layers menu) to show the real ones."}>
                 ⓘ Waymarks inferred: {inferredWaymarks.name}
@@ -596,21 +640,52 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             />
           </>
         )}
-        {/* Waymarks: only for fights that have a preset, or a loaded log with some. */}
+        {/* Waymarks: for fights with a replay spec, or a loaded log with some. */}
         {hasWaymarkChoice && (
-          <label style={{ color: "var(--ck-text-2)", fontSize: 13, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}
-            title="FFLogs has no waymarks. Auto shows them from a loaded ACT / IINACT log when one covers this pull, else the fight's default preset.">
-            Waymarks
-            <select value={waymarkChoice} onChange={(e) => setWaymarkChoice(e.target.value)}>
-              <option value="auto">Auto{waymarkChoice === "auto" ? ` (${waymarkSource ? (waymarkSource.kind === "log" ? "log" : `${waymarkSource.preset.name}, inferred`) : "none"})` : ""}</option>
-              <option value="log" disabled={!logHasWaymarks}>From log{logHasWaymarks ? "" : " (none loaded)"}</option>
-              {waymarkPresets.map((p) => <option key={p.name} value={p.name}>{p.name} (inferred)</option>)}
-              {waymarkChoice !== "auto" && waymarkChoice !== "log" && waymarkChoice !== "off" && !waymarkPresets.some((p) => p.name === waymarkChoice) && (
-                <option value={waymarkChoice}>{waymarkChoice} (not in this fight)</option>
-              )}
-              <option value="off">Off</option>
-            </select>
-          </label>
+          <>
+            <label style={{ color: "var(--ck-text-2)", fontSize: 13, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}
+              title={"FFLogs has no waymarks. Auto shows them from a loaded ACT / IINACT log when one covers this pull, else "
+                + (userDefault ? "your default for this fight." : "the fight's first preset.")}>
+              Waymarks
+              <select value={waymarkChoice} onChange={(e) => { setWaymarkChoice(e.target.value); setWaymarkError(null); }}>
+                <option value="auto">Auto{waymarkChoice === "auto" ? ` (${waymarkSource ? (waymarkSource.kind === "log" ? "log" : `${waymarkSource.preset.name}, inferred`) : "none"})` : ""}</option>
+                <option value="log" disabled={!logHasWaymarks}>From log{logHasWaymarks ? "" : " (none loaded)"}</option>
+                {waymarkPresets.map((p) => <option key={p.value} value={p.value}>{p.label} (inferred){p.value === userDefault ? " · default" : ""}</option>)}
+                {waymarkChoice !== "auto" && waymarkChoice !== "log" && waymarkChoice !== "off" && !waymarkPresets.some((p) => p.value === waymarkChoice) && (
+                  <option value={waymarkChoice}>{waymarkChoice.replace(MINE_PREFIX, "")} (not in this fight)</option>
+                )}
+                <option value="off">Off{userDefault === "off" ? " · default" : ""}</option>
+              </select>
+            </label>
+            {waymarkFight && (
+              <button className="ck-btn" style={{ fontSize: 12 }} onClick={() => setImportOpen(true)}
+                title="Paste a Waymark Preset / Waymark Librarian preset to save it to your account for this fight">
+                Import waymarks
+              </button>
+            )}
+            {canSetDefault && (
+              <button className="ck-btn" style={{ fontSize: 12 }} onClick={setWaymarkDefault}
+                title={`Make this what Auto shows on ${waymarkFight?.name ?? "this fight"} when no loaded log covers the pull`}>
+                Set as default
+              </button>
+            )}
+            {pickedMine && (
+              <button className="ck-btn" style={{ fontSize: 12 }} onClick={deleteMine} title="Delete this imported preset from your account">
+                Delete
+              </button>
+            )}
+            {waymarkError && <span style={{ color: "#e06c6c", fontSize: 12, whiteSpace: "nowrap" }}>{waymarkError}</span>}
+          </>
+        )}
+        {waymarkFight && (
+          <WaymarkImportDialog open={importOpen} fightName={waymarkFight.name} fightMapId={waymarkFight.waymarkMapId}
+            signedIn={userWaymarks.signedIn} existingNames={userWaymarks.presets.map((p) => p.name)}
+            onSave={async (p) => {
+              const err = await userWaymarks.savePreset(p);
+              if (!err) setWaymarkChoice(MINE_PREFIX + p.name);
+              return err;
+            }}
+            onClose={() => setImportOpen(false)} />
         )}
         <button className="ck-btn" onClick={() => setLayersOpen((v) => !v)} aria-expanded={layersOpen}>Layers ▾</button>
         {layersOpen && (

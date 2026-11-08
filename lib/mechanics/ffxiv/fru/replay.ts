@@ -897,4 +897,5 @@ export const FRU_REPLAY: FightReplay = {
       [92.93, 92.93], [107.07, 92.93], [107.07, 107.07], [92.93, 107.07]],
       "NAUR's FRU PF - Inner Circle preset, naurffxiv.com"),
   ],
+  waymarkMapId: 1006,
 };

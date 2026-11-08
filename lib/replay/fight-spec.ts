@@ -28,6 +28,8 @@
 //   waymarkPresets FFXIV: default waymark layouts (A-D, 1-4) offered in the
 //                 Waymarks dropdown for pulls no loaded ACT log covers
 //                 (lib/replay/waymarks.ts); the first is the default
+//                 unless the user set their own
+//   waymarkMapId  FFXIV: the duty's MapID in WaymarkPresetPlugin JSON
 //
 // A spec applies to a pull when any of its `signature` ability ids, or any
 // ability id it overrides or names, shows up in the pull's casts, hits or
@@ -174,4 +176,8 @@ export type FightReplay = {
   // FFXIV: default waymark layouts in absolute arena coordinates. The first
   // shows when no loaded log covers the pull; the rest are choices.
   waymarkPresets?: WaymarkPreset[];
+  // FFXIV: the duty's ContentFinderCondition id, the MapID in
+  // WaymarkPresetPlugin JSON; the Import dialog warns when a pasted
+  // preset names another duty.
+  waymarkMapId?: number;
 };

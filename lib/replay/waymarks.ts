@@ -18,6 +18,13 @@
 // 2. **A fight's default presets** (FightReplay.waymarkPresets in the
 //    fight's replay spec), picked from the Waymarks dropdown when the static
 //    plays from FFLogs only.
+// 3. **The user's imported presets**: WaymarkPresetPlugin / Waymark
+//    Librarian JSON pasted into the replay's Import dialog
+//    (parseWaymarkPresetJson), saved per account and fight
+//    (UserWaymarkPreset, app/api/waymarks). That JSON's X / Z are the
+//    game's horizontal yalms, the same plane as the ACT log's x / y; Y is
+//    height. MapID is the duty's ContentFinderCondition id
+//    (FightReplay.waymarkMapId).
 //
 // Units here are the replay's: centi-yalms, +y south.
 
@@ -43,6 +50,61 @@ export function presetFromYalms(name: string, yalms: ([number, number] | null)[]
   const marks: Waymark[] = [];
   yalms.forEach((p, mark) => { if (p) marks.push({ mark, x: Math.round(p[0] * 100), y: Math.round(p[1] * 100) }); });
   return { name, marks, note };
+}
+
+/** WaymarkPresetPlugin's keys for the eight marks, in WAYMARK_LABELS order. */
+const PRESET_JSON_KEYS = ["A", "B", "C", "D", "One", "Two", "Three", "Four"] as const;
+export const MAX_PRESET_NAME = 64;
+/** Dropdown / default value prefix for the user's own presets: "mine:<name>". */
+export const MINE_PREFIX = "mine:";
+
+/**
+ * Marks checked for saving: 1-8 distinct marks 0-7 with integer
+ * centi-yalm coordinates within ±1000 yalms. Null when anything is off.
+ * The server runs this on whatever a client sends.
+ */
+export function cleanMarks(raw: unknown): Waymark[] | null {
+  if (!Array.isArray(raw) || raw.length < 1 || raw.length > 8) return null;
+  const seen = new Set<number>();
+  const out: Waymark[] = [];
+  for (const m of raw) {
+    const { mark, x, y } = (m ?? {}) as Record<string, unknown>;
+    if (!Number.isInteger(mark) || (mark as number) < 0 || (mark as number) > 7 || seen.has(mark as number)) return null;
+    if (![x, y].every((v) => Number.isInteger(v) && Math.abs(v as number) <= 100000)) return null;
+    seen.add(mark as number);
+    out.push({ mark: mark as number, x: x as number, y: y as number });
+  }
+  return out.sort((a, b) => a.mark - b.mark);
+}
+
+/**
+ * Reads a WaymarkPresetPlugin / Waymark Librarian preset:
+ * `{ Name, MapID, A: { X, Y, Z, ID, Active }, B, ..., Four }`. Inactive
+ * marks are skipped. Returns the preset or what's wrong with the text.
+ */
+export function parseWaymarkPresetJson(text: string):
+  { ok: true; name: string; mapId: number | null; marks: Waymark[] } | { ok: false; error: string } {
+  let j: unknown;
+  try { j = JSON.parse(text); } catch { return { ok: false, error: "That isn't valid JSON. Paste the whole preset, from { to }." }; }
+  if (!j || typeof j !== "object" || Array.isArray(j)) return { ok: false, error: "Expected one preset: an object with A, B, C, D, One, Two, Three and Four." };
+  const o = j as Record<string, unknown>;
+  const marks: Waymark[] = [];
+  for (let mark = 0; mark < 8; mark++) {
+    const key = PRESET_JSON_KEYS[mark];
+    const w = o[key];
+    if (w === undefined || w === null) continue;
+    if (typeof w !== "object") return { ok: false, error: `Waymark ${key} isn't an object with X, Y and Z.` };
+    const { X, Z, Active } = w as Record<string, unknown>;
+    if (Active === false) continue;
+    if (typeof X !== "number" || typeof Z !== "number" || !Number.isFinite(X) || !Number.isFinite(Z) || Math.abs(X) > 1000 || Math.abs(Z) > 1000) {
+      return { ok: false, error: `Waymark ${key} needs numeric X and Z.` };
+    }
+    marks.push({ mark, x: Math.round(X * 100), y: Math.round(Z * 100) });
+  }
+  if (!marks.length) return { ok: false, error: "No active waymarks in that preset." };
+  const name = typeof o.Name === "string" && o.Name.trim() ? o.Name.trim().slice(0, MAX_PRESET_NAME) : "Imported preset";
+  const mapId = typeof o.MapID === "number" && Number.isInteger(o.MapID) ? o.MapID : null;
+  return { ok: true, name, mapId, marks };
 }
 
 /**

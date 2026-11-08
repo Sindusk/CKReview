@@ -369,3 +369,34 @@ model StaticExcludedPlayer {
 
   @@unique([staticId, sessionId, name])
 }
+
+/// A waymark preset a user imported for one fight on the replay
+/// (WaymarkPresetPlugin JSON, lib/replay/waymarks.ts). `fightKey` is the
+/// FightReplay key ("fru", "dancingmad"); `marks` is
+/// [{ mark 0-7, x, y }] in centi-yalms. A same-named import replaces it.
+model UserWaymarkPreset {
+  id        Int      @id @default(autoincrement())
+  /// app_user.id from the shared `users` database — no FK, see Static.createdByUserId.
+  userId    Int
+  fightKey  String
+  name      String
+  marks     Json
+  /// The JSON's MapID (the duty's ContentFinderCondition id), if it had one.
+  mapId     Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, fightKey, name])
+}
+
+/// The waymarks a user's replay shows on Auto for one fight when no loaded
+/// ACT log covers the pull: a built-in preset's name, "mine:<name>" for
+/// one of their UserWaymarkPresets, or "off".
+model UserWaymarkDefault {
+  userId    Int
+  fightKey  String
+  choice    String
+  updatedAt DateTime @updatedAt
+
+  @@id([userId, fightKey])
+}

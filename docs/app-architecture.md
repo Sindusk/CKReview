@@ -510,12 +510,24 @@ file's header comment. Mechanic detection has its own guide:
   the user picks in the Layers menu, matched to pulls by wall-clock time
   and saved per file in localStorage (only the zone and waymark lines;
   the log never leaves the browser), or from the fight's default presets
-  (`FightReplay.waymarkPresets`). The control bar's Waymarks dropdown,
-  shown only when the fight has a preset or a loaded log has waymarks:
-  Auto (log when one covers the pull, else the first preset), From log,
-  each preset, Off; remembered across pulls. While a preset is drawn, an
-  amber "Waymarks inferred" pill sits top right of the arena; its tooltip
-  says the marks aren't this pull's and names the preset's source.
+  (`FightReplay.waymarkPresets`), or from the user's own presets. The
+  control bar's Waymarks dropdown, shown for FFXIV fights with a replay
+  spec or when a loaded log has waymarks: Auto (log when one covers the
+  pull, else the user's default for the fight, else its first preset),
+  From log, each preset (the user's marked "yours"), Off; remembered
+  across pulls. While a preset is drawn, an amber "Waymarks inferred" pill
+  sits top right of the arena; its tooltip says the marks aren't this
+  pull's and names the preset's source.
+  - **Import waymarks** (`components/WaymarkImportDialog.tsx`): paste a
+    WaymarkPresetPlugin / Waymark Librarian JSON preset
+    (`parseWaymarkPresetJson`); it's saved to the account for that fight
+    (`UserWaymarkPreset`, `app/api/waymarks`, `hooks/useUserWaymarks.ts`).
+    A same-named import replaces the old one; a MapID other than the
+    fight's `waymarkMapId` gets a warning, not a refusal. Signed out,
+    nothing can be saved.
+  - **Set as default** stores the picked preset (or Off) as what Auto
+    shows on that fight (`UserWaymarkDefault`) and switches the dropdown
+    back to Auto. **Delete** removes an imported preset that's selected.
 - **Facing:** players get a wedge, bosses the game's target ring (orange
   arc open at the back, front marker, side chevrons) at hitbox size, from
   geometry.ts's `facingToCompassBearing`. The replay's
