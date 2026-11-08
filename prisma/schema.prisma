@@ -8,6 +8,9 @@ datasource db {
 
 enum StaticMemberRole {
   OWNER
+  /// Can upload/resync reviews, edit pull summaries, merge/rename players
+  /// (lib/static-access.ts). MEMBER is view-only.
+  MODERATOR
   MEMBER
 }
 

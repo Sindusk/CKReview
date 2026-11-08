@@ -39,7 +39,7 @@ type RowState =
 
 type Row = { item: BatchItem; code: string | null; state: RowState };
 
-type StaticSummary = { id: number; name: string };
+type StaticSummary = { id: number; name: string; role: "OWNER" | "MODERATOR" | "MEMBER" };
 
 export default function BatchImportDialog({ open, onClose, initialStaticId, runItem, progress }: {
   open:             boolean;
@@ -65,9 +65,11 @@ export default function BatchImportDialog({ open, onClose, initialStaticId, runI
       .then(async (res) => {
         const data = await res.json();
         if (!res.ok) { setError(data.error || "Failed to load your statics"); setStatics([]); return; }
-        setStatics(data.statics);
-        const wanted = data.statics.find((s: StaticSummary) => s.id === initialStaticId);
-        setStaticId(wanted?.id ?? data.statics[0]?.id ?? null);
+        // Only statics the user may upload to (OWNER/MODERATOR, lib/static-access.ts).
+        const editable = (data.statics as StaticSummary[]).filter((s) => s.role !== "MEMBER");
+        setStatics(editable);
+        const wanted = editable.find((s) => s.id === initialStaticId);
+        setStaticId(wanted?.id ?? editable[0]?.id ?? null);
       })
       .catch(() => setError("Failed to load your statics"));
   }, [open, initialStaticId]);
@@ -164,7 +166,7 @@ export default function BatchImportDialog({ open, onClose, initialStaticId, runI
       {statics === null ? (
         <p className="ck-dialog-text">Loading your statics...</p>
       ) : statics.length === 0 ? (
-        <p className="ck-dialog-text">You don&apos;t have any statics yet. Create one from the menu first.</p>
+        <p className="ck-dialog-text">You don&apos;t have any statics you can add to. Create one from the menu, or ask a static&apos;s owner to make you a moderator.</p>
       ) : (
         <>
           <p className="ck-dialog-text" style={{ marginTop: 0 }}>

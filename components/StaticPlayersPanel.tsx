@@ -63,9 +63,13 @@ const NUMERIC_COLUMNS: { key: SortKey; label: string; title?: string }[] = [
 export default function StaticPlayersPanel({
   staticId,
   onPlayersDeleted,
+  canEdit = true,
 }: {
   staticId:          number;
   onPlayersDeleted?: () => void;
+  // False for a view-only MEMBER (lib/static-access.ts): hides rename,
+  // merge and delete; the routes refuse them anyway.
+  canEdit?:          boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [players, setPlayers] = useState<PlayerIdentity[] | null>(null);
@@ -268,7 +272,7 @@ export default function StaticPlayersPanel({
                           {p.adjustedPerPull === null ? "—" : p.adjustedPerPull.toFixed(2)}
                         </td>
                         <td style={{ padding: "6px 8px", textAlign: "right" }}>
-                          {renamingId !== p.id && (
+                          {canEdit && renamingId !== p.id && (
                             <div style={{ display: "inline-flex", gap: "4px" }}>
                               <button className="ck-btn ck-btn--xs" onClick={() => { setRenamingId(p.id); setRenameDraft(p.name); }}>
                                 Rename
@@ -298,7 +302,7 @@ export default function StaticPlayersPanel({
             </div>
           )}
 
-          {players && players.length > 1 && (
+          {canEdit && players && players.length > 1 && (
             <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
               <span className="ck-label" style={{ margin: 0 }}>Merge</span>
               <select className="ck-field" value={mergeFrom ?? ""} onChange={(e) => setMergeFrom(Number(e.target.value) || null)} style={{ padding: "4px 8px" }}>

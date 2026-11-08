@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { requireStaticRole } from "@/lib/static-access";
 
 export async function PATCH(
   req: NextRequest,
@@ -22,10 +23,8 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  const membership = await prisma.staticMember.findUnique({
-    where: { staticId_userId: { staticId, userId: user.id } },
-  });
-  if (!membership) return NextResponse.json({ error: "Not a member of this static" }, { status: 403 });
+  const membership = await requireStaticRole(staticId, user.id, "MODERATOR");
+  if (membership instanceof NextResponse) return membership;
 
   const pull = await prisma.staticReviewPull.findUnique({
     where:  { id: pullId },

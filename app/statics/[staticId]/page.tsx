@@ -8,6 +8,7 @@
 // collapsible per-review ("Session") list of pulls with error counts/notes,
 // and the player-identity merge panel (StaticPlayersPanel). Reachable from
 // BurgerMenu's "Manage Statics" dialog — the "View" link there routes here.
+// The Members button (StaticMembersDialog) shares the static and sets roles.
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
@@ -20,8 +21,11 @@ import { SeverityIcon, SEVERITY_COLOR } from "@/components/SeverityIcon";
 import BrandBanner from "@/components/BrandBanner";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Panel, PanelHeader } from "@/components/ui/Panel";
+import StaticMembersDialog, { ROLE_COLOR, ROLE_LABEL, type StaticRole } from "@/components/StaticMembersDialog";
 
-type StaticInfo = { id: number; name: string; role: "OWNER" | "MEMBER" };
+// role: lib/static-access.ts. MEMBER is view-only, so the page hides the
+// import/resync, label, note, remove and player-edit controls for it.
+type StaticInfo = { id: number; name: string; role: StaticRole; viewerUserId: number };
 
 type ReviewSummary = {
   id:        number;
@@ -31,6 +35,7 @@ type ReviewSummary = {
   reportUrl: string;
   label:     string | null;
   addedAt:   string;
+  addedByUserId: number;
   // ISO date the LOG was recorded (StaticReview.reportStartedAt) — null for
   // reviews added before that column existed; those show a dash until
   // they're resynced from a client that has the report open.
@@ -94,6 +99,7 @@ export default function StaticDashboardPage() {
   const [labelDraft, setLabelDraft] = useState("");
   const [pendingRemove, setPendingRemove] = useState<{ review: ReviewSummary; number: number } | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const [membersOpen, setMembersOpen] = useState(false);
   // Bumped when a player delete removes pulls, so the analysis panels
   // (which fetch for themselves) reload. Database reads only.
   const [dataVersion, setDataVersion] = useState(0);
@@ -199,9 +205,9 @@ export default function StaticDashboardPage() {
 
   // Detaches one review from this static. The DELETE route cascades to that
   // review's pulls and per-player error rows only; the saved session itself
-  // and every other review are untouched. Only an owner or the member who
-  // added the review may do it — the route enforces that and its message is
-  // surfaced here.
+  // and every other review are untouched. Only the owner or the moderator
+  // who added the review may do it — the route enforces that and its
+  // message is surfaced here.
   async function removeReview(reviewId: number) {
     setPendingRemove(null);
     setRemoveError(null);
@@ -259,6 +265,10 @@ export default function StaticDashboardPage() {
   }
 
   const sectionGap = "28px";
+  // Until the role loads, edit controls stay hidden rather than flash.
+  const canEdit = staticInfo?.role === "OWNER" || staticInfo?.role === "MODERATOR";
+  const canRemove = (review: ReviewSummary) =>
+    staticInfo?.role === "OWNER" || (staticInfo?.role === "MODERATOR" && review.addedByUserId === staticInfo.viewerUserId);
 
   return (
     <div className="ck-app" style={{ minHeight: "100vh" }}>
@@ -285,9 +295,15 @@ export default function StaticDashboardPage() {
         <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "22px" }}>
           <h1 className="ck-panel-title" style={{ fontSize: "28px" }}>{staticInfo?.name ?? "Loading..."}</h1>
           {staticInfo && (
-            <span className="ck-badge ck-badge--plain" style={{ color: staticInfo.role === "OWNER" ? "var(--ck-text-gold)" : "var(--ck-text-2)" }}>
-              {staticInfo.role === "OWNER" ? "Owner" : "Member"}
-            </span>
+            <>
+              <span className="ck-badge ck-badge--plain" style={{ color: ROLE_COLOR[staticInfo.role] }}>
+                {ROLE_LABEL[staticInfo.role]}
+              </span>
+              <button className="ck-btn ck-btn--sm" style={{ marginLeft: "auto" }} onClick={() => setMembersOpen(true)}
+                title={staticInfo.role === "OWNER" ? "Share this static and set who can edit it" : "Who is in this static"}>
+                Members
+              </button>
+            </>
           )}
         </div>
 
@@ -313,7 +329,7 @@ export default function StaticDashboardPage() {
 
         <Panel style={{ marginBottom: sectionGap }}>
           {Number.isInteger(staticId) && (
-            <StaticPlayersPanel staticId={staticId} onPlayersDeleted={() => setDataVersion((v) => v + 1)} />
+            <StaticPlayersPanel staticId={staticId} canEdit={canEdit} onPlayersDeleted={() => setDataVersion((v) => v + 1)} />
           )}
         </Panel>
 
@@ -321,10 +337,12 @@ export default function StaticDashboardPage() {
           <PanelHeader title="Sessions" count={sessions ? `(${sessions.length})` : undefined}>
             {/* Opens the review screen's batch importer on this static (a
                 new tab; nothing is fetched until its Start button). */}
-            <a className="ck-btn ck-btn--sm" href={`/?batchStatic=${staticId}`} target="_blank" rel="noopener"
-              title="Import several reports into this static, or resync all of its sessions">
-              Import / resync reports
-            </a>
+            {canEdit && (
+              <a className="ck-btn ck-btn--sm" href={`/?batchStatic=${staticId}`} target="_blank" rel="noopener"
+                title="Import several reports into this static, or resync all of its sessions">
+                Import / resync reports
+              </a>
+            )}
           </PanelHeader>
       <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "12px" }}>
         {removeError && <p className="ck-error-text" style={{ margin: "0 2px" }}>{removeError}</p>}
@@ -399,6 +417,7 @@ export default function StaticDashboardPage() {
                       </div>
                     ) : (
                       <>
+                        {canEdit ? (
                         <button
                           onClick={() => { setEditingReview(session.review.id); setLabelDraft(session.review.label ?? ""); }}
                           title="Rename this session"
@@ -419,6 +438,11 @@ export default function StaticDashboardPage() {
                         >
                           {session.review.label ? `— ${session.review.label}` : "— add a label"}
                         </button>
+                        ) : session.review.label ? (
+                          <span style={{ fontSize: "13px", color: "var(--ck-text-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            — {session.review.label}
+                          </span>
+                        ) : null}
                         <span className="ck-count" style={{ flexShrink: 0 }}>{session.pulls.length} pulls</span>
                       </>
                     )}
@@ -459,13 +483,15 @@ export default function StaticDashboardPage() {
                         {/fflogs/i.test(session.review.reportUrl) ? "FFLogs" : "WCL"} &#8599;
                       </a>
                     )}
-                    <button
-                      className="ck-btn ck-btn--xs ck-btn--danger"
-                      onClick={() => setPendingRemove({ review: session.review, number: sessionIdx + 1 })}
-                      title="Remove this session from the static"
-                    >
-                      Remove
-                    </button>
+                    {canRemove(session.review) && (
+                      <button
+                        className="ck-btn ck-btn--xs ck-btn--danger"
+                        onClick={() => setPendingRemove({ review: session.review, number: sessionIdx + 1 })}
+                        title="Remove this session from the static"
+                      >
+                        Remove
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -495,7 +521,7 @@ export default function StaticDashboardPage() {
                                 {pull.raidErrorAtMs != null ? `wiped at ${durationLabel}` : `lasted ${durationLabel}`}
                               </span>
                             </div>
-                            {!isEditing && (
+                            {canEdit && !isEditing && (
                               <button className="ck-btn ck-btn--xs" onClick={() => startEditingSummary(pull.id, pull.summary ?? null)}>
                                 {pull.summary ? "Edit note" : "Add note"}
                               </button>
@@ -549,6 +575,17 @@ export default function StaticDashboardPage() {
         onConfirm={() => pendingRemove && removeReview(pendingRemove.review.id)}
         onCancel={() => setPendingRemove(null)}
       />
+
+      {staticInfo && (
+        <StaticMembersDialog
+          open={membersOpen}
+          staticId={staticId}
+          viewerUserId={staticInfo.viewerUserId}
+          viewerRole={staticInfo.role}
+          onClose={() => setMembersOpen(false)}
+          onLeft={() => { window.location.href = backHref; }}
+        />
+      )}
     </div>
   );
 }

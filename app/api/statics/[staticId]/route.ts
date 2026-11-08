@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { requireStaticRole } from "@/lib/static-access";
 
 export async function GET(
   _req: NextRequest,
@@ -16,15 +17,14 @@ export async function GET(
     return NextResponse.json({ error: "Invalid static id" }, { status: 400 });
   }
 
-  const membership = await prisma.staticMember.findUnique({
-    where: { staticId_userId: { staticId, userId: user.id } },
-  });
-  if (!membership) return NextResponse.json({ error: "Not a member of this static" }, { status: 403 });
+  const membership = await requireStaticRole(staticId, user.id, "MEMBER");
+  if (membership instanceof NextResponse) return membership;
 
   const staticRow = await prisma.static.findUnique({ where: { id: staticId } });
   if (!staticRow) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  return NextResponse.json({ static: { ...staticRow, role: membership.role } });
+  // viewerUserId lets the page offer Remove on a moderator's own reviews.
+  return NextResponse.json({ static: { ...staticRow, role: membership.role, viewerUserId: user.id } });
 }
 
 export async function DELETE(
@@ -39,12 +39,8 @@ export async function DELETE(
     return NextResponse.json({ error: "Invalid static id" }, { status: 400 });
   }
 
-  const membership = await prisma.staticMember.findUnique({
-    where: { staticId_userId: { staticId, userId: user.id } },
-  });
-  if (!membership || membership.role !== "OWNER") {
-    return NextResponse.json({ error: "Only an owner can delete this static" }, { status: 403 });
-  }
+  const membership = await requireStaticRole(staticId, user.id, "OWNER");
+  if (membership instanceof NextResponse) return membership;
 
   // Cascades to StaticMember/StaticReview via onDelete: Cascade.
   await prisma.static.delete({ where: { id: staticId } });

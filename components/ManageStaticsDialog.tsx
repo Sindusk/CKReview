@@ -2,21 +2,23 @@
 
 // components/ManageStaticsDialog.tsx
 //
-// Create/delete the current user's statics. Membership management beyond
-// "you're the owner of what you created" is deferred — the CRUD routes for
-// adding/removing members already exist (app/api/statics/[staticId]/members)
-// but this dialog doesn't expose them yet.
+// Create/delete the current user's statics, and list the ones they belong
+// to with their role. Sharing a static (adding members, making them
+// moderators, removing them, leaving) lives on the static's own page, in
+// its Members dialog (components/StaticMembersDialog.tsx); roles are in
+// lib/static-access.ts.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import ConfirmDialog from "./ConfirmDialog";
 import { Dialog } from "./ui/Dialog";
+import { ROLE_LABEL, type StaticRole } from "./StaticMembersDialog";
 
 type StaticSummary = {
   id:        number;
   name:      string;
   createdAt: string;
-  role:      "OWNER" | "MEMBER";
+  role:      StaticRole;
 };
 
 type ManageStaticsDialogProps = {
@@ -149,7 +151,7 @@ export default function ManageStaticsDialog({ open, sessionId, onClose }: Manage
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: "13px", fontWeight: 600 }}>{s.name}</div>
                 <div style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: s.role === "OWNER" ? "var(--ck-text-gold)" : "var(--ck-text-3)" }}>
-                  {s.role}
+                  {ROLE_LABEL[s.role]}
                 </div>
               </div>
               <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>

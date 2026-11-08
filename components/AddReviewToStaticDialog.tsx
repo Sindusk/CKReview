@@ -5,7 +5,9 @@
 // Attaches the currently-open review session (see app/page.tsx's
 // sessionId/sessionReportUrl state) to one of the current user's statics.
 // Only persists a pointer (sessionId + a denormalized reportUrl/label) —
-// the underlying session in data/sessions/<id>.json is untouched.
+// the underlying session in data/sessions/<id>.json is untouched. Only
+// statics where the user is OWNER or MODERATOR are offered; MEMBER is
+// view-only (lib/static-access.ts).
 
 import { useEffect, useState } from "react";
 import type { Pull } from "@/types/Pull";
@@ -15,8 +17,11 @@ import { Dialog, Field } from "./ui/Dialog";
 type StaticSummary = {
   id:   number;
   name: string;
-  role: "OWNER" | "MEMBER";
+  role: "OWNER" | "MODERATOR" | "MEMBER";
 };
+
+// Only these roles may add or resync a session (lib/static-access.ts).
+const canUpload = (s: StaticSummary) => s.role === "OWNER" || s.role === "MODERATOR";
 
 type AddReviewToStaticDialogProps = {
   open:               boolean;
@@ -41,7 +46,9 @@ export default function AddReviewToStaticDialog({
   onClose,
   onOpenManageStatics,
 }: AddReviewToStaticDialogProps) {
+  // Statics the user may upload to; view-only ones are counted, not listed.
   const [statics, setStatics] = useState<StaticSummary[] | null>(null);
+  const [viewOnlyCount, setViewOnlyCount] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [label, setLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -69,8 +76,11 @@ export default function AddReviewToStaticDialog({
           setStatics([]);
           return;
         }
-        setStatics(data.statics);
-        setSelectedId(data.statics[0]?.id ?? null);
+        const all: StaticSummary[] = data.statics;
+        const editable = all.filter(canUpload);
+        setStatics(editable);
+        setViewOnlyCount(all.length - editable.length);
+        setSelectedId(editable[0]?.id ?? null);
       })
       .catch(() => setError("Failed to load your statics"));
   }, [open]);
@@ -170,7 +180,9 @@ export default function AddReviewToStaticDialog({
       ) : error ? null : statics.length === 0 ? (
         <div>
           <p className="ck-dialog-text" style={{ marginBottom: "14px" }}>
-            You don&apos;t have any statics yet.
+            {viewOnlyCount > 0
+              ? `You're a view-only member of ${viewOnlyCount === 1 ? "your static" : "your statics"}. Ask the owner to make you a moderator, or create your own.`
+              : "You don't have any statics yet."}
           </p>
           <button className="ck-btn ck-btn--md ck-btn--primary" onClick={() => { onClose(); onOpenManageStatics(); }}>
             Create a Static

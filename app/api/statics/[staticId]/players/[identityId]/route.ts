@@ -15,12 +15,17 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import type { StaticMemberRole } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
+import { requireStaticRole } from "@/lib/static-access";
 
 type Ctx = { params: Promise<{ staticId: string; identityId: string }> };
 
-/** Auth, membership and ownership checks shared by every method. */
-async function loadIdentity({ params }: Ctx) {
+/**
+ * Auth, role (lib/static-access.ts) and ownership checks shared by every
+ * method. GET is open to any member; PATCH and DELETE need a moderator.
+ */
+async function loadIdentity({ params }: Ctx, minRole: StaticMemberRole) {
   const user = await getCurrentUser();
   if (!user) return { error: NextResponse.json({ error: "Login required" }, { status: 401 }) };
 
@@ -31,10 +36,8 @@ async function loadIdentity({ params }: Ctx) {
     return { error: NextResponse.json({ error: "Invalid id" }, { status: 400 }) };
   }
 
-  const membership = await prisma.staticMember.findUnique({
-    where: { staticId_userId: { staticId, userId: user.id } },
-  });
-  if (!membership) return { error: NextResponse.json({ error: "Not a member of this static" }, { status: 403 }) };
+  const membership = await requireStaticRole(staticId, user.id, minRole);
+  if (membership instanceof NextResponse) return { error: membership };
 
   const identity = await prisma.staticPlayerIdentity.findUnique({
     where:   { id: identityId },
@@ -65,7 +68,7 @@ async function findAffectedPulls(staticId: number, identityId: number, aliases: 
 }
 
 export async function GET(_req: NextRequest, ctx: Ctx) {
-  const loaded = await loadIdentity(ctx);
+  const loaded = await loadIdentity(ctx, "MEMBER");
   if ("error" in loaded) return loaded.error;
   const { staticId, identity } = loaded;
 
@@ -75,7 +78,7 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
 }
 
 export async function DELETE(_req: NextRequest, ctx: Ctx) {
-  const loaded = await loadIdentity(ctx);
+  const loaded = await loadIdentity(ctx, "MODERATOR");
   if ("error" in loaded) return loaded.error;
   const { user, membership, staticId, identity } = loaded;
 
@@ -83,8 +86,8 @@ export async function DELETE(_req: NextRequest, ctx: Ctx) {
   const pulls = await findAffectedPulls(staticId, identity.id, aliases);
   const reviews = new Map(pulls.map((p) => [p.review.id, p.review]));
 
-  // Same rule as detaching a review (reviews/[reviewId] DELETE): an owner,
-  // or the member who added every review this touches.
+  // Same rule as detaching a review (reviews/[reviewId] DELETE): the owner,
+  // or the moderator who added every review this touches.
   if (membership.role !== "OWNER") {
     const foreign = [...reviews.values()].find((r) => r.addedByUserId !== user.id);
     if (foreign) {
@@ -127,7 +130,7 @@ export async function DELETE(_req: NextRequest, ctx: Ctx) {
 }
 
 export async function PATCH(req: NextRequest, ctx: Ctx) {
-  const loaded = await loadIdentity(ctx);
+  const loaded = await loadIdentity(ctx, "MODERATOR");
   if ("error" in loaded) return loaded.error;
 
   const body = await req.json();

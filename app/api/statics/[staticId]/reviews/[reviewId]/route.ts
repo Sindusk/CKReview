@@ -3,12 +3,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { requireStaticRole } from "@/lib/static-access";
 
 /**
  * Renames a review's label — the session heading on the static dashboard.
- * Any member of the static can edit it (unlike DELETE, which is restricted
+ * Any moderator or the owner can edit it (unlike DELETE, which is restricted
  * to the adder/owner): a label is shared context for the group, and a wrong
- * one is cheap to fix and impossible to lose data over.
+ * one is cheap to fix and impossible to lose data over. MEMBER is view-only
+ * (lib/static-access.ts).
  *
  * An empty/whitespace label clears it back to null rather than storing "".
  */
@@ -26,10 +28,8 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  const membership = await prisma.staticMember.findUnique({
-    where: { staticId_userId: { staticId, userId: user.id } },
-  });
-  if (!membership) return NextResponse.json({ error: "Not a member of this static" }, { status: 403 });
+  const membership = await requireStaticRole(staticId, user.id, "MODERATOR");
+  if (membership instanceof NextResponse) return membership;
 
   const review = await prisma.staticReview.findUnique({ where: { id: reviewId } });
   if (!review || review.staticId !== staticId) {
@@ -64,10 +64,10 @@ export async function DELETE(
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  const membership = await prisma.staticMember.findUnique({
-    where: { staticId_userId: { staticId, userId: user.id } },
-  });
-  if (!membership) return NextResponse.json({ error: "Not a member of this static" }, { status: 403 });
+  // A moderator may remove reviews they added; the owner any review. A
+  // MEMBER (view-only) can't, even one they added before roles existed.
+  const membership = await requireStaticRole(staticId, user.id, "MODERATOR");
+  if (membership instanceof NextResponse) return membership;
 
   const review = await prisma.staticReview.findUnique({ where: { id: reviewId } });
   if (!review || review.staticId !== staticId) {
@@ -76,7 +76,7 @@ export async function DELETE(
 
   const canDelete = membership.role === "OWNER" || review.addedByUserId === user.id;
   if (!canDelete) {
-    return NextResponse.json({ error: "Only the member who added this review or an owner can remove it" }, { status: 403 });
+    return NextResponse.json({ error: "Only the moderator who added this review or the owner can remove it" }, { status: 403 });
   }
 
   // Only removes the association row — never touches data/sessions/*.

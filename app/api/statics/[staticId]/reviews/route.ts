@@ -8,16 +8,11 @@ import type { StaticReviewPayload, StaticReviewPullData } from "@/lib/static-rev
 import { resolvePlayerIdentities } from "@/lib/static-player-identity";
 import { parseLogUrl } from "@/lib/url-parsers";
 import { byLogDate } from "@/lib/static-analysis";
+import { requireStaticRole } from "@/lib/static-access";
 
 // A 65-pull night writes a few thousand detail rows; the 5 s default
 // interactive-transaction timeout is too tight for that.
 const IMPORT_TX_OPTIONS = { timeout: 60_000, maxWait: 10_000 };
-
-async function requireMembership(staticId: number, userId: number) {
-  return prisma.staticMember.findUnique({
-    where: { staticId_userId: { staticId, userId } },
-  });
-}
 
 /**
  * Upserts the static's rule and phase-name lookups for this payload and
@@ -151,8 +146,8 @@ export async function GET(
     return NextResponse.json({ error: "Invalid static id" }, { status: 400 });
   }
 
-  const membership = await requireMembership(staticId, user.id);
-  if (!membership) return NextResponse.json({ error: "Not a member of this static" }, { status: 403 });
+  const membership = await requireStaticRole(staticId, user.id, "MEMBER");
+  if (membership instanceof NextResponse) return membership;
 
   const reviews = await prisma.staticReview.findMany({
     where:   { staticId },
@@ -174,8 +169,9 @@ export async function POST(
     return NextResponse.json({ error: "Invalid static id" }, { status: 400 });
   }
 
-  const membership = await requireMembership(staticId, user.id);
-  if (!membership) return NextResponse.json({ error: "Not a member of this static" }, { status: 403 });
+  // Adding or resyncing a session: moderators and the owner (MEMBER is view-only).
+  const membership = await requireStaticRole(staticId, user.id, "MODERATOR");
+  if (membership instanceof NextResponse) return membership;
 
   const body = await req.json();
   const sessionId = String(body?.sessionId || "").trim();

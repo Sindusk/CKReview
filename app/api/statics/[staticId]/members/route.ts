@@ -1,15 +1,14 @@
 // app/api/statics/[staticId]/members/route.ts
+//
+// GET lists the static's members (any member). POST adds an existing
+// account by username with role MEMBER (default) or MODERATOR — owner only.
+// Role changes are PATCH members/[userId]; roles are in lib/static-access.ts.
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { usersPool } from "@/lib/usersDb";
-
-async function requireMembership(staticId: number, userId: number) {
-  return prisma.staticMember.findUnique({
-    where: { staticId_userId: { staticId, userId } },
-  });
-}
+import { requireStaticRole } from "@/lib/static-access";
 
 export async function GET(
   _req: NextRequest,
@@ -23,10 +22,10 @@ export async function GET(
     return NextResponse.json({ error: "Invalid static id" }, { status: 400 });
   }
 
-  const membership = await requireMembership(staticId, user.id);
-  if (!membership) return NextResponse.json({ error: "Not a member of this static" }, { status: 403 });
+  const membership = await requireStaticRole(staticId, user.id, "MEMBER");
+  if (membership instanceof NextResponse) return membership;
 
-  const members = await prisma.staticMember.findMany({ where: { staticId } });
+  const members = await prisma.staticMember.findMany({ where: { staticId }, orderBy: { addedAt: "asc" } });
 
   // StaticMember.userId isn't an FK into this app's own schema (that
   // account lives in the shared users DB), so usernames are resolved with
@@ -62,14 +61,16 @@ export async function POST(
     return NextResponse.json({ error: "Invalid static id" }, { status: 400 });
   }
 
-  const membership = await requireMembership(staticId, user.id);
-  if (!membership || membership.role !== "OWNER") {
-    return NextResponse.json({ error: "Only an owner can add members" }, { status: 403 });
-  }
+  const membership = await requireStaticRole(staticId, user.id, "OWNER");
+  if (membership instanceof NextResponse) return membership;
 
   const body = await req.json();
   const username = String(body?.username || "").trim().toLowerCase();
   if (!username) return NextResponse.json({ error: "Username is required" }, { status: 400 });
+  const role = body?.role ?? "MEMBER";
+  if (role !== "MEMBER" && role !== "MODERATOR") {
+    return NextResponse.json({ error: "role must be MEMBER or MODERATOR" }, { status: 400 });
+  }
 
   // No auto-create here (unlike login) — this claims an *existing* account,
   // it doesn't create one on the invitee's behalf.
@@ -79,11 +80,18 @@ export async function POST(
   }
   const targetUserId: number = found.rows[0].id;
 
-  const added = await prisma.staticMember.upsert({
-    where:  { staticId_userId: { staticId, userId: targetUserId } },
-    update: {},
-    create: { staticId, userId: targetUserId, role: "MEMBER" },
+  const existing = await prisma.staticMember.findUnique({
+    where: { staticId_userId: { staticId, userId: targetUserId } },
+  });
+  if (existing) {
+    return NextResponse.json({ error: "That account is already a member" }, { status: 409 });
+  }
+
+  const added = await prisma.staticMember.create({
+    data: { staticId, userId: targetUserId, role },
   });
 
-  return NextResponse.json({ member: { userId: added.userId, username, role: added.role } });
+  return NextResponse.json({
+    member: { userId: added.userId, username, role: added.role, addedAt: added.addedAt },
+  });
 }
