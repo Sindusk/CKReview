@@ -268,6 +268,9 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
     if (logHasWaymarks) return { kind: "log" };
     return waymarkPresets[0] ? { kind: "preset", preset: waymarkPresets[0] } : null;
   })();
+  const hasWaymarkChoice = !!data && data.game !== "wow" && (waymarkPresets.length > 0 || logHasWaymarks);
+  // Shown waymarks that come from a preset, not this pull's log: flagged on the arena.
+  const inferredWaymarks = waymarkSource?.kind === "preset" ? waymarkSource.preset : null;
   const tethers = useMemo(() => (data && data.game !== "wow" ? buildTethers(data) : []), [data]);
   const players = useMemo(() => new Map((pull?.players ?? []).map((p) => [p.name, p])), [pull]);
   const slotByName = useMemo(() => {
@@ -522,16 +525,25 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
           )}
         </svg>
 
-        {showAoes && (raidwide.length > 0 || fightNotes.length > 0) && (
+        {((showAoes && (raidwide.length > 0 || fightNotes.length > 0)) || inferredWaymarks) && (
           <div style={{ position: "absolute", top: 14, right: 14, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, pointerEvents: "none" }}>
+            {/* Waymarks drawn from a fight preset rather than a log of this pull. */}
+            {inferredWaymarks && (
+              <div style={{ background: "rgba(10,10,14,0.82)", border: "1px dashed #d9a441", borderRadius: 4, padding: "3px 8px", fontSize: 11, color: "#f0d9a8", fontStyle: "italic", whiteSpace: "nowrap", pointerEvents: "auto", cursor: "help" }}
+                title={"These waymarks aren't from this pull. FFLogs doesn't record waymarks, so this is the fight's default layout"
+                  + (inferredWaymarks.note ? ` (${inferredWaymarks.note})` : "")
+                  + ". Load an ACT / IINACT log covering this pull (Layers menu) to show the real ones."}>
+                ⓘ Waymarks inferred: {inferredWaymarks.name}
+              </div>
+            )}
             {/* The fight's standing limits (FightReplay.notes): what the log can't place. */}
-            {fightNotes.map((n) => (
+            {showAoes && fightNotes.map((n) => (
               <div key={n} style={{ background: "rgba(10,10,14,0.82)", border: "1px dashed #8a8f9a", borderRadius: 4, padding: "3px 8px", fontSize: 11, color: "#c4c8d0", fontStyle: "italic", whiteSpace: "nowrap" }}
                 title="A limit of the log, not something missing from this replay">
                 ⓘ {n}
               </div>
             ))}
-            {wowRaidwideAt(raidwide, t).slice(0, 3).map((r) => (
+            {showAoes && wowRaidwideAt(raidwide, t).slice(0, 3).map((r) => (
               <div key={`${r.t}-${r.name}`} style={{ background: "rgba(60,20,90,0.85)", border: "1px solid #b47bff", borderRadius: 4, padding: "3px 8px", fontSize: 12, color: "#f1e2ff", whiteSpace: "nowrap" }}
                 title="A room-wide hit">
                 {r.name} <span style={{ color: "#c99bff" }}>· {r.players} hit</span>
@@ -584,6 +596,22 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             />
           </>
         )}
+        {/* Waymarks: only for fights that have a preset, or a loaded log with some. */}
+        {hasWaymarkChoice && (
+          <label style={{ color: "var(--ck-text-2)", fontSize: 13, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}
+            title="FFLogs has no waymarks. Auto shows them from a loaded ACT / IINACT log when one covers this pull, else the fight's default preset.">
+            Waymarks
+            <select value={waymarkChoice} onChange={(e) => setWaymarkChoice(e.target.value)}>
+              <option value="auto">Auto{waymarkChoice === "auto" ? ` (${waymarkSource ? (waymarkSource.kind === "log" ? "log" : `${waymarkSource.preset.name}, inferred`) : "none"})` : ""}</option>
+              <option value="log" disabled={!logHasWaymarks}>From log{logHasWaymarks ? "" : " (none loaded)"}</option>
+              {waymarkPresets.map((p) => <option key={p.name} value={p.name}>{p.name} (inferred)</option>)}
+              {waymarkChoice !== "auto" && waymarkChoice !== "log" && waymarkChoice !== "off" && !waymarkPresets.some((p) => p.name === waymarkChoice) && (
+                <option value={waymarkChoice}>{waymarkChoice} (not in this fight)</option>
+              )}
+              <option value="off">Off</option>
+            </select>
+          </label>
+        )}
         <button className="ck-btn" onClick={() => setLayersOpen((v) => !v)} aria-expanded={layersOpen}>Layers ▾</button>
         {layersOpen && (
           <div className="ck-menu" style={{ position: "absolute", right: 10, bottom: "100%", marginBottom: 4, zIndex: 5, padding: "6px 10px", display: "flex", flexDirection: "column", gap: 4 }}>
@@ -594,22 +622,6 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             <Toggle label="5y grid" title={`A 5-${unit.slice(0, -1)} grid with 0,0 at the ${wow ? "party's median position" : "arena centre"}`} checked={showGrid} onChange={setShowGrid} />
             <Toggle label="Helper actors" title="Untargetable actors that place AoEs" checked={showHelpers} onChange={setShowHelpers} />
             {!wow && <Toggle label="Statuses" title="Debuffs enemies put on each player, with time left and stacks, and head markers" checked={showStatuses} onChange={setShowStatuses} />}
-            {!wow && (
-              <label style={{ color: "var(--ck-text-2)", fontSize: 13, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}
-                title={"FFLogs has no waymarks. Auto shows them from a loaded ACT / IINACT log when one covers this pull, else the fight's default preset."
-                  + (waymarkSource?.kind === "preset" && waymarkSource.preset.note ? `\nShowing: ${waymarkSource.preset.note}` : "")}>
-                Waymarks
-                <select value={waymarkChoice} onChange={(e) => setWaymarkChoice(e.target.value)}>
-                  <option value="auto">Auto{waymarkChoice === "auto" ? ` (${waymarkSource ? (waymarkSource.kind === "log" ? "log" : waymarkSource.preset.name) : "none"})` : ""}</option>
-                  <option value="log" disabled={!logHasWaymarks}>From log{logHasWaymarks ? "" : " (none loaded)"}</option>
-                  {waymarkPresets.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
-                  {waymarkChoice !== "auto" && waymarkChoice !== "log" && waymarkChoice !== "off" && !waymarkPresets.some((p) => p.name === waymarkChoice) && (
-                    <option value={waymarkChoice}>{waymarkChoice} (not in this fight)</option>
-                  )}
-                  <option value="off">Off</option>
-                </select>
-              </label>
-            )}
             {!wow && onWaymarkLogFile && (
               <>
                 <button className="ck-btn" style={{ fontSize: 12 }} disabled={waymarkLogProgress !== null}

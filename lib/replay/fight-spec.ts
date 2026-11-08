@@ -26,7 +26,7 @@
 //                 place, said outright instead of drawn as a guess
 //   hitboxes      WoW: enemy hitbox radii by name (WCL gives none)
 //   waymarkPresets FFXIV: default waymark layouts (A-D, 1-4) offered in the
-//                 Layers menu for pulls no loaded ACT log covers
+//                 Waymarks dropdown for pulls no loaded ACT log covers
 //                 (lib/replay/waymarks.ts); the first is the default
 //
 // A spec applies to a pull when any of its `signature` ability ids, or any

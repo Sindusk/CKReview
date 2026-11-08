@@ -16,7 +16,7 @@
 //    them too: waymarks never survive one in game.
 //    Limit: waymarks placed before the log started aren't in it.
 // 2. **A fight's default presets** (FightReplay.waymarkPresets in the
-//    fight's replay spec), picked from the Layers menu when the static
+//    fight's replay spec), picked from the Waymarks dropdown when the static
 //    plays from FFLogs only.
 //
 // Units here are the replay's: centi-yalms, +y south.

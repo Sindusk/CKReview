@@ -508,9 +508,12 @@ file's header comment. Mechanic detection has its own guide:
   the user picks in the Layers menu, matched to pulls by wall-clock time
   and saved per file in localStorage (only the zone and waymark lines;
   the log never leaves the browser), or from the fight's default presets
-  (`FightReplay.waymarkPresets`). The Layers menu's Waymarks dropdown:
+  (`FightReplay.waymarkPresets`). The control bar's Waymarks dropdown,
+  shown only when the fight has a preset or a loaded log has waymarks:
   Auto (log when one covers the pull, else the first preset), From log,
-  each preset, Off; remembered across pulls.
+  each preset, Off; remembered across pulls. While a preset is drawn, an
+  amber "Waymarks inferred" pill sits top right of the arena; its tooltip
+  says the marks aren't this pull's and names the preset's source.
 - **Facing:** players get a wedge, bosses the game's target ring (orange
   arc open at the back, front marker, side chevrons) at hitbox size, from
   geometry.ts's `facingToCompassBearing`. The replay's
