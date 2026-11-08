@@ -111,6 +111,7 @@ export default function OnboardingView({
   onLiveLogEnabledChange,
   connected,
   onConnect,
+  onLocalLog,
 }: {
   value:                  string;
   onChange:               (v: string) => void;
@@ -123,6 +124,8 @@ export default function OnboardingView({
   onLiveLogEnabledChange: (v: boolean) => void;
   connected:              { wcl: boolean; ffl: boolean };
   onConnect:              (provider: LogProvider) => void;
+  /** Opens the local ACT / IINACT log import (components/LocalLogImportDialog.tsx). */
+  onLocalLog:             () => void;
 }) {
   const [focused, setFocused] = useState(false);
   const anyConnected = connected.wcl || connected.ffl;
@@ -220,6 +223,11 @@ export default function OnboardingView({
                 <input type="checkbox" checked={liveLogEnabled} onChange={e => onLiveLogEnabledChange(e.target.checked)} />
                 Live log — keep importing new pulls as they happen
               </label>
+              <button className="ck-btn" onClick={onLocalLog} style={{ marginTop: 10, marginLeft: 16, fontSize: 13 }}
+                title="FFXIV: an ACT or IINACT Network_*.log from this computer, read in the browser and never uploaded">
+                <GlyphIcon name="upload" size={15} />
+                Or import an ACT / IINACT log…
+              </button>
 
               {error && (
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, fontSize: 13, color: "#f87171" }}>

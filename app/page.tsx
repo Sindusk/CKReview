@@ -52,6 +52,9 @@ import { createCallWipeError, CALL_WIPE_RULE_ID, createManualError, type ManualE
 import type { SavedSession, SavedSessionVod } from "@/types/Session";
 import useTimelineController from "@/hooks/useTimelineController";
 import { useLogWaymarks } from "@/hooks/useLogWaymarks";
+import LocalLogImportDialog from "@/components/LocalLogImportDialog";
+import { buildLocalReplay, importLocalLog, localLogUrl, parseLocalLogUrl, type ActZoneVisit } from "@/lib/local-log/import";
+import type { ActLogImport } from "@/lib/local-log/act-report";
 import { fetchReport, fetchFightData, fetchWowReplayData, buildFightLogLabels, getWCLRateLimitStatus, isWCLQuotaExhausted, beginWCLImportMeasure, endWCLImportMeasure, type WCLReport } from "@/lib/wcl-client";
 import {
   transformReportToPulls,
@@ -448,6 +451,10 @@ export default function Home() {
   // FFXIV waymarks from ACT / IINACT logs the user picked, matched to the
   // pull by wall-clock time (hooks/useLogWaymarks.ts).
   const logWaymarks = useLogWaymarks();
+  // A report imported from an ACT / IINACT log (lib/local-log/import.ts):
+  // kept in memory so Load replay builds from it instead of calling FFLogs.
+  const localImportRef = useRef<ActLogImport | null>(null);
+  const [localLogOpen, setLocalLogOpen] = useState(false);
   const activePullWaymarks = useMemo(() => {
     if (!activePull || activePull.game !== "ffxiv" || activePull.reportStartedAt === undefined) return null;
     const start = activePull.reportStartedAt + activePull.startTime * 1000;
@@ -461,7 +468,13 @@ export default function Home() {
     try {
       let data: ReplayData | null = null;
       const wow = activePull.logSource === "wcl";
-      if (loadedFromSampleData) {
+      const local = localImportRef.current;
+      if (local && local.report.code === activePull.reportCode) {
+        data = await buildLocalReplay(local, activePull.fightId);
+        if (!data) throw new Error("This pull isn't in the loaded log file.");
+      } else if (parseLocalLogUrl(sessionReportUrlRef.current)) {
+        throw new Error("This pull came from a local log file: import the same file again to load its replay.");
+      } else if (loadedFromSampleData) {
         const res = await fetch(`/api/sample-report/${activePull.logSource}/${activePull.reportCode}/replay/${activePull.fightId}`);
         if (res.ok) data = await res.json();
       }
@@ -715,10 +728,17 @@ export default function Home() {
   const startNewSessionIfDifferentLog = useCallback((rawInput: string) => {
     if (!sessionIdRef.current) return;
 
-    const current = parseLogUrl(sessionReportUrlRef.current ?? "");
-    const next    = parseLogUrl(rawInput);
+    // A report's identity: its log source and code, or a local log's code.
+    const identity = (raw: string) => {
+      const local = parseLocalLogUrl(raw);
+      if (local) return `local:${local}`;
+      const p = parseLogUrl(raw);
+      return p ? `${p.source}:${p.code}` : null;
+    };
+    const current = identity(sessionReportUrlRef.current ?? "");
+    const next    = identity(rawInput);
     if (!next) return;
-    if (current && current.source === next.source && current.code === next.code) return;
+    if (current === next) return;
 
     sessionIdRef.current = null;
     readOnlySessionRef.current = false;
@@ -830,6 +850,8 @@ export default function Home() {
   // Report half of a local VOD's remembered-sync key (lib/local-vod-sync.ts):
   // the same file's offset only applies to the log it was calibrated on.
   function currentReportKey(): string {
+    const local = parseLocalLogUrl(sessionReportUrlRef.current);
+    if (local) return `local:${local}`;
     const parsed = parseLogUrl(sessionReportUrlRef.current ?? "");
     return parsed ? `${parsed.source}:${parsed.code}` : "";
   }
@@ -1203,6 +1225,12 @@ export default function Home() {
   ): Promise<string | null> {
     const parsed = parseLogUrl(rawInput);
 
+    if (!parsed && parseLocalLogUrl(rawInput)) {
+      const message = "This session came from a local log file. Open the same file again with \"Import a local log\".";
+      setImportError(message);
+      setLocalLogOpen(true);
+      return message;
+    }
     if (!parsed) {
       const message =
         "Please paste a full WarcraftLogs or FFLogs report URL " +
@@ -1470,6 +1498,40 @@ export default function Home() {
     persistSession();
   }
 
+  // ── Local ACT / IINACT log (lib/local-log/import.ts) ──────────────────────
+  // Parsed in the browser into the same report shape as an FFLogs import,
+  // then loaded through applySampleReport's path. The session's report URL
+  // is local-log:<code>; the same file gives the same code, so its saved
+  // session (wipe calls, VOD sync) comes back when the file is re-opened.
+  async function handleImportLocalLog(file: File, visits: ActZoneVisit[]) {
+    setLocalLogOpen(false);
+    setImporting(true);
+    setImportError(null);
+    setImportProgress(0);
+    setImportStatus(`Reading ${file.name}…`);
+    try {
+      const imp = await importLocalLog(file, visits, (f) => setImportProgress(Math.round(f * 90)));
+      if (!imp.report.fights.length) throw new Error("No pulls found in the chosen duties.");
+      const url = localLogUrl(imp.report.code);
+      startNewSessionIfDifferentLog(url);
+      setSessionReportUrl(url);
+      sessionReportUrlRef.current = url;
+      setImportInput(url);
+      localImportRef.current = imp;
+      // The same pass read the waymarks: the replay picks them up by time.
+      logWaymarks.addRead({ name: file.name, size: file.size, start: imp.fileStart, end: imp.fileEnd, events: imp.waymarks });
+      setReplays({});
+      applySampleReport({ source: "ffl", report: imp.report, fightDataList: imp.fightDataList } as SampleReportPayload);
+      setLoadedFromSampleData(false);
+      setImportStatus(`Log Loaded: ${imp.report.title}`);
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : String(err));
+      setImportStatus(null);
+    } finally {
+      setImporting(false);
+    }
+  }
+
   async function handleUseSampleData() {
     const found = sampleDataFound;
     setSampleDataFound(null);
@@ -1554,6 +1616,7 @@ export default function Home() {
       liveLogEnabled={liveLogEnabled}
       onLiveLogEnabledChange={handleLiveLogEnabledChange}
       onConnect={setLogApiSetup}
+      onLocalLog={() => setLocalLogOpen(true)}
     />
   );
   const reportLoaded = loadedReportCode !== null && !importing;
@@ -1693,6 +1756,7 @@ export default function Home() {
           onLiveLogEnabledChange={handleLiveLogEnabledChange}
           connected={logsConnected}
           onConnect={setLogApiSetup}
+          onLocalLog={() => setLocalLogOpen(true)}
         />
       ) : (
       <div
@@ -1915,6 +1979,8 @@ export default function Home() {
         onImportFresh={handleImportFreshInstead}
       />
 
+      {localLogOpen && <LocalLogImportDialog onClose={() => setLocalLogOpen(false)} onImport={handleImportLocalLog} />}
+
       <SampleDataFoundDialog
         open={sampleDataFound !== null}
         reportCode={sampleDataFound?.code ?? ""}
@@ -2123,8 +2189,10 @@ function WCLImportBar({
   liveLogEnabled,
   onLiveLogEnabledChange,
   onConnect,
+  onLocalLog,
 }: {
   onConnect:        (provider: LogProvider) => void;
+  onLocalLog:       () => void;
   value:            string;
   onChange:         (v: string) => void;
   importing:        boolean;
@@ -2208,6 +2276,9 @@ function WCLImportBar({
       >
         <LineGlyph name="upload" size={14} />
         Import
+      </button>
+      <button className="ck-btn" onClick={onLocalLog} title="Import an ACT / IINACT network log from this computer (FFXIV)">
+        Local log…
       </button>
       {error && (
         <span style={{ fontSize: "12px", color: "#f87171", maxWidth: "320px" }}>

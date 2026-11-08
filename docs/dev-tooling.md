@@ -145,6 +145,19 @@ nothing written:
   cooldown).
 - Then `node scripts/fetch-wow-report.js <code> --fight <id>`.
 
+## Local ACT / IINACT logs
+
+- `node scripts/check-local-log.js <Network_*.log> [--zone "<zone>"] [--pulls 1-3] [--errors] [--stats]`
+  runs a log through the local-log importer and the detection pipeline and
+  prints each pull (jobs, never names).
+- `node scripts/compare-local-log.js <Network_*.log> <fflogs code> [--times]`
+  pairs the log's pulls with an FFLogs sample of the same night (fetch it
+  with `--fight` first) and prints what differs: start and length, stream
+  counts, deaths, errors. Run it after any change to
+  `lib/local-log/act-report.ts`.
+- The logs are large (50-300MB) and full of other players' names: never
+  copy them into the repo. Read them with `grep`/`awk` on line types.
+
 ## Analyzing a report (`scripts/analyze-report.js`)
 
 The standard investigation recipes for verifying a model or debugging a

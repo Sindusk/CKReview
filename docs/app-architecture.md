@@ -248,6 +248,37 @@ file's header comment. Mechanic detection has its own guide:
     `proxy_set_header X-Real-IP $remote_addr;` so the throttle can count
     per address.
 
+## Local ACT / IINACT logs (FFXIV)
+
+- **What it is.** "Local log…" (toolbar) / "Or import an ACT / IINACT
+  log…" (opening screen) opens `components/LocalLogImportDialog.tsx`: pick
+  a `Network_*.log`, a quick scan lists its duties and pulls, and the
+  chosen ones are parsed in the browser (`lib/local-log/act-report.ts`,
+  whose header has the line formats and what is and isn't reproduced) into
+  the same `FFLReport` + `FFLFightData[]` an FFLogs import gives, loaded
+  through `applySampleReport`. No FFLogs account or API points; the file is
+  never uploaded.
+- **Checked against FFLogs** (`scripts/compare-local-log.js`, 2026-11-08):
+  three Dancing Mad pulls of a night uploaded by another raider
+  (Hbd3BmMhwGAaF1px) against the user's IINACT log of it gave the same
+  errors (rule, player) on every pull, the same pull start and death times
+  to the millisecond, and the same cast, damage-taken, debuff, marker and
+  tether counts. Missing on the local side: FFLogs' shields ("absorbed"),
+  simulated per-DoT / HoT ticks, natural regen and self-heals on damage
+  actions, so the Damage and Mitigation dialogs are rougher there.
+- **Sessions.** The report URL is `local-log:<code>` (`lib/local-log/
+  import.ts`; the code hashes the file's name, size and first line, so the
+  same file finds its session again). Re-opening the session needs the
+  file picked again; Import on that URL says so and opens the dialog.
+  Statics take it like any session; Resync needs the file loaded.
+- **Replay.** Load replay builds from the parsed log (`buildLocalReplay`),
+  map art from XIVAPI's Map sheet. The same pass feeds the replay's
+  waymarks.
+- **Buff vs debuff and names** come from XIVAPI (`lib/local-log/
+  status-categories.ts`); boss auto-attacks, which the game leaves unnamed,
+  are recognised by their rhythm and named "Attack" as FFLogs does
+  (roles.ts reads it for the main tank).
+
 ## Import conveniences
 
 - **Local sample data.** When a pasted report exists under `sampledata/`,
