@@ -181,7 +181,10 @@ const TRACKED = new Map<string, TrackedCooldown[]>(
       firstUseOffsetMs: spec.firstUseOffsetMs ?? 0,
       holdMs:           spec.holdMs,
       prePullEvidenceIds: spec.prePullEvidence?.map((key) => XIVA_ACTIONS[key]?.id).filter((id): id is number => id !== undefined),
-      damageIds:        spec.damage?.map((key) => XIVA_ACTIONS[key]?.id).filter((id): id is number => id !== undefined),
+      damageIds:        spec.damage || spec.damageStatuses ? [
+        ...(spec.damage ?? []).map((key) => XIVA_ACTIONS[key]?.id),
+        ...(spec.damageStatuses ?? []).map((key) => XIVA_STATUSES[key]?.id),
+      ].filter((id): id is number => id !== undefined) : undefined,
       landDelayMs:      spec.landDelayMs,
       petDamage:        spec.petDamage,
       valuePerUse:      spec.valuePerUse,
@@ -190,6 +193,7 @@ const TRACKED = new Map<string, TrackedCooldown[]>(
       holdMsOnPatches:  spec.holdMsOnPatches,
       recastOnPatches:  spec.recastOnPatches,
       minLevel:         spec.minLevel,
+      chargesFromLevel: spec.chargesFromLevel,
     }];
   })]),
 );

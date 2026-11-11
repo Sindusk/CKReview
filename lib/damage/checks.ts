@@ -596,6 +596,8 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
   // Each window counts only for the cooldown's last recharge before its
   // target (holdWindowsFor).
   const holds = ctx.context?.cooldownHoldWindows?.(ctx.pull) ?? [];
+  // A death that lasts to the end of the analysis (a wipe's).
+  const deadToEnd = ctx.dead.find((d) => d.endMs >= ctx.endMs)?.startMs;
 
   for (const tracked of ctx.game.trackedCooldowns(ctx.job)) {
     if (ctx.patch && tracked.notOnPatches?.includes(ctx.patch)) continue;
@@ -604,7 +606,8 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
     // is the cap's: Reassemble has one charge before 84).
     if (ctx.level !== undefined) {
       if (tracked.minLevel !== undefined && ctx.level < tracked.minLevel) continue;
-      if (!tracked.actionIds.some((id) => learnedAt(ctx, id)) || tracked.charges > 1) continue;
+      if (!tracked.actionIds.some((id) => learnedAt(ctx, id))) continue;
+      if (tracked.charges > 1 && !(tracked.chargesFromLevel !== undefined && ctx.level >= tracked.chargesFromLevel)) continue;
     }
     const patchHold = ctx.patch !== undefined ? tracked.holdMsOnPatches?.[ctx.patch] : undefined;
     const patchRecast = ctx.patch !== undefined ? tracked.recastOnPatches?.[ctx.patch] : undefined;
@@ -671,7 +674,15 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
       // xivanalysis's 15/17).
       const blockers = ctx.decidingPhaseStart !== undefined && w.endMs >= ctx.decidingPhaseStart ? withDeciding : notHeld;
       const first = avoidable > 0 ? w.startMs : firstPressable(w.startMs, w.endMs, cd.landDelayMs ?? 0, blockers);
-      const lost = first === undefined ? 0 : Math.floor(Math.max(0, w.endMs - first - allowance) / cd.cooldownMs);
+      // Dead to the end of the pull, the stretch ends at the death: lying
+      // dead isn't ready time. jN3XDrf2z8PmLgRJ Red Hot and Deep Blue (Dark
+      // Knight): pull 42's Salted Earth, back at 1:45.6 with ~1s before
+      // downtime, dead from 2:00.9 to the 3:23 wipe, read as a lost use.
+      // Holds short of a recast before such a death drop out like any other
+      // (pull 35's Delirium, 10.8s; pull 19's Carve and Spit, 22s), and the
+      // death is counted on its own.
+      const stretchEnd = Math.min(w.endMs, deadToEnd ?? Infinity);
+      const lost = first === undefined ? 0 : Math.floor(Math.max(0, stretchEnd - first - allowance) / cd.cooldownMs);
       stretchLost += lost;
       // Anchored on the longest hold, not the longest stretch: a stretch
       // mostly in downtime (Aetherflow 6:40-7:18) isn't where it drifted.
@@ -703,7 +714,7 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
     const atKill = killLost > Math.max(stretchLost, Math.floor(unforced / cd.cooldownMs), openerLost)
       ? "; without the holds, one more would have landed before the kill" : "";
     const heldText = unforced > 0 ? `sat ready for ${s(unforced)} in total` : "had a charge back and unused at the kill";
-    const custom = cd.valuePerUse?.(ctx.player, ctx.endMs, ctx.values.gcdValue(undefined, false));
+    const custom = cd.valuePerUse?.(ctx.player, ctx.endMs, ctx.values.gcdValue(undefined, false), ctx.level);
     if (cd.valuePerUse) {
       if (!custom || custom.value <= 0) continue;
       const uses = (n: number) => `${n} use${n === 1 ? "" : "s"}`;

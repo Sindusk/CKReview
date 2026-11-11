@@ -240,7 +240,8 @@ export type TrackedCooldown = {
   // the basis to print. Overrides damageIds / petDamage / own damage.
   // gcdValue: the player's average GCD, for a GCD cooldown whose lost use
   // still had its GCD filled (Retribution's Divine Toll).
-  valuePerUse?(player: PlayerInfo, endMs: number, gcdValue: number): { value: number; basis: string } | undefined;
+  // level: the sync level (DamageGame.levelOf), below the cap only.
+  valuePerUse?(player: PlayerInfo, endMs: number, gcdValue: number, level?: number): { value: number; basis: string } | undefined;
   // Party buffs a use leads to that its action doesn't apply itself
   // (Technical Step → Technical Finish): valued as the buff's average
   // window (checks.ts checkCooldownDrift).
@@ -258,6 +259,10 @@ export type TrackedCooldown = {
   // (DamageGame.levelOf): Black Mage's Amplifier (86) in TEA (80) read as
   // never pressed.
   minLevel?: number;
+  // Synced below the cap, a cooldown with charges isn't judged (charges
+  // come with traits) unless its vendored charges hold from this level
+  // (Dark Knight's Shadowbringer: two charges when learned at 90).
+  chargesFromLevel?: number;
   // holdMs on these patches instead (Gunbreaker's Bloodfest waited for
   // No Mercy before 7.4: 10s).
   holdMsOnPatches?: Record<string, number>;

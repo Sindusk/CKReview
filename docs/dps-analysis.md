@@ -256,6 +256,22 @@ buffs). The on-disk TOP captures start late (`--from-minutes`), which
 the damage analysis skips, so the full kill lives in
 `sampledata/damage-ff/bNcrLh7Y4dkHxM9q-full/` and is swapped over the
 partial Pull 16 only for a print-only run, then restored.
+A solo P8S kill (pQN92wtfWMqCR3zj, 2026-11-11, docs/damage-case-studies/)
+added Endwalker savage / extreme names at 90 and showed two synced-level
+gaps that generalize:
+- **The buff stream only fetches the cap's statuses**
+  (`buff-stream.ts`): a below-cap status with its own id (Dark Knight's
+  pre-96 Delirium, 1972) never reaches disk, so a check keyed on it is
+  silent. Derive the window from the casts, or add the id to the filter
+  and refetch.
+- **A trait-gated value is undefined below its trait**: a drift value
+  built from the level-100 kit (Delirium's Scarlet combo) silently
+  drops the cooldown; give it a below-level value (`belowLevel` in
+  tracked-cooldowns.ts; `valuePerUse` gets the sync level).
+- **A tracked cooldown with no damage under its own id is never judged**
+  (Salted Earth's ticks log under its status): give it `damage` /
+  `damageStatuses`, then check what the drift engine newly reports. A cooldown with charges is judged only when
+  its charges are known to hold at that level (`chargesFromLevel`).
 Learn levels come from XIVAPI (`action-levels.ts`, generated). Trait
 levels that change a rule (a gauge cap, a charge) aren't in it; they're
 read from the job guides and named in the `fromLevel` comment. The

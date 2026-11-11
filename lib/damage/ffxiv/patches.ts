@@ -15,6 +15,7 @@
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
 
 import type { Pull } from "@/types/Pull";
+import { ACTION_LEVELS } from "./action-levels";
 
 const PATCHES: [patch: string, startsSec: number][] = [
   ["7.0", 1719565200],  // 28/06/24
@@ -35,11 +36,27 @@ const SYNC_LEVELS: Record<string, number> = {
   "The Epic of Alexander": 80,
   "Dragonsong's Reprise": 90,
   "The Omega Protocol": 90,
+  // Endwalker savage and extreme fights (FFLogs fight names), played synced
+  // (pQN92wtfWMqCR3zj: a solo Hephaistos kill, base substats 400, the
+  // level-90 value). Only Hephaistos is checked against a log so far.
+  ...Object.fromEntries([
+    "Erichthonios", "Hippokampos", "Phoinix", "Hesperos", "Hesperos II",
+    "Proto-Carbuncle", "Hegemone", "Agdistis", "Hephaistos", "Hephaistos II",
+    "Kokytos", "Pandæmonium", "Themis", "Athena", "Pallas Athena",
+    "Zodiark", "Hydaelyn", "Endsinger", "Barbariccia", "Rubicante", "Golbez", "Zeromus",
+  ].map((n) => [n, 90])),
 };
 
-/** The level the encounter syncs to, or undefined at the current cap. */
+/**
+ * The level the encounter syncs to, or undefined at the current cap. A
+ * pull where anyone pressed an action learned above that level was played
+ * unsynced (old content can be): judged at the cap.
+ */
 export function levelOf(pull: Pull): number | undefined {
-  return SYNC_LEVELS[pull.name];
+  const level = SYNC_LEVELS[pull.name];
+  if (level === undefined) return undefined;
+  const above = pull.players.some((p) => p.casts.some((c) => (ACTION_LEVELS[c.abilityId] ?? 0) > level));
+  return above ? undefined : level;
 }
 
 /** The patch live when the log started, or undefined when the date isn't known. */

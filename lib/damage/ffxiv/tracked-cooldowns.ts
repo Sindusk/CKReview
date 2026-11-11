@@ -32,6 +32,10 @@ export type TrackedCooldownSpec = {
   prePullEvidence?:  string[];
   // Action keys its damage logs under, when not its own (a pet's hits).
   damage?:           string[];
+  // Status keys its damage logs under (Salted Earth's ticks, 1000749).
+  damageStatuses?:   string[];
+  // Its vendored charges already hold from this level (TrackedCooldown.chargesFromLevel).
+  chargesFromLevel?: number;
   // Its effect lands this long after the press (checks.ts roomForUses).
   landDelayMs?:      number;
   // Its damage is the player's pet hits (Bunshin's shadow).
@@ -171,6 +175,13 @@ function innerReleaseValue(player: PlayerInfo, endMs: number): { value: number; 
 // of any of them, averaged over all their uses: Monk's Blitzes, Red
 // Mage's Verflare or Verholy, a job's filler GCDs.
 type UnlockKey = string | { keys: string[]; label: string };
+/** One valuePerUse rule below a level (synced content), another at or above it. */
+function belowLevel(level: number, below: NonNullable<TrackedCooldown["valuePerUse"]>,
+  atCap: NonNullable<TrackedCooldown["valuePerUse"]>): TrackedCooldown["valuePerUse"] {
+  return (player, endMs, gcdValue, syncLevel) =>
+    (syncLevel !== undefined && syncLevel < level ? below : atCap)(player, endMs, gcdValue, syncLevel);
+}
+
 function unlockValue(plus: UnlockKey[], minus: UnlockKey[]) {
   return (player: PlayerInfo, endMs: number): { value: number; basis: string } | undefined => {
     const avg = (key: UnlockKey) => {
@@ -339,11 +350,19 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
       holdMsOnPatches: onPatches(PRE_7_4, 10_000), recastOnPatches: onPatches(PRE_7_4, { cooldownMs: 120_000 }) },
   ],
   "Dark Knight": [
+    // Below 96 a Delirium is three free Bloodspillers (jobs/drk.ts), not
+    // the combo, whose value is undefined there.
     { actions: ["DELIRIUM"], firstUseOffsetMs: 10000,
-      valuePerUse: unlockValue(["SCARLET_DELIRIUM", "COMEUPPANCE", "TORCLEAVER", "DISESTEEM"], ["HARD_SLASH", "SYPHON_STRIKE", "SOULEATER", "HARD_SLASH"]) },
-    { actions: ["SALTED_EARTH"], firstUseOffsetMs: 12500 },
+      valuePerUse: belowLevel(96,
+        unlockValue(["BLOODSPILLER", "BLOODSPILLER", "BLOODSPILLER"], ["HARD_SLASH", "SYPHON_STRIKE", "SOULEATER"]),
+        unlockValue(["SCARLET_DELIRIUM", "COMEUPPANCE", "TORCLEAVER", "DISESTEEM"], ["HARD_SLASH", "SYPHON_STRIKE", "SOULEATER", "HARD_SLASH"])) },
+    // Its ticks log under the status (1000749), and a lost Salted Earth
+    // loses its Salt and Darkness too. With no damage ids its drift was
+    // never valued (pQN92wtfWMqCR3zj: ~50s held, xivanalysis 35/36).
+    { actions: ["SALTED_EARTH"], firstUseOffsetMs: 12500, damage: ["SALT_AND_DARKNESS_DAMAGE"], damageStatuses: ["SALTED_EARTH"] },
     { actions: ["CARVE_AND_SPIT", "ABYSSAL_DRAIN"], firstUseOffsetMs: 17500 },
-    { actions: ["SHADOWBRINGER"], firstUseOffsetMs: 20000 },
+    // Two charges from its learn level (90).
+    { actions: ["SHADOWBRINGER"], firstUseOffsetMs: 20000, chargesFromLevel: 90 },
     // Its damage is Esteem's (the only Dark Knight pet). Esteem acting
     // before the first cast shows one pressed before the pull
     // (gNBGDwLzva1JdHXA Cryptknight Myth: Esteem at 0:05.5, first cast

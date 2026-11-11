@@ -60,6 +60,24 @@
 // - "4 incorrect weaves": triple weaves at 6:01, 6:14, 15:24, 18:07 that
 //   delayed the next GCD by 0.03-0.10s each, ~0.3s in all.
 //
+// Level 90 (synced), checked against xivanalysis on pQN92wtfWMqCR3zj, a
+// solo Hephaistos kill (7.5, 2026-11-11; xivanalysis has no level-90
+// rules, so its level-100 claims are discounted). Matched: GCD uptime and
+// the 26:42 triple weave (2.8s), Darkside drops, the 10:42 broken combo,
+// all 26 Esteem summons full (at 90 its sixth action is Carve and Spit,
+// read from the pet as before), Delirium 52/52 with three free
+// Bloodspillers each. Built: the level-90 Delirium (below), Blood and MP
+// under it, Salted Earth's drift value (tracked-cooldowns.ts), Shadowbringer
+// judged at 90 (two charges from 90), and the Dark Arts break by absorb
+// total (below), which also removed a false overwrite at 28:33. Not adopted:
+// - "31 Dark Arts lost": 0 overwrites and 63 shields that expired unbroken
+//   (mitigation, not counted; see darkArtsBreaks).
+// - Living Shadow 26/27: ~23s held in all (after the 1.25s per-stretch
+//   allowance), so one more would have come back ~4s before the 54:19
+//   kill, inside usesLostAtKill's 15s margin; not counted.
+// - Defensives (Dark Mind, Reprisal, Shadowed Vigil "extra uses"):
+//   mitigation.
+//
 //   Copyright (c) 2018 Saxon Landers & contributors
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
 
@@ -73,7 +91,43 @@ import { comboLanded } from "./gnb";
 const id = (key: string) => A[key].id;
 const DELIRIUM_GCDS = ["SCARLET_DELIRIUM", "COMEUPPANCE", "TORCLEAVER", "IMPALEMENT"].map(id);
 
+// Below 96 (Enhanced Delirium) Delirium is 3 stacks that make Bloodspiller
+// or Quietus free, under status 1972, which the buff stream's filter
+// (buff-stream.ts, the cap's statuses) doesn't fetch. So the windows come
+// from the casts: each Delirium to its third Bloodspiller / Quietus, or
+// its 15s. Measured on pQN92wtfWMqCR3zj (level 90): the three after each
+// Delirium consume the Blood Weapon stacks it grants, and each brings 200
+// MP like the level-100 Delirium combo (MP logged at the next cast).
+const ENHANCED_DELIRIUM_LEVEL = 96;
+const DELIRIUM_MS = 15_000;
+const freeDelirium = (ctx: PlayerCheckContext) => ctx.level !== undefined && ctx.level < ENHANCED_DELIRIUM_LEVEL;
+function freeDeliriumWindows(ctx: PlayerCheckContext): { window: Window; spends: number[] }[] {
+  const spenders = new Set([id("BLOODSPILLER"), id("QUIETUS")]);
+  const casts = [...ctx.player.casts].sort((a, b) => a.timestamp - b.timestamp);
+  return casts.filter((c) => c.abilityId === id("DELIRIUM")).map((d) => {
+    const spends = casts.filter((c) => spenders.has(c.abilityId) && c.timestamp > d.timestamp && c.timestamp <= d.timestamp + DELIRIUM_MS)
+      .slice(0, 3).map((c) => c.timestamp);
+    const endMs = spends.length === 3 ? spends[2] : d.timestamp + DELIRIUM_MS;
+    return { window: { startMs: d.timestamp, endMs }, spends };
+  });
+}
+
 const delirium: JobCheck = (ctx) => {
+  if (freeDelirium(ctx)) {
+    const avgSpiller = Math.max(ctx.values.perUse(id("BLOODSPILLER")), ctx.values.perUse(id("QUIETUS")));
+    return burstWindowFindings(ctx, {
+      statusId: S.DELIRIUM.id,
+      name: "Delirium",
+      bonus: 0,
+      bonusBasis: "a missing free Bloodspiller = the player's average Bloodspiller minus their average GCD",
+      windows: (c) => freeDeliriumWindows(c).map((x) => x.window),
+      inference: true,
+      expected: () => [{
+        ids: [id("BLOODSPILLER"), id("QUIETUS")], count: 3, name: "free Bloodspiller",
+        value: (c) => Math.max(0, avgSpiller - c.values.gcdValue(undefined, false)),
+      }],
+    });
+  }
   const avgDelirium = Math.max(...DELIRIUM_GCDS.map((x) => ctx.values.perUse(x)));
   return burstWindowFindings(ctx, {
     statusId: S.DELIRIUM.id,
@@ -121,7 +175,9 @@ const blood: JobCheck = (ctx) => {
   const events: GaugeEvent[] = [];
   const builders = new Set([id("SOULEATER"), id("STALWART_SOUL")]);
   const spenders = new Set([id("BLOODSPILLER"), id("QUIETUS")]);
-  const deliriumWindows = statusWindows(ctx, S.DELIRIUM.id)
+  // Below 96 the three free spends are known one by one (freeDeliriumWindows).
+  const free = freeDelirium(ctx) ? new Set(freeDeliriumWindows(ctx).flatMap((x) => x.spends)) : undefined;
+  const deliriumWindows = free ? [] : statusWindows(ctx, S.DELIRIUM.id)
     .map((w) => ({ startMs: w.startMs, endMs: w.endMs + 100 }));
   // Each Blood Weapon stack a weaponskill consumes is +10: read from the
   // stack's own removal, when it coincides with a GCD.
@@ -134,7 +190,7 @@ const blood: JobCheck = (ctx) => {
     if (builders.has(c.abilityId) && comboLanded(ctx, c.abilityId, c.timestamp)) {
       events.push({ t: c.timestamp, type: "gain", amount: 20, label: `${c.abilityName} at high Blood` });
     }
-    if (spenders.has(c.abilityId) && !inWindows(c.timestamp, deliriumWindows)) {
+    if (spenders.has(c.abilityId) && !free?.has(c.timestamp) && !inWindows(c.timestamp, deliriumWindows)) {
       events.push({ t: c.timestamp, type: "spend", amount: 50, label: c.abilityName });
     }
   }
@@ -281,16 +337,50 @@ const clock = (ms: number) => {
 // in 226. Not counted: a shield that never breaks (126 of 1,058 on disk,
 // 15 of 241 among the top 38): a mitigation call whose cost is MP, which
 // the log streams the app fetches don't carry for players.
+// A break is also a shield whose absorbs add up to its whole size, 25% of
+// the target's max HP: the removal can come 0.2-0.7s before the hit that
+// broke it (the absorb logs when the hit lands). On pQN92wtfWMqCR3zj (solo,
+// level 90) 41 of 107 shields summed to exactly 32146 of 128587 HP; the
+// 50ms rule alone saw 36 of them, and across the disk the sum adds 71
+// breaks to its 1,849. xivanalysis's 31 Dark Arts lost there is its own
+// miss: it reads a removal with no remaining shield logged as broken, and
+// this log carries none, so every shield that expired read as a break.
 const TBN_ABSORB_MS = 50;
+const TBN_LATE_ABSORB_MS = 1_000;
+const TBN_SHARE = 0.25;
+// 7s from when the shield lands; removals at expiry log 7.58-7.67s after the cast.
+const TBN_EXPIRED_MS = 7_500;
 /** When The Blackest Night broke (each grants Dark Arts). */
 function darkArtsBreaks(ctx: PlayerCheckContext): number[] {
   const tbn = S.BLACKEST_NIGHT?.id;
   if (tbn === undefined) return [];
-  const h = (ctx.player.healing ?? []).filter((e) => e.abilityId === tbn && e.timestamp < ctx.endMs);
+  const h = (ctx.player.healing ?? []).filter((e) => e.abilityId === tbn && e.timestamp < ctx.endMs + TBN_LATE_ABSORB_MS);
   const absorbs = h.filter((e) => e.healType === "absorbed");
-  return h.filter((e) => e.healType === "removebuff" &&
-    absorbs.some((a) => a.target === e.target && Math.abs(a.timestamp - e.timestamp) <= TBN_ABSORB_MS))
-    .map((e) => e.timestamp).sort((a, b) => a - b);
+  const removals = h.filter((e) => e.healType === "removebuff" && e.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
+  const maxHpOf = (target: string | undefined, t: number) => {
+    const taken = ctx.pull.players.find((p) => p.name === target)?.damageTaken ?? [];
+    let best: number | undefined;
+    for (const e of taken) if (e.maxHealth && (best === undefined || e.timestamp <= t)) best = e.maxHealth;
+    return best;
+  };
+  const casts = ctx.player.casts.filter((c) => c.abilityId === id("THE_BLACKEST_NIGHT")).map((c) => c.timestamp);
+  return removals.filter((e, i) => {
+    const prev = removals.slice(0, i).reverse().find((r) => r.target === e.target)?.timestamp ?? -Infinity;
+    const sum = absorbs.filter((a) => a.target === e.target && a.timestamp > prev + TBN_LATE_ABSORB_MS && a.timestamp <= e.timestamp + TBN_LATE_ABSORB_MS)
+      .reduce((s, a) => s + (a.amount ?? 0), 0);
+    const maxHp = maxHpOf(e.target, e.timestamp);
+    const full = maxHp !== undefined && sum >= Math.floor(maxHp * TBN_SHARE) - 1;
+    if (full) return true;
+    if (!absorbs.some((a) => a.target === e.target && Math.abs(a.timestamp - e.timestamp) <= TBN_ABSORB_MS)) return false;
+    // An absorb beside a removal at the shield's full duration, with the
+    // absorbs short of its size, is a hit landing as it expired: 2 of the
+    // 1,849 50ms matches on disk (pQN92wtfWMqCR3zj 28:14, 26178 of 32146,
+    // 7.62s after the cast). The other 41 that fall short broke 1.7-7.3s
+    // in (a max HP that changed after the cast, or absorbs not logged).
+    const cast = casts.filter((t) => t < e.timestamp).pop();
+    const expired = cast !== undefined && e.timestamp - cast >= TBN_EXPIRED_MS && maxHp !== undefined;
+    return !expired;
+  }).map((e) => e.timestamp);
 }
 const darkArtsOverwrite: JobCheck = (ctx) => {
   const breaks = darkArtsBreaks(ctx);
@@ -357,11 +447,13 @@ export function drkMpLosses(ctx: PlayerCheckContext): MpLoss[] | undefined {
     (b.buffStatus === "stackRemoved" || b.buffStatus === "removed")).map((b) => b.timestamp);
   const hitAt = (c: (typeof casts)[number]) => ctx.player.damageDone.find((e) => e.abilityId === c.abilityId && !e.isDoT && !e.pet &&
     e.timestamp >= c.timestamp && e.timestamp <= c.timestamp + MP_HIT_MS)?.timestamp ?? c.timestamp + MP_HIT_DEFAULT_MS;
+  const freeSpends = new Set(freeDelirium(ctx) ? freeDeliriumWindows(ctx).flatMap((x) => x.spends) : []);
   const gains: { t: number; mp: number; how: string }[] = [];
   for (const c of ctx.player.casts) {
     let gain = gainOf.get(c.abilityId) ?? 0;
     // The combo steps give MP only in combo.
     if ((c.abilityId === id("SYPHON_STRIKE") || c.abilityId === id("STALWART_SOUL")) && !comboLanded(ctx, c.abilityId, c.timestamp)) gain = 0;
+    if (freeSpends.has(c.timestamp)) gain += 200;
     if (bloodWeapon.some((t) => Math.abs(t - c.timestamp) <= 100)) gain += 600;
     if (gain > 0) gains.push({ t: hitAt(c), mp: gain, how: c.abilityName });
   }
