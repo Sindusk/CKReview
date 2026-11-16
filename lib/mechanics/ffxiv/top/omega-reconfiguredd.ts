@@ -36,7 +36,8 @@
 //     else receiver or nearest holder, whoever walked further)
 //   ffxiv-top3-monitor     Major if a death follows, else Minor  picked twice,
 //     all alive: circle over two (+ a tank south of the DNC there, 2y), else
-//     player-less (the unpicked living are no longer named: NAME_UNPICKED). Layout: see RULES IMPLEMENTED. With
+//     the one holder > 1.0y south of the SE holder spot (clean max +0.2y,
+//     failed +1.5y), else player-less (unpicked living no longer named). Layout: see RULES IMPLEMENTED. With
 //     SGE RDM RPR GNB DRK MNK DNC SCH in the party: players > 5y off their
 //     spot ("Monitor Layout: Off the Spot", OWC_ORDER), instead of the above
 //   ffxiv-top3-hello-world Raid  empty tower, uncleansed defect, timeout,
@@ -203,8 +204,9 @@
 // in expectations/rulings.json. Unsettled, left as detected and unruled:
 // Pull 3 5:31 rot swap ("a car crash", SAM or RDM); Pull 22 6:38 shared blue
 // tower (the user leans RDM, who left the south tower's spot, but it is the
-// only shared-tower case on disk); Pull 1 7:25 the monitor holder who aimed
-// wrong (DRK, also 3y south of the clean spot) can't be named from the log.
+// only shared-tower case on disk). Pull 1 7:25 and Pull 13 7:23 monitors: the
+// DRK holder "should have been more north" (1.6y / 1.7y south of the SE spot,
+// clean max +0.2y): now named (see ffxiv-top3-monitor, HOLDER_SOUTH).
 // VOD review 2026-11-06 (user): WtGX1fYHyJMx3Pr7 Pulls 2, 6, 15, 17, 24, 31;
 // rulings in expectations/rulings.json. Open: Pull 15 6:25 rot clip was the
 // red-rot RDM moving in, not the DNC (one clip on disk shows the signal, not
@@ -328,8 +330,15 @@
 //   The living players no cannon picked are no longer named (NAME_UNPICKED
 //   false; user, 2026-11-15, Pull 1 7:25: SCH and MNK "correct", a holder
 //   (DRK) faced its monitor the wrong way, so the cannon cleaved inside; facing
-//   isn't logged, holders sat within 3y of clean spots): player-less "Monitor
-//   Picked Twice". Same fall-through for Pulls 13 7:23 / 27 7:20 (DNC, unasked).
+//   isn't logged): player-less "Monitor Picked Twice" unless exactly one
+//   holder stands > HOLDER_SOUTH (1.0y) south of the SE holder spot (10,9),
+//   boss-R frame: that holder is named "Monitor Holder Too Far South" (user,
+//   2026-11-15, Pull 1 7:25 DRK "should have been more north"; Pull 13 7:23
+//   "DRK should have been more north to make sure 2 other players get hit,
+//   not the GNB's fault"; Pull 27 7:20 GNB same spot, unasked). Measured over
+//   18 reports / 77 volleys, probe omega-reconfigured-holderspots.js: clean
+//   holders at that spot -5.3..+0.2y in y (n 49), failed volleys +1.5..+1.8y;
+//   the other two holder spots are noisy (clean +2.3y, failed +1.7y), unused.
 // ffxiv-top3-stack covers cycles 1-3 only; cycle 4's stacks are unchecked. The
 //   user could not name who was wrong on nbKLdq Pull 12 6:39.3 (DRK took the
 //   4th-cycle stack alone inside the red tower and died; the other stack had
@@ -773,6 +782,8 @@ const CLIP_RANGE          = 800; // a rot explosion is 5y; positions are interpo
 const HOLDER_MOVED        = 700;
 /** Name the living players no cannon picked? Off since the Pull 1 VOD check: they were correct, a holder's cannon was aimed wrong. */
 const NAME_UNPICKED = false;
+/** A monitor holder this far (units 1/100 y) south of the SE holder spot is off it: clean max +0.2y, failures +1.5y. */
+const HOLDER_SOUTH = 100;
 /** An early tether break: the partner who walked this much further (units 1/100 y) is the mover. */
 const TETHER_MOVER = 30;
 /** A lone stack owner this far from the arena centre (units 1/100 y) stood off the stack ring. */
@@ -1548,6 +1559,29 @@ function detectMonitors(players: PlayerInfo[], life: Life, casts: EnemyEvent[], 
       description: `No cannon picked them, so a side came up short: ${outcome}. ${MONITOR_WHY}`,
       timestamp: t, abilityId: OWC, abilityName: "Oversampled Wave Cannon",
     }));
+  }
+  // A failed volley with exactly one holder south of the SE holder spot (the
+  // (10,9) spot, boss-R frame): that holder is the one (user, 2026-11-15,
+  // Pull 1 7:25 "DRK faces the monitor the wrong way... should have been more
+  // north" and Pull 13 7:23 "DRK should have been more north to make sure 2
+  // other players get hit; not the GNB's fault"). Measured over 18 reports,
+  // 77 volleys: holders nearest that spot sit -5.3..+0.2y of it in y in clean
+  // volleys (n 49), +1.5..+1.8y in failed ones (Pulls 1, 13, 27 + one more);
+  // the other two holder spots are noisy (clean to +2.3y) and not used.
+  const southOf = hits.map((h) => h.p).filter((p) => {
+    if (!holderOf(p)) return false;
+    const q = interpolatePlayerPosition(p, t - 1000, { windowMs: 2000, maxSpanMs: 3000 });
+    if (!q) return false;
+    const x = (q.x / 100 - 100) * (boss.abilityId === 31595 ? 1 : -1), y = q.y / 100 - 100;
+    const near = OWC_SPOTS_HOLD.map((s, i) => ({ i, d: Math.hypot(x - s[0], y - s[1]) })).sort((a, b) => a.d - b.d)[0];
+    return near.i === 1 && y - OWC_SPOTS_HOLD[1][1] > HOLDER_SOUTH / 100;
+  });
+  if (southOf.length === 1) {
+    return [playerError(southOf[0], {
+      ruleId: TOP3_MONITOR_RULE_ID, severity: sev, name: "Monitor Holder Too Far South",
+      description: `Held a monitor too far south of their holder spot, so the cannon didn't land on the intended players: ${outcome}. ${MONITOR_WHY}`,
+      timestamp: t, abilityId: OWC, abilityName: "Oversampled Wave Cannon",
+    })];
   }
   return [playerlessMinor(TOP3_MONITOR_RULE_ID, "Monitor Picked Twice",
     hits.some((h) => !h.hits.length)
