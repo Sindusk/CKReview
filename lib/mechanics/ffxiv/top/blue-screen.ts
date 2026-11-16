@@ -41,6 +41,9 @@
 //   late P3 DoTs; who was early or late on a ring, a stack's raw-damage
 //   deaths, LB plan and DPS (the Damage dialog's job). Strat details (South
 //   Safe, solo-tank lines) are unknown for the user's static.
+// VOD review 2026-11-15 (user): mndNDbvQzyW97qTj Pull 24 8:23, the first P4
+// VOD check: "Wrong Stack Group" (Minor) on the player who crossed with the
+// swapping marker is correct; ruling in expectations/rulings.json.
 // Baseline (ten reports, one static, no VOD): 64 P4 pulls, 42 passed, 22
 //   wiped in P4; rings killed 18; a marked player killed before the second
 //   stacks leaves both lines on the other group.

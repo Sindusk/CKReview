@@ -16,7 +16,8 @@
 //     tower / both in one ("Same Tower", conga keeps "Wrong Tower") / another
 //     number soaking early; "Tower Out of Turn" skips a covering player
 //   ffxiv-top1-blaster       Major on Doom/death, else Minor  Blaster clips,
-//     "Wrong Tether Spot", "Took Another's Tether", "Died From a Blaster Clip"
+//     "Wrong Tether Spot", "Took Another's Tether", "Took a Tether Out of
+//     Turn" (other-number holder), "Died From a Blaster Clip"
 //   ffxiv-top1-missile       Major on death (missile >= merged lines on the
 //     victim, else the line's death), else Minor  missile hit others
 //     or carrier in a line; "Stood by a Missile" (stray, E14 1:33.2)
@@ -24,7 +25,8 @@
 //     both marked in one line, "Didn't Cross", "Left the Group"; groups
 //     broken: Major + Raid; "Pantokrator One Short" Raid, player-less
 //   ffxiv-top1-diffuse       Major on death, else Minor  farthest non-tank
-//     hit, tank missed; "Tank Cones Without Invuln" (Raid if 3+ die next)
+//     hit, tank missed; "Tank Cones Without Invuln" (Raid if 3+ die next;
+//     not a tank that died holding Damage Down after absorbing cones, Q7)
 //   ffxiv-top1-wave-cannon   line hit 2+ players, all six non-tanks alive;
 //     pantokrator-conga.ts narrows a two-player overlap to the one whose line
 //     bearing is outside its report-learned usual range (Major if the
@@ -232,6 +234,10 @@
 //   and D). D36 0:38.1: the MNK took the DNC's, the SCH's by the pairing,
 //   leaving the RDM's; the SCH then took it from the MNK. User: the MNK.
 // Report E = KCX2qW4khczmZ9T1 (the user's static, same roster and conga).
+// VOD review 2026-11-15 (user): mndNDbvQzyW97qTj Pulls 15, 25; rulings in
+// expectations/rulings.json (a tank dropping its invuln to die to the cones
+// while holding Damage Down is a reset, not an error; a tether taken out of
+// turn is that player's error, and so is the take it provokes).
 // VOD review 2026-11-06 (user): WtGX1fYHyJMx3Pr7 Pulls 5, 6, 11; rulings in
 // expectations/rulings.json. Open: Pull 21 1:48 Wave Cannon overlap was the
 // RDM alone (moved late into the RPR's line) but needs per-job usual
@@ -296,7 +302,13 @@
 //   Both In Line players in one Blaster while another stayed on last
 //   round's holder (no take): the later taker ("Took Another's Tether";
 //   user, C45); pantokrator-conga.ts moves it to the first taker when the
-//   conga pairing gave them the tether left behind (user, D36). "Died From a Blaster Clip" (Major): a player named for
+//   conga pairing gave them the tether left behind (user, D36). A holder of
+//   another In Line number who took a tether this round (with an In Line h
+//   player left off) is named "Took a Tether Out of Turn" instead of "Blaster
+//   Hit Others" (user, 2026-11-15, mndNDbvQzyW97qTj Pull 25 0:41: MNK, In Line
+//   3; SGE "Took Another's Tether" stays, SCH not flagged). Same rename on 5
+//   other pulls (2qgaAkxVypGWv9CN P4, LG64YVQy2KZbtpN8 P22, hjgk42MDf81arFVY
+//   P19, P41), no ruling touched. "Died From a Blaster Clip" (Major): a player named for
 //   standing in a Blaster who died at their own next tower/tether within
 //   Ruin's 11s, unless that round already names them (user, C34, C38).
 // ffxiv-top1-tower "Tower Out of Turn" skips a player with no duty that
@@ -337,7 +349,11 @@
 //   farthest non-tank a cone hit, and a tank no cone reached. A tank the
 //   cones killed had no invuln ("Tank Cones Without Invuln", Major; Raid
 //   when the next cones killed 3+; user, B51); an invuln cast up to 3s
-//   before their first cone is named as too late (user, D1).
+//   before their first cone is named as too late (user, D1). Not named when
+//   they absorbed earlier cones under an invuln (cast 3.5-15s before the
+//   volley) and died holding Damage Down: a deliberate reset (user,
+//   2026-11-15, mndNDbvQzyW97qTj Pull 15 1:56 GNB; the only such tank death on
+//   the 18 reports on disk).
 // ffxiv-top1-wave-cannon: a line hitting 2+ players, all six non-tanks
 //   alive (everyone it hit named here: one pull can't say who moved).
 //   Cross-pull (pantokrator-conga.ts applyWaveMover): a line on exactly two
@@ -1153,6 +1169,19 @@ function blasterClips(
     // the generic tail.
     const placed = (blamed.length === 1 && why !== "") || rest.some((x) => soaked.has(x));
     for (const p of blamed) {
+      // A holder of another number, who took a tether this round while an In
+      // Line h player was left off, took one out of turn (user, 2026-11-15,
+      // mndNDbvQzyW97qTj Pull 25 0:41-0:47: the MNK, In Line 3 owing a round-3
+      // tower, took at 0:41.3 a tether In Line 1 holds; that confused the SGE,
+      // who took the SCH's: "a mistake by both MNK and SGE, SCH was correct").
+      // Says what happened instead of "Blaster Hit Others"; the one error.
+      // Clean extreme: holder In Line h (or kept, no take); failure extreme:
+      // a different-number taker with an In Line h player left off.
+      if (p === holder && held && num.get(p) !== h && lastTake(p) > -Infinity && hPlayers.some((x) => !held!.has(x))) {
+        push(p, "Took a Tether Out of Turn",
+          `Round ${rd.r}: In Line ${num.get(p) ?? "?"}, took a Blaster tether ${((rd.t - lastTake(p)) / 1000).toFixed(1)}s before the Blaster; round ${rd.r}'s tethers are In Line ${h}'s. It also hit ${namesOf(rest)}${rest.some((x) => soaked.has(x)) ? ", in a tower" : ""}.${tailFor([holder, ...rest])}`);
+        continue;
+      }
       push(p, p === holder ? "Blaster Hit Others" : "Stood in a Blaster",
         `Round ${rd.r}: ${holder.name}'s Blaster (In Line ${h}) also hit ${namesOf(rest)}${rest.some((x) => soaked.has(x)) ? ", in a tower" : ""}${why}.${tailFor([holder, ...rest], !placed)}`);
     }
@@ -1531,7 +1560,8 @@ function fatalHitT(p: PlayerInfo, life: Life, t: number): number {
 
 // ── the final volley: Diffuse and Wave Cannon Kyrios ────────────────────────
 
-const DIFFUSE_WHY = "The two farthest from Omega take all five cones: tanks, farthest out under invuln.";
+const INVULN_SPAN_MS = 15000;
+const DIFFUSE_WHY ="The two farthest from Omega take all five cones: tanks, farthest out under invuln.";
 
 /**
  * Diffuse Wave Cannon Kyrios on a non-tank with both tanks alive: the
@@ -1558,6 +1588,17 @@ function detectDiffuse(players: PlayerInfo[], life: Life, deaths: DeathEvent[], 
       const later = volleys.filter((w) => w[0].timestamp > t).flatMap((w) => w.flatMap((c) => instanceHits(players, life, c, 1000)));
       const victims = uniq(later.filter((x) => !fallen.includes(x.p) && life.diedFrom(x.p, x.e.timestamp)).map((x) => x.p));
       for (const p of fallen) {
+        // A tank that took earlier cones under an invuln (cast within
+        // INVULN_SPAN_MS before the volley) and then died to a later cone while
+        // holding Damage Down went on purpose to drop it (user, 2026-11-15,
+        // mndNDbvQzyW97qTj Pull 15 1:56: the GNB, four cones absorbed, died to
+        // the fifth holding the 1:38 Ballistic Impact Damage Down: "dying to
+        // reset the debuff"; same call as LG64YVQy2KZbtpN8 Pull 28 1:57.8).
+        // Clean extreme: invuln up and Damage Down held; failure extreme: no
+        // invuln cast (Pull 51, 2qgaAkxVypGWv9CN) or no Damage Down.
+        const dth = deaths.find((d) => d.player === p.name && d.timestamp >= t);
+        if (dth && p.casts.some((c) => INVULNS[c.abilityId] && c.timestamp <= t - 3500 && t - c.timestamp <= INVULN_SPAN_MS)
+          && holdsAt(p, DAMAGE_DOWN, dth.timestamp - DEATH_EVENT_LAG_MS - 500)) continue;
         // An invuln pressed just before the cone didn't apply in time
         // (user, 2026-10-28, hjgk42MDf81arFVY Pull 1 1:47.6: the GNB's
         // Superbolide 0.5s before the first cone landed; Pull 8 the same;

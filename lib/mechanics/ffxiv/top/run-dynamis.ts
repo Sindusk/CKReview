@@ -15,7 +15,8 @@
 //   -delta-arm: names the baiter (cast target, else 3y+ nearest), not the hit.
 //   -wall (Major): silent death no Doom/failure/wipe/reset explains.
 //   -patch: failed Patch, both tether partners alive, both named.
-//   -monitor: Delta monitor on non-Local; Omega sit-out jumped by a World.
+//   -monitor: Delta monitor on non-Local (a Local hit twice: the Loading
+//     holder alone, 2026-11-15); Omega sit-out jumped by a World.
 //   -world: extra player in another origin circle, jump over two or back,
 //     hit at three Dynamis. -prey: unmarked Sigma arm victim not farthest.
 //   -arm: Sigma arm line on a non-target. -glitch: pair out of range at
@@ -181,6 +182,19 @@
 // Regression ids; Sigma's tower helpers log no position (towers placed on
 // their soakers); 31638 is the boss monitor firing right. Built in replay.ts.
 //
+// VOD-CONFIRMED (user, 2026-11-15, first P5 VOD review of mndNDbvQzyW97qTj):
+// - Optical Laser edge clips count: Pull 13 9:45, DRK and SGE stood 7.7-7.8y
+//   off the centre line, "just barely clipped", their error (detection right).
+// - Delta monitors, Pull 24 9:52: SAM, the Loading (blue monitor) holder,
+//   aimed the wrong way (should point north and stand slightly more north),
+//   so both monitors covered the south pair: SCH and RDM took two cannons
+//   each, an extra source hit the centre stack (SAM, MNK, GNB). SAM's error;
+//   MNK/GNB are victims. Same signature, Loading holder + a Local hit twice +
+//   a non-Local hit, in C8bQAFtakJBYxM6n Pull 8, FqWyfQALBRhgcTkt Pulls 5 and
+//   13 (not VOD-checked). Clean volleys (K9nqQw6Z Pulls 7/10/14/17/18/20/25):
+//   four hits, one per Local, none on a non-Local. Probes:
+//   tools/ffxiv/top/delta-mon.js, delta-laser.js.
+//
 // -- RULES IMPLEMENTED --
 // ffxiv-top5-avoidable (Major on Damage Down or death, else Minor): Optical
 //   Laser, Swivel Cannon, Rear Lasers, Omega-F's stance and the clone combo.
@@ -195,7 +209,10 @@
 // ffxiv-top5-patch (targeted: each tether pair at its break): a failed
 //   Patch with both partners alive (ran out or broke early), both named.
 // ffxiv-top5-monitor: a Delta monitor on a non-Local player, everyone
-//   alive; an Omega monitor sit-out reached by a World jump names the
+//   alive, named as hit; but when the Loading (blue monitor) holder is
+//   found and a Local was hit twice, only the holder is named (aimed
+//   wrong; stack members their cannon hit are victims; user, 2026-11-15,
+//   Pull 24 9:52; one VOD pull); an Omega monitor sit-out reached by a World jump names the
 //   chain player who took no hit (fallout if they were dead, player-less
 //   with several).
 // ffxiv-top5-world: a player in another World's origin circle (the extra,
@@ -676,6 +693,7 @@ const ORIGIN_HITS  = [31625, 33040]; // Near / Distant World, the holder's own 8
 const BOUNCE_HITS  = [31626, 33041]; // the two jumps (4y circles)
 const WORLD_HITS   = [...ORIGIN_HITS, ...BOUNCE_HITS];
 const MONITOR      = 31597;
+const LOADING_A = 1003452, LOADING_B = 1003453; // Oversampled Wave Cannon Loading (blue monitor holder)
 const DOOM         = 1002519;
 const PREY         = 31604;
 const SIGMA_ARM    = 31602;
@@ -956,14 +974,32 @@ function detectMonitors(players: PlayerInfo[], life: Life, start: number, tether
   const delta = liveHits(players, life, [MONITOR], start + 55_000, start + 80_000);
   if (delta.length && local.length === 4 && players.every((p) => life.alive(p, delta[0].e.timestamp - 3000))) {
     const picked = uniq(delta.map((h) => h.p));
-    for (const p of picked.filter((x) => !local.includes(x))) {
-      const t = delta.find((h) => h.p === p)!.e.timestamp;
+    const extra = picked.filter((x) => !local.includes(x));
+    // The Loading holder aims the blue monitor, so a stack member their
+    // cannon hits is a victim of that aim (user, 2026-11-15, Pull 24 9:52:
+    // SAM, the holder, aimed at the wrong side so both monitors covered the
+    // south pair and the centre stack took the extra cannon: "SAM error",
+    // not MNK/GNB). Rests on ONE failed volley; clean volleys (K9nqQw6Z
+    // Pulls 7/10/14/17/18/20/25) have 4 hits, one per Local, none on a
+    // non-Local. Without a Loading holder the hit player is named as before.
+    const t0 = delta[0].e.timestamp;
+    const holder = players.find((q) => q.debuffs.some((d) => (d.abilityId === LOADING_A || d.abilityId === LOADING_B) && d.debuffStatus === "applied" && d.timestamp <= t0 && d.timestamp > t0 - 15_000));
+    const doubled = local.filter((q) => delta.filter((h) => h.p === q).length > 1);
+    // Only a doubled Local (the cannons covering one pair) marks a mis-aim;
+    // a lone non-Local hit stays as before (the Defense-target cases, H5/H13).
+    const misaim = !!holder && extra.length > 0 && doubled.length > 0;
+    for (const p of misaim ? [holder!] : extra) {
+      const t = (delta.find((h) => h.p === p) ?? delta.find((h) => extra.includes(h.p))!).e.timestamp;
       const doom = p.debuffs.some((d) => d.abilityId === DOOM && d.debuffStatus === "applied" && Math.abs(d.timestamp - t) <= 1500);
-      const died = deathsAfter(p, life, t);
+      const aimed = misaim;
+      const victims = extra.filter((q) => q !== holder);
+      const died = aimed ? [...victims, ...doubled].some((v) => deathsAfter(v, life, t)) : deathsAfter(p, life, t);
       const left = local.filter((q) => !picked.includes(q));
       errors.push(playerError(p, {
         ruleId: TOP5_MONITOR_RULE_ID, severity: doom || died ? "Major" : "Minor", name: "Took a Monitor",
-        description: `Took a Wave Cannon monitor without a Local tether${doom ? "; with Ruin already on them, got Doom" : ""}${died ? (doom ? " and died" : "; they died") : ""}.${left.length ? ` ${names(left.map((q) => q.name))} (Local) went unpicked.` : ""} Only the four Locals take monitors; Remotes stack for Pile Pitch away from them.`,
+        description: aimed
+          ? `Held the blue Wave Cannon monitor and aimed it the wrong way: both monitors covered the same pair of Locals, so ${names(doubled.map((q) => q.name))} took two each${victims.length ? `, and ${names(victims.map((q) => q.name))} in the Pile Pitch stack took the extra cannon` : ""}${died ? "; a Local died, breaking the tethers" : ""}.${left.length ? ` ${names(left.map((q) => q.name))} (Local) went unpicked.` : ""} The blue monitor points outward opposite Final's monitor, clear of the stack.`
+          : `Took a Wave Cannon monitor without a Local tether${doom ? "; with Ruin already on them, got Doom" : ""}${died ? (doom ? " and died" : "; they died") : ""}.${left.length ? ` ${names(left.map((q) => q.name))} (Local) went unpicked.` : ""} Only the four Locals take monitors; Remotes stack for Pile Pitch away from them.`,
         timestamp: t, abilityId: MONITOR, abilityName: "Oversampled Wave Cannon",
       }));
     }
