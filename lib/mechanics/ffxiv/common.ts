@@ -13,6 +13,11 @@
 // 1:05 were the pull already ending). A player-less Raid marker at the moment
 // the second healer died, which makes it the cutoff when nothing earlier is.
 // A kill means the boss died without them, so it never fires there.
+// Not when both are raised again afterwards (a raise cast before the second
+// healer died, then that healer raised in turn): the pull goes on (user,
+// 2026-11-25, 6GDBJ1WY8br7zCHk Pull 5 14:31, Dancing Mad). Matches 3 of ~550
+// both-dead moments across the ff reports on disk; a pending raise alone
+// (~35, mostly real wipes) is not enough.
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
@@ -42,11 +47,20 @@ function detectHealersDead(players: PlayerInfo[], deaths: DeathEvent[], isKill: 
     const own = deaths.filter((d) => d.player === h.name).sort((a, b) => a.timestamp - b.timestamp);
     return own.map((d, i) => {
       const next = own[i + 1]?.timestamp ?? Infinity;
-      return { start: d.timestamp - DEATH_EVENT_LAG_MS, end: rezzedAt(h, d.timestamp, next) ?? next - DEATH_EVENT_LAG_MS };
+      const rez = rezzedAt(h, d.timestamp, next);
+      return { start: d.timestamp - DEATH_EVENT_LAG_MS, end: rez ?? next - DEATH_EVENT_LAG_MS, raised: rez !== undefined };
     });
   });
-  const deadAt = (i: number, t: number) => out[i].some((w) => t >= w.start && t < w.end);
-  const t = out.flat().map((w) => w.start).sort((a, b) => a - b).find((x) => healers.every((_, i) => deadAt(i, x)));
+  const windowAt = (i: number, t: number) => out[i].find((w) => t >= w.start && t < w.end);
+  // Both dead, but each is raised afterwards (one healer's raise landed on
+  // the other before they too went down): the pull goes on, so that moment
+  // is no cutoff (user, 2026-11-25, 6GDBJ1WY8br7zCHk Pull 5 14:31: "They
+  // were able to be resurrected in sequence, so the party was able to
+  // continue the pull").
+  const t = out.flat().map((w) => w.start).sort((a, b) => a - b).find((x) => {
+    const ws = healers.map((_, i) => windowAt(i, x));
+    return ws.every((w) => w) && !ws.every((w) => w!.raised);
+  });
   if (t === undefined) return [];
   return [raidMarker(FF_HEALERS_DEAD_RULE_ID, "Both Healers Dead",
     `Both healers were dead at once (${joinNames(healers.map((h) => h.name))}) with no Red Mage or Summoner to raise them, so nobody could raise. Treated as the cutoff point.`,
