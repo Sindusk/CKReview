@@ -9,7 +9,8 @@
 //   ffxiv-limitcut-pushed-off-arena           Major  zero-ability (fall) death during
 //     the player's gaze debuff or within 10s after it
 //   ffxiv-limitcut-dead-during-mechanic       Raid   died between gaze check and dash
-//     set and never dash-hit (their clone re-fires); whole dash set skipped
+//     set and never dash-hit (their clone re-fires) AND the re-fire kills 2+
+//     others (else no marker); whole dash set skipped either way
 //   ffxiv-limitcut-wrong-dash-position        Major  single-victim dash landed away
 //     from its fitted slot, or on-angle but closer than r 1650; missing-player
 //     form (clone landed on someone else) skipped when the dash was dodged
@@ -163,6 +164,15 @@
 //     first dash to 10s after the last. The slot check then runs on the
 //     remaining dashes as usual. A clone that lands on someone else (the
 //     G7kTFVxjcAC6p1MN pull 12 retarget) is still flagged.
+//   - ffxiv-limitcut-dead-during-mechanic (2026-11-25, user, 6GDBJ1WY8br7zCHk
+//     Pull 8 8:51, "calls a wipe at 8:51, we went until 16:39"): Raid only
+//     when the re-fired clone(s) kill 2+ OTHER players within 6s of the dash
+//     set (gTkMH91DWRmLbNCn Pull 10: 2 killed, true wipe). Pull 8: fallen
+//     player raised 0.7s after the first dash, re-fire killed 1 -> no
+//     marker; the dash-set positional skip still applies. VERIFIED on two
+//     cases only. The re-fire victim's death is left unflagged.
+//   VOD review 2026-11-25 (user): 6GDBJ1WY8br7zCHk Pull 8 (cutoff only),
+//     ruling in expectations/rulings.json.
 //
 // ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
 // Not built:
@@ -187,6 +197,10 @@ export const LIMITCUT_PUSHED_OFF_RULE_ID   = "ffxiv-limitcut-pushed-off-arena";
 export const LIMITCUT_DASH_CLIP_RULE_ID    = "ffxiv-limitcut-dash-clipped-other-player";
 export const LIMITCUT_WRONG_POSITION_RULE_ID = "ffxiv-limitcut-wrong-dash-position";
 export const LIMITCUT_DEAD_DURING_MECHANIC_RULE_ID = "ffxiv-limitcut-dead-during-mechanic";
+// Re-fire kills counted from the first dash to this long after the last one
+// (gTkMH91DWRmLbNCn Pull 10 deaths landed 3.6s after the first dash).
+const REFIRE_DEATH_WINDOW_MS = 6000;
+const REFIRE_WIPE_MIN_KILLS = 2;
 
 const DASH_ABILITY_ID = 47844;
 
@@ -431,6 +445,24 @@ function detectDashErrors(
     ),
   ];
   if (deadPlayersMissingDash.length > 0) {
+    // user, 2026-11-25, 6GDBJ1WY8br7zCHk Pull 8 8:51: a fallen player raised
+    // 0.7s after the first dash, whose re-fired clone killed ONE other
+    // player, was not a wipe (the pull ran to 16:39). Only a re-fire that
+    // kills 2+ others (gTkMH91DWRmLbNCn Pull 10: 2 killed, all dead by
+    // 9:03) keeps the Raid marker; otherwise no marker, still skipping the
+    // positional analysis. Rests on two cases on disk.
+    const lastDashTime = Math.max(...hits.map((h) => h.timestamp));
+    const killedBySet = new Set(
+      deathEvents
+        .filter(
+          (d) =>
+            d.timestamp >= firstDashTime &&
+            d.timestamp <= lastDashTime + REFIRE_DEATH_WINDOW_MS &&
+            !deadPlayersMissingDash.includes(d.player)
+        )
+        .map((d) => d.player)
+    );
+    if (killedBySet.size < REFIRE_WIPE_MIN_KILLS) return [];
     return deadPlayersMissingDash.map((player) => ({
       ruleId:      LIMITCUT_DEAD_DURING_MECHANIC_RULE_ID,
       severity:    "Raid",

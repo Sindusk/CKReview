@@ -22,6 +22,13 @@
 //   checks (Flood included) stop at the first phase death. A deliberate
 //   Damage Down walk-off (no killing ability, no 0-HP hit, still holding
 //   1002911, raid reaches Phase 5) is skipped (BpAdkacQh63VCrRM Pull 5 14:15).
+//   A death after a donut resolution (Stray Flames 47907 / Stray Spray 47908)
+//   has gone off, with none cast after the lethal hit, is survivable and
+//   also skipped (a wipe before any donut logs none, so the donut must
+//   precede the death): circles only
+//   (47906 / 47909) are left (user, 2026-11-25, 6GDBJ1WY8br7zCHk Pull 3
+//   13:52). Checks continue with 7 alive; stack companions needed drop by
+//   the number of dead players.
 // Key thresholds:
 //   ISOLATION_THRESHOLD_YALMS = 7 (clean stack max 2.8y / clean spread min
 //     11.3y; failures 0.7, 1.7 and 16.2y, Vmbf6WYw3QGcMntx pull 20)
@@ -802,6 +809,19 @@ function detectFloodOfNaughtErrors(players: PlayerInfo[]): PullError[] {
 // Phase 4 (BpAdkacQh63VCrRM pull 3 PLD 14:11 and DRK 14:19, pull 6 DRK
 // 14:17) were in pulls that failed the Phase 4 HP check (no Ultima
 // Repeater) and are untouched — pull 6's starts the called wipe.
+//
+// RULES IMPLEMENTED (change, 2026-11-25): a death is not "the first phase
+// death" (no marker, no cutoff) when a donut resolution (47907 / 47908)
+// went off before its lethal hit and none after; see isSurvivableDeath for
+// the user's call.
+// Stack holders' MIN_STACK_COMPANIONS is lowered by the dead-player count at
+// the block. VERIFIED 2026-11-25 (12 reports on disk): exactly two markers
+// removed, 6GDBJ1WY8br7zCHk Pull 3 (RPR 13:52) and BpAdkacQh63VCrRM Pull 3
+// (SGE 13:53.7, donut 13:48.8); every other report and error unchanged.
+// Off disk: Vmbf6WYw3QGcMntx P20 / dQ8wmb1VhKt6yBXk P15 rulings need the
+// marker; unchecked.
+// VOD review 2026-11-25 (user): 6GDBJ1WY8br7zCHk Pulls 3, 5, 8 (cutoffs
+// only), rulings in expectations/rulings.json.
 
 
 /**
@@ -990,6 +1010,32 @@ function grandCrossStates(
  * pulls 3 and 6, the DRK and PLD) were in pulls that failed the Phase 4 HP
  * check, so they are untouched.
  */
+// Chaos's resolution casts encode their shape (matches the 1002056 decode on
+// all 16 P4 resolutions across 7 reports): Stray Flames 47906 circles / 47907
+// donut, Stray Spray 47908 donut / 47909 circles.
+const DONUT_RESOLUTION_ABILITY_IDS = new Set([47907, 47908]);
+
+/**
+ * A death with no donut resolution still to come does not end the phase
+ * (user, 2026-11-25, 6GDBJ1WY8br7zCHk Pull 3 13:52: "in pull 3, a death in
+ * p4 doesn't automatically wipe, it depends (heavy asterisk, if a donut
+ * hadn't gone off yet it's likely a wipe unless everyone knows, but in this
+ * case the twister hadn't gone off yet so the death didn't kill anyone
+ * extra)"). The donut (Stray Flames 47907 / Stray Spray 47908) had gone off
+ * at 13:48; only circles were left, so the RPR's Death Bomb death cost
+ * nothing further. Narrow: only a donut AFTER the lethal hit makes a death
+ * fatal to the phase; circles after it do not. VERIFIED on 6GDBJ1WY8br7zCHk
+ * Pull 3 (RPR 13:52, raid reached P5) and BpAdkacQh63VCrRM Pull 3 (SGE
+ * 13:53.7, donut 13:48.8; its cutoff moves to the next death).
+ */
+function isSurvivableDeath(lethalAt: number, enemyCastEvents: EnemyEvent[]): boolean {
+  // Also require the donut to have gone off BEFORE the death: a pull that
+  // wipes before its donut resolves logs no donut cast at all, and "no donut
+  // after" alone would wrongly call that death survivable.
+  const donuts = enemyCastEvents.filter((e) => DONUT_RESOLUTION_ABILITY_IDS.has(e.abilityId));
+  return donuts.some((e) => e.timestamp <= lethalAt) && !donuts.some((e) => e.timestamp > lethalAt);
+}
+
 function isDamageDownWalkOff(
   victim:          PlayerInfo | undefined,
   death:           DeathEvent,
@@ -1028,8 +1074,11 @@ function firstPhaseDeath(
       .sort((a, b) => b.timestamp - a.timestamp)[0];
 
   // Skip deliberate Damage Down walk-offs: not the death that ends the phase.
+  // Also skip a death after the donut has resolved (see isSurvivableDeath).
   const death = deaths.find(
-    (d) => !isDamageDownWalkOff(players.find((p) => p.name === d.player), d, lethalHitFor(d) !== undefined, enemyCastEvents)
+    (d) =>
+      !isDamageDownWalkOff(players.find((p) => p.name === d.player), d, lethalHitFor(d) !== undefined, enemyCastEvents) &&
+      !isSurvivableDeath(lethalHitFor(d)?.timestamp ?? d.timestamp, enemyCastEvents)
   );
   if (!death) return null;
 
@@ -1048,6 +1097,7 @@ function detectResolutionBlockErrors(
   crosses: GrandCross[],
   cutoff:  number,
   occurrences?: ReportedOccurrence[],
+  deathEvents: DeathEvent[] = [],
 ): PullError[] {
   // Every elemental application, tagged with the Grand Cross that applied it
   // and the removal (= expiry) that resolves it.
@@ -1119,6 +1169,11 @@ function detectResolutionBlockErrors(
     }
     if (positions.size < 2) continue; // no usable positions — unknown, not wrong
 
+    // A survivable earlier death (see isSurvivableDeath) leaves 7 alive: a
+    // stack holder then has one fewer possible companion per dead player.
+    const deadAtBlock = new Set(deathEvents.filter((d) => d.timestamp <= blockTime).map((d) => d.player)).size;
+    const minCompanions = Math.max(0, MIN_STACK_COMPANIONS - deadAtBlock);
+
     /** Nearest other player, and how many sit inside the isolation radius. */
     const neighbourhood = (actorId: number): { nearest: number; companions: number } | null => {
       const self = positions.get(actorId);
@@ -1156,7 +1211,7 @@ function detectResolutionBlockErrors(
       // one neighbour (see MIN_STACK_COMPANIONS).
       const resolvedCorrectly = mustSpread
         ? around.companions === 0
-        : around.companions >= MIN_STACK_COMPANIONS;
+        : around.companions >= minCompanions;
       if (resolvedCorrectly) continue;
 
       const cross = `Grand Cross ${el.grandCrossOrdinal}`;
@@ -1386,7 +1441,7 @@ export function detectKefkaSaysErrors(
   // even though the module treats everything past that point as fallout.
   const errors = [
     ...detectFloodOfNaughtErrors(players).filter((e) => e.timestamp <= cutoff),
-    ...detectResolutionBlockErrors(players, crosses, cutoff, occurrences),
+    ...detectResolutionBlockErrors(players, crosses, cutoff, occurrences, deathEvents),
     ...detectAccelerationBombErrors(players, crosses, cutoff, occurrences),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
